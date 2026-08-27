@@ -80,7 +80,11 @@ from fermentation.core.chemistry import M_ACETALDEHYDE, M_O2
 from fermentation.core.media import get_medium
 from fermentation.parameters import default_data_dir, load_parameters
 from fermentation.runtime.schedule import simulate_scheduled
-from fermentation.scenario.compile import CompiledScenario, compile_scenario
+from fermentation.scenario.compile import (
+    CompiledScenario,
+    amino_acid_dose_nitrogen_mgl,
+    compile_scenario,
+)
 from fermentation.scenario.schema import Intervention, Scenario, TemperaturePoint
 
 # ------------------------------------------------------------------------------------
@@ -294,6 +298,11 @@ def _wine_scenario(*, oak: bool, amino_acids_gpl: float) -> Scenario:
     }
     if amino_acids_gpl:
         initial["amino_acids_gpl"] = amino_acids_gpl
+    # D-244: ``yan_mgl`` is the must's TOTAL assimilable nitrogen and the amino-acid dose is
+    # carved OUT of it. This fixture was authored when the two channels ADDED, so it declares
+    # the sum -- which leaves its pitch state bit-for-bit and moves only the point Coleman's
+    # yield fit is evaluated at, which is the defect D-243 found.
+    initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
     interventions = [
         Intervention(day=_WINE_FERMENT_DAYS - 1.0, action="add_so2", params={"so2_mgl": 60.0}),
         Intervention(day=_WINE_FERMENT_DAYS, action="begin_aging"),
@@ -334,19 +343,40 @@ def _wine_scenario(*, oak: bool, amino_acids_gpl: float) -> Scenario:
 # direct-vs-burst separation these numbers feed is unchanged to 0.0045 percentage points.
 # Each moved value is recorded old -> new below and in the D-182 record. The three that did
 # NOT move beyond tolerance keep D-140's own numbers, untouched.
+# SIX OF THESE MOVED AGAIN AT D-244, and unlike D-182's ~2e-4 nudge one of them moved by
+# NINETY-SEVEN TIMES. The cause is the model, not the solver. This guard wine doses 0.5 g/L of
+# amino acids; before D-244 that nitrogen was carried on TOP of the declared 200 mg N/L, so the
+# run held 312.7 while Coleman's yield fit was evaluated at 200 (D-243 4). The fixture now
+# declares the total it actually carries, its pitch state is bit-for-bit what it was, and the
+# only thing that changed is the evaluation point: f_N 0.0622 -> 0.0934, so the must builds
+# fewer, more nitrogen-rich cells. Five slots absorb that as ~2e-4. PHENYLACETALDEHYDE does
+# not: fewer cells drain less phenylalanine, so the pool the aging Strecker route draws on
+# survives fermentation instead of being consumed, and the 2 y endpoint goes 2.30e-09 ->
+# 2.24e-07. That is the corrected yield showing up in an aroma marker, and it is the reason
+# this beat re-records rather than re-tolerances: no tolerance that admits 97x is a guard.
 _WINE_PINS: dict[str, tuple[float, float]] = {
     # slot: (value at 1 y, value at 2 y)
     # D-182: 1.444070363339e-05, 1.576919862838e-05 before the carbonic term.
-    "o2": (1.444363621566332e-05, 1.577233131562574e-05),
+    # D-244: 1.444363621566332e-05, 1.577233131562574e-05 at the pre-carve-out fit point.
+    "o2": (1.4446331736489804e-05, 1.5775032556729384e-05),
+    # Unmoved at D-244 (8.6e-06 / 1.8e-05 relative, inside the pin's own tolerance).
     "so2_total": (5.650150172989e-02, 5.286949820113e-02),
     # D-182: 1.517312917092e-03, 2.586921779751e-03 before the carbonic term.
-    "A420": (1.5176242482004844e-03, 2.5874482824764554e-03),
+    # D-244: 1.5176242482004844e-03, 2.5874482824764554e-03 at the pre-carve-out fit point.
+    "A420": (0.0015179040478392825, 0.002587920135601885),
     # D-182: 4.856388639843e-05, 1.032235022293e-04 before the carbonic term.
-    "acetaldehyde": (4.85736353454487e-05, 1.032442374762564e-04),
+    # D-244: 4.85736353454487e-05, 1.032442374762564e-04 at the pre-carve-out fit point.
+    "acetaldehyde": (4.858584422950734e-05, 0.0001032662376263802),
     # D-182: 2.394235591543e-07, 5.088022950883e-07 before the carbonic term.
-    "methional": (2.39472898361291e-07, 5.089058045079665e-07),
-    "phenylacetaldehyde": (1.084038787891e-09, 2.302542270316e-09),
-    "anthocyanin": (4.364843106077e-05, 1.140357095547e-06),
+    # D-244: 2.39472898361291e-07, 5.089058045079665e-07 at the pre-carve-out fit point.
+    "methional": (2.3951789206098536e-07, 5.089990907748021e-07),
+    # D-244: 1.084038787891e-09, 2.302542270316e-09 at the pre-carve-out fit point -- the 97x
+    # slot, and the one worth reading the header comment for.
+    "phenylacetaldehyde": (1.0551535973175389e-07, 2.2412978823174311e-07),
+    # D-244: 4.364843106077e-05, 1.140357095547e-06 at the pre-carve-out fit point.
+    "anthocyanin": (4.3645381603888625e-05, 1.14100858584033e-06),
+    # Unmoved at D-244 (7.5e-07 relative), as is ellagitannin (9.2e-08) -- neither reads the
+    # amino-acid pool, which is exactly why they are the controls for the six that did move.
     "faded_anthocyanin": (2.478027419280e-03, 2.479828995301e-03),
     "ellagitannin": (5.923487479412e-02, 5.997209704187e-02),
 }
@@ -599,21 +629,27 @@ def _copper_scenario(copper_gpl: float) -> Scenario:
     Runs only one day past the dose — the assertion is the INSTANTANEOUS draw at the dose, so
     integrating the aging tail would cost time and buy nothing.
     """
+    initial: dict[str, float] = {
+        "brix": 24.0,
+        "yan_mgl": 200.0,
+        "pitch_gpl": 0.25,
+        "anthocyanin_gpl": 0.3,
+        "tannin_gpl": 2.0,
+        "amino_acids_gpl": 0.5,
+        "copper_gpl": copper_gpl,
+        "tartaric_gpl": 6.0,
+        "malic_gpl": 3.0,
+        "initial_ph": 3.5,
+    }
+    # D-244: ``yan_mgl`` is the must's TOTAL assimilable nitrogen and the amino-acid dose is
+    # carved OUT of it. This fixture was authored when the two channels ADDED, so it declares
+    # the sum -- which leaves its pitch state bit-for-bit and moves only the point Coleman's
+    # yield fit is evaluated at, which is the defect D-243 found.
+    initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
     return Scenario(
         name=f"d149-copper-{copper_gpl:.3e}",
         medium="wine",
-        initial={
-            "brix": 24.0,
-            "yan_mgl": 200.0,
-            "pitch_gpl": 0.25,
-            "anthocyanin_gpl": 0.3,
-            "tannin_gpl": 2.0,
-            "amino_acids_gpl": 0.5,
-            "copper_gpl": copper_gpl,
-            "tartaric_gpl": 6.0,
-            "malic_gpl": 3.0,
-            "initial_ph": 3.5,
-        },
+        initial=initial,
         temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
         duration_days=_COPPER_FERMENT_DAYS + 1.0,
         closure="hermetic",
@@ -823,20 +859,26 @@ def _ph_scenario(*, initial_ph: float, so2_mgl: float) -> Scenario:
             0,
             Intervention(day=_PH_FERMENT_DAYS - 1.0, action="add_so2", params={"so2_mgl": so2_mgl}),
         )
+    initial: dict[str, float] = {
+        "brix": 24.0,
+        "yan_mgl": 200.0,
+        "pitch_gpl": 0.25,
+        "anthocyanin_gpl": 0.3,
+        "tannin_gpl": 2.0,
+        "amino_acids_gpl": 0.5,
+        "tartaric_gpl": 6.0,
+        "malic_gpl": 3.0,
+        "initial_ph": initial_ph,
+    }
+    # D-244: ``yan_mgl`` is the must's TOTAL assimilable nitrogen and the amino-acid dose is
+    # carved OUT of it. This fixture was authored when the two channels ADDED, so it declares
+    # the sum -- which leaves its pitch state bit-for-bit and moves only the point Coleman's
+    # yield fit is evaluated at, which is the defect D-243 found.
+    initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
     return Scenario(
         name=f"d150-ph{initial_ph:g}-so2{so2_mgl:g}",
         medium="wine",
-        initial={
-            "brix": 24.0,
-            "yan_mgl": 200.0,
-            "pitch_gpl": 0.25,
-            "anthocyanin_gpl": 0.3,
-            "tannin_gpl": 2.0,
-            "amino_acids_gpl": 0.5,
-            "tartaric_gpl": 6.0,
-            "malic_gpl": 3.0,
-            "initial_ph": initial_ph,
-        },
+        initial=initial,
         temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
         duration_days=_PH_FERMENT_DAYS + 1.0,
         closure="hermetic",

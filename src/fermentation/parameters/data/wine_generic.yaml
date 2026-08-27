@@ -756,6 +756,33 @@ biomass_N_yield_log_slope:
       reproduces Fig 4 at both 80 mg/L -> 24.8 g/g and 330 mg/L -> 10.1 g/g). The
       as-printed -3.61 would collapse Y_X/N to ~0 by 2 mg N/L, which is absurd.
 
+# The DOMAIN Coleman's regression was fitted over (decision D-244). These are transcribed
+# experimental facts -- the span of initial-nitrogen treatments in the trial -- not fitted
+# quantities, so both are PINNED ZERO-WIDTH (the acidbase.yaml idiom): a width here would be
+# invented. They exist because the regression is EXTRAPOLATED outside them and extrapolation
+# needs a stated edge rather than a literal in compile.py (prime directive 2).
+biomass_N_yield_fit_yan_min:
+  value: 70.0
+  unit: "mg N/L"
+  tier: validated
+  uncertainty: { low: 70.0, high: 70.0, note: "ZERO-WIDTH BY CONSTRUCTION: the low edge of the treatment span, a fact of the experimental design. The engine does NOT clamp at this edge -- below it f_N only DECREASES (monotone in YAN) and its infimum as YAN->0 is 1/exp(a0) = 1/exp(3.50) = 0.0302 g N/g cell, which stays inside biomass_N_fraction's [0.03, 0.15] bracket and inside physiology. Recorded so the asymmetry with the max below is legible, and so a future low-side policy has an edge to name." }
+  provenance:
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884, Fig 4 + Table A2"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; lowest initial-nitrogen treatment of the Y_X/N regression"
+    notes: "The coefficient entries above cite 'the real 70-350 mg N/L range' in prose; this is that statement given provenance so code can read it. Cross-checks in the same notes: 80 mg N/L -> Y_X/N 24.8 g/g and 330 mg N/L -> 10.1 g/g, both inside this span and both matching Fig 4."
+
+biomass_N_yield_fit_yan_max:
+  value: 350.0
+  unit: "mg N/L"
+  tier: validated
+  uncertainty: { low: 350.0, high: 350.0, note: "ZERO-WIDTH BY CONSTRUCTION -- see biomass_N_yield_fit_yan_min. This edge IS enforced: above it the compile seam HOLDS the fit at this evaluation point and drops the derived biomass_N_fraction to SPECULATIVE (decision D-244). Do NOT re-read that hold as a physiological saturation claim -- no source here says Y_X/N plateaus; it is the epistemic rule that a regression is not evaluated outside the domain it was fitted on, and the tier is what carries the admission." }
+  provenance:
+    source: "Coleman, Fish & Block 2007, Appl. Environ. Microbiol. 73(18):5875-5884, Fig 4 + Table A2"
+    doi: "10.1128/aem.00670-07"
+    conditions: "Premier Cuvee, Chardonnay must; highest initial-nitrogen treatment of the Y_X/N regression"
+    notes: "Extrapolating past this edge is what made a summed nitrogen budget impossible before D-244: unheld, f_N leaves biomass_N_fraction's [0.03, 0.15] bracket at 444.0 mg N/L and reaches 0.379 (cells 38 % nitrogen) at 700.9, so a high-YAN must did not compile AT ALL -- it raised an opaque band ValidationError naming neither nitrogen nor Coleman (D-243 measured the arithmetic; D-244 measured the refusal)."
+
 # -- Temperature-/metabolism-driven aroma byproducts (Milestone 2, decision D-19) --
 # Esters and fusel (higher) alcohols: trace pools whose run-integrated total RISES with
 # temperature (warm ferments are estery/fusel-heavy). SOURCED in the D-19 sourcing step

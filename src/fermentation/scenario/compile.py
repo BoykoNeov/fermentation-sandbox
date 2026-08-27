@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fermentation.core import acidbase
-from fermentation.core.chemistry import sugar_species
+from fermentation.core.chemistry import nitrogen_mass_fraction, sugar_species
 from fermentation.core.kinetics import (
     AcetaldehydeBridgedCondensation,
     AceticAcidOverflow,
@@ -123,6 +123,12 @@ from fermentation.units.convert import (
 #: Coleman Y_X/N regression coefficients (decision D-14). Present iff a medium
 #: ships the nitrogen-dependent biomass yield; gates the compile-time override.
 _N_YIELD_COEFFS = ("biomass_N_yield_log_intercept", "biomass_N_yield_log_slope")
+
+#: The upper edge of the domain that regression was FITTED over (decision D-244). Above it the
+#: compile seam holds the evaluation point here and drops the derived tier to speculative — see
+#: :func:`_apply_nitrogen_dependent_yield`. Absent ⇒ no hold (an older parameter set still
+#: compiles, at the pre-D-244 extrapolating behaviour).
+_N_YIELD_FIT_MAX = "biomass_N_yield_fit_yan_max"
 
 
 @dataclass(frozen=True)
@@ -947,6 +953,85 @@ def _wine_amino_acids(values: Mapping[str, float], parameters: ParameterSet) -> 
     return pools
 
 
+def amino_acid_nitrogen_gpl(pools: Mapping[str, float]) -> float:
+    """Nitrogen [g N/L] carried by the eight speciated amino-acid pools (decision D-244).
+
+    Weighted at each pool's OWN species — the same weights
+    :func:`~fermentation.validation.conservation.total_nitrogen` uses, read off the same
+    registry, so the carve-out below and the conservation check can never disagree about how
+    much nitrogen a dose is. A ninth pool joins both at once or neither.
+    """
+    return sum(
+        pools.get(spec.pool, 0.0) * nitrogen_mass_fraction(spec.species)
+        for spec in AMINO_ACID_SPECS
+    )
+
+
+def amino_acid_dose_nitrogen_mgl(
+    initial: Mapping[str, float],
+    *,
+    medium: str = "wine",
+    strain: str = "generic",
+    data_dir: str | Path | None = None,
+) -> float:
+    """Nitrogen [mg N/L] an ``initial`` block's amino-acid dose carries — the D-244 migration aid.
+
+    Answers the one question a pre-D-244 scenario has to answer to keep meaning what it meant:
+    *how much of my nitrogen was the amino-acid dose?* Before D-244 the dose ADDED to ``yan_mgl``,
+    so a scenario migrates by declaring the sum::
+
+        initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
+
+    which leaves the pitch state bit-for-bit identical — the carve-out hands the ``N`` slot back
+    exactly the ammonium it had — and changes only the point Coleman's yield fit is evaluated at,
+    which is precisely the defect D-243 §4 found. Honours the per-species override keys, so a
+    "hold the must, spike the leucine" scenario migrates by its own real nitrogen, not the
+    spectrum's nominal share.
+    """
+    path = (
+        Path(data_dir) if data_dir is not None else default_data_dir()
+    ) / f"{medium}_{strain}.yaml"
+    pools = _wine_amino_acids(initial, load_parameters(path))
+    return amino_acid_nitrogen_gpl(pools) * 1000.0
+
+
+def _wine_ammonium_gpl(yan_mgl: float, pools: Mapping[str, float]) -> float:
+    """The ``N`` slot: the declared YAN **minus** its amino-acid share (decision D-244).
+
+    ``yan_mgl`` is a must's **total** assimilable nitrogen — the number a lab reports, ammonium
+    plus free α-amino nitrogen, proline excluded because it is not assimilated anaerobically
+    (the exclusion :data:`~fermentation.core.kinetics.amino_acid_pools.AMINO_ACID_SPECS` already
+    honours). The speciated pools hold the amino-acid share of that total, so the ``N`` slot —
+    which is the ammonium remainder — is what is left after carving them out.
+
+    **This is a correction, not a convention change** (D-243 §4 found it, D-244 repairs it).
+    Before D-244 the two channels ADDED: a wine declaring 250 mg N/L and dosing 0.5 g/L amino
+    acids carried 362.7 mg N/L of assimilable nitrogen, declared 250, and had its Coleman yield
+    fit evaluated at the 250 — more nitrogen *and* a yield fitted for a poorer must, compounding.
+    D-32's own premise ("amino acids are part of YAN") is what this implements.
+
+    Refuses rather than clamping when the dose out-runs the declaration: a must cannot hold more
+    amino-acid nitrogen than it has assimilable nitrogen, and silently flooring the ammonium at
+    zero would put the run back into the state D-243 named — carrying nitrogen it never declared.
+    There is deliberately **no minimum-ammonium floor**: real musts always carry some ammonium,
+    but no sourced figure says how much, so an ammonium-poor must stays legal and its residual
+    sugar is the honest output.
+    """
+    declared = mgl_to_gpl(yan_mgl)
+    amino = amino_acid_nitrogen_gpl(pools)
+    if amino > declared:
+        raise ValueError(
+            f"wine scenario.initial: the amino-acid dose carries {amino * 1000.0:.1f} mg N/L, "
+            f"more than the declared yan_mgl={yan_mgl:g}. Since decision D-244 yan_mgl is the "
+            "must's TOTAL assimilable nitrogen and the amino-acid pools are the share of it "
+            "that is amino acids, so the dose cannot exceed it. Raise yan_mgl to at least "
+            f"{math.ceil(amino * 1000.0)} (its previous meaning was ammonium-only, so a "
+            "pre-D-244 scenario migrates by ADDING the dose's nitrogen to its declared YAN) "
+            "or lower amino_acids_gpl."
+        )
+    return declared - amino
+
+
 def _wine_initial(
     values: Mapping[str, float], temperature_k: float, parameters: ParameterSet
 ) -> _Initial:
@@ -970,11 +1055,17 @@ def _wine_initial(
     # (inverse anchoring): D-18 predicts pH *changes*, not absolute initial pH.
     tartaric = _optional(values, "tartaric_gpl", 0.0)
     malic = _optional(values, "malic_gpl", 0.0)
+    # The amino-acid pools are seeded BEFORE the ammonium slot because they are PART of the
+    # declared YAN and are carved OUT of it (decision D-244): ``yan_mgl`` is the must's total
+    # assimilable nitrogen, exactly what a lab measures, and the speciated pools hold the
+    # amino-acid share of it. Before D-244 the two channels ADDED, so a wine declaring 250 mg N/L
+    # and dosing 0.5 g/L carried 362.7 and said nothing (D-243 §4).
+    amino_pools = _wine_amino_acids(values, parameters)
     initial: _Initial = {
         "X": _require(values, "pitch_gpl", "wine"),
         "S": [sugar_gpl],
         "E": _optional(values, "ethanol_gpl", 0.0),
-        "N": mgl_to_gpl(_require(values, "yan_mgl", "wine")),
+        "N": _wine_ammonium_gpl(_require(values, "yan_mgl", "wine"), amino_pools),
         "T": temperature_k,
         "CO2": 0.0,
         "X_dead": 0.0,  # no inactivated biomass at pitch
@@ -1092,8 +1183,9 @@ def _wine_initial(
         # :func:`_wine_amino_acids`. Carbon- AND nitrogen-bearing (every pool is weighted in both
         # ledgers); inert at 0 and the compile step below disables the amino-acid Processes
         # entirely when the dose is 0, so an undosed run is byte-for-byte the validated core
-        # (tier + perf isolability, the MLF/carrying pattern).
-        **_wine_amino_acids(values, parameters),
+        # (tier + perf isolability, the MLF/carrying pattern). Since D-244 the dose is carved
+        # out of ``yan_mgl`` rather than added on top of it, so the pools are computed above.
+        **amino_pools,
         # Non-assimilable cell-wall debris pool (decision D-34); produced-only, empty at pitch.
         # YeastAutolysis routes the carbon-rich remainder of autolysed dead biomass here after
         # releasing the nitrogen-rich amino acids; inert (weight 0) until autolysis is opted in.
@@ -1687,6 +1779,26 @@ def _apply_nitrogen_dependent_yield(scenario: Scenario, parameters: ParameterSet
 
     Gated on the regression coefficients being present, so a medium without them
     (beer) keeps the static elemental ``biomass_N_fraction`` untouched.
+
+    **The evaluation point is the declared YAN, and since D-244 that IS the run's total
+    assimilable nitrogen** — ``_wine_ammonium_gpl`` carves the amino-acid pools out of it rather
+    than letting them add on top, so the fit no longer reads a poorer must than the one being
+    simulated (D-243 §4 found that gap; this is its other half).
+
+    **Held at the fit's upper edge above** ``biomass_N_yield_fit_yan_max`` **(decision D-244).**
+    ``ln(Y_X/N)`` falls linearly in YAN, so extrapolating upward grows ``f_N`` without bound:
+    unheld it leaves the bracket below at 444.0 mg N/L and reaches 0.379 g N/g cell — cells 38 %
+    nitrogen — by 700.9. The hold is an **epistemic** rule, not a physiological claim: a
+    regression is not evaluated outside the domain it was fitted on. What carries the admission
+    is the **tier**, dropped to ``SPECULATIVE`` whenever the hold bites, so it propagates
+    lowest-of-inputs into every quantity the run derives from biomass. **Do not read the hold as
+    saturation of ``Y_X/N`` — no source here says that**, and a sourced high-nitrogen yield curve
+    would replace the hold rather than confirm it.
+
+    The **low** edge is deliberately NOT held. ``f_N`` is monotone increasing in YAN, so below the
+    fitted span it only falls, with infimum ``1/exp(a0) = 0.0302`` as YAN → 0 — inside the bracket
+    and inside physiology. A low hold would also move Varela's 50 mg N/L arm, the project's only
+    independent wine dataset (D-56's firewall), for no epistemic gain.
     """
     if not all(name in parameters for name in _N_YIELD_COEFFS):
         return parameters
@@ -1695,13 +1807,17 @@ def _apply_nitrogen_dependent_yield(scenario: Scenario, parameters: ParameterSet
         return parameters
 
     a0, a1 = (parameters[name] for name in _N_YIELD_COEFFS)
-    y_xn = math.exp(a0.value + a1.value * float(yan_mgl))  # g cell / g N
+    declared = float(yan_mgl)
+    fit_max = parameters[_N_YIELD_FIT_MAX].value if _N_YIELD_FIT_MAX in parameters else math.inf
+    evaluated_at = min(declared, fit_max)
+    held = evaluated_at < declared
+    y_xn = math.exp(a0.value + a1.value * evaluated_at)  # g cell / g N
     f_n = 1.0 / y_xn
     override = Parameter(
         name="biomass_N_fraction",
         value=f_n,
         unit="g/g",
-        tier=combine((a0.tier, a1.tier)),
+        tier=combine((a0.tier, a1.tier, *((Tier.SPECULATIVE,) if held else ()))),
         uncertainty=Uncertainty(
             # Bracketing metadata, not a tuned value: f_N = 1/Y_X/N ranges
             # ~0.039-0.107 across Coleman's 70-350 mg N/L treatment span
@@ -1714,13 +1830,27 @@ def _apply_nitrogen_dependent_yield(scenario: Scenario, parameters: ParameterSet
             source=a0.provenance.source,
             doi=a0.provenance.doi,
             conditions=(
-                f"computed at compile from Coleman Y_X/N regression at YAN={float(yan_mgl):g} mg/L"
+                f"computed at compile from Coleman Y_X/N regression at YAN={evaluated_at:g} mg/L"
+                + (
+                    f" — HELD at the fit's upper edge; the scenario declares {declared:g} mg/L, "
+                    "outside the domain the regression was fitted on (decision D-244)"
+                    if held
+                    else ""
+                )
             ),
             notes=(
-                f"Y_X/N = exp({a0.value} + {a1.value}*{float(yan_mgl):g}) = {y_xn:.2f} g cell/g N; "
+                f"Y_X/N = exp({a0.value} + {a1.value}*{evaluated_at:g}) = {y_xn:.2f} g cell/g N; "
                 f"f_N = 1/Y_X/N = {f_n:.4f} g N/g cell. Overrides the static elemental "
                 "biomass_N_fraction so a nitrogen-limited must builds realistically little "
                 "biomass (decision D-14)."
+                + (
+                    f" EXTRAPOLATION HELD (D-244): declared YAN {declared:g} > "
+                    f"biomass_N_yield_fit_yan_max {fit_max:g}, so the fit is evaluated at the "
+                    "edge and this parameter's tier is dropped to speculative. That is an "
+                    "epistemic hold, NOT a claim that Y_X/N saturates."
+                    if held
+                    else ""
+                )
             ),
         ),
     )

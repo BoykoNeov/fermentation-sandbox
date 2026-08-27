@@ -36,7 +36,12 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import simulate
-from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.scenario import (
+    Scenario,
+    TemperaturePoint,
+    amino_acid_dose_nitrogen_mgl,
+    compile_scenario,
+)
 from fermentation.validation import assert_conserved, total_carbon, total_nitrogen
 
 #: The must-spectrum share each pool receives of an ``amino_acids_gpl`` dose (D-100),
@@ -293,6 +298,11 @@ def _run(
     if carrying_capacity_gpl is not None:
         initial["carrying_capacity_gpl"] = carrying_capacity_gpl
     initial.update(overrides)
+    # D-244: ``yan_mgl`` is the must's TOTAL assimilable nitrogen and the amino-acid dose is
+    # carved OUT of it. This fixture was authored when the two channels ADDED, so it declares
+    # the sum -- which leaves its pitch state bit-for-bit and moves only the point Coleman's
+    # yield fit is evaluated at, which is the defect D-243 found.
+    initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
     scenario = Scenario(
         name=f"wine-aa-{yan_mgl:.0f}-{amino_acids_gpl or 0:.1f}",
         medium="wine",
@@ -365,6 +375,18 @@ def test_dose_behaves_like_supplementary_yan():
     # The emergent (second-order) effect: growth's derivatives are untouched, but the swap
     # refunds ammonium N, so the pool growth reads is replenished on the next step — dosing amino
     # acids acts like extra YAN, building more biomass. Directional, not a fit value.
+    #
+    # D-244 SHRANK THE MARGIN and the pin is now two-sided rather than a floor. The dosed wine's
+    # pitch state is unchanged (it declares the total it always carried), but its yield fit is no
+    # longer evaluated at 80 mg N/L — it reads 530.9, held at Coleman's 350 edge, so f_N goes
+    # 0.0439 → 0.1068 and the same swapped nitrogen builds less than half the cells. The effect
+    # survives (the dose still adds biomass) at 1.044x where it used to clear 1.05x. Lowering the
+    # floor to 1.03 and stopping there would let the effect decay to nothing unnoticed, which is
+    # the whole claim, so the upper edge is pinned too.
     peak_undosed = float(np.max(_run(80.0)[0].series("X")))
     peak_dosed = float(np.max(_run(80.0, amino_acids_gpl=2.0)[0].series("X")))
-    assert peak_dosed > peak_undosed * 1.05  # materially more biomass with the aa dose
+    assert peak_dosed / peak_undosed == pytest.approx(1.044, abs=5e-3), (
+        f"the amino-acid dose now builds {peak_dosed / peak_undosed:.4f}x the undosed biomass, "
+        "not the characterized 1.044x — the D-32 swap's contribution to growth moved"
+    )
+    assert peak_dosed > peak_undosed, "the dose no longer adds biomass at all — the swap is dead"

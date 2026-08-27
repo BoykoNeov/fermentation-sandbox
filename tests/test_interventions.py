@@ -28,7 +28,13 @@ from fermentation.core.kinetics.carbon_routing import ESTER_SPECS, FUSEL_SPECS
 from fermentation.core.tiers import Tier
 from fermentation.runtime import simulate
 from fermentation.runtime.schedule import ScheduledTrajectory
-from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
+from fermentation.scenario import (
+    Intervention,
+    Scenario,
+    TemperaturePoint,
+    amino_acid_dose_nitrogen_mgl,
+    compile_scenario,
+)
 from fermentation.units.convert import mgl_to_gpl
 from fermentation.validation.conservation import total_carbon, total_nitrogen
 
@@ -402,18 +408,24 @@ def test_dap_dose_and_rack_conserve_carbon_and_nitrogen_across_all_jumps():
 def _mlf_so2_rack(rack_fraction: float) -> Scenario:
     # Co-inoculate O. oeni with amino acids (so X_mlf grows), SO₂ at day 5 to kill some bacteria
     # (so X_mlf_dead accumulates while viable X_mlf remains), then a day-7 rack draws both off.
+    initial: dict[str, float] = {
+        "brix": 22.0,
+        "yan_mgl": 200.0,
+        "pitch_gpl": 0.25,
+        "malic_gpl": 3.0,
+        "initial_ph": 3.5,
+        "mlf_pitch_gpl": 0.2,
+        "amino_acids_gpl": 1.0,
+    }  # fmt: skip
+    # D-244: ``yan_mgl`` is the must's TOTAL assimilable nitrogen and the amino-acid dose is
+    # carved OUT of it. This fixture was authored when the two channels ADDED, so it declares
+    # the sum -- which leaves its pitch state bit-for-bit and moves only the point Coleman's
+    # yield fit is evaluated at, which is the defect D-243 found.
+    initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
     return Scenario(
         name="mlf-rack",
         medium="wine",
-        initial={
-            "brix": 22.0,
-            "yan_mgl": 200.0,
-            "pitch_gpl": 0.25,
-            "malic_gpl": 3.0,
-            "initial_ph": 3.5,
-            "mlf_pitch_gpl": 0.2,
-            "amino_acids_gpl": 1.0,
-        },  # fmt: skip
+        initial=initial,
         temperature_schedule=[TemperaturePoint(day=0.0, celsius=22.0)],
         interventions=[
             Intervention(day=5.0, action="add_so2", params={"so2_mgl": 40.0}),

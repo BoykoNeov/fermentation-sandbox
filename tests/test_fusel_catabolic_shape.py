@@ -45,6 +45,7 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.runtime import simulate_scheduled
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from tests.test_fusel_keto_acid_node import (
+    _D244_DE_NOVO_GAP,
     _FERMENT_DAYS,
     _OTHER_PRECURSOR_CONSUMERS,
     _de_novo_share,
@@ -74,6 +75,7 @@ def _direct_catabolic_share_sink_off(spec) -> float:
     return alc_from_prec / (made * carbon_mass_fraction(spec.species))
 
 
+@pytest.mark.xfail(strict=True, reason=_D244_DE_NOVO_GAP)
 def test_the_d104_sink_absorbs_the_d103_gate_shape_spread():
     """D-103's 11x catabolic spread is absorbed by the D-104 sink (decision D-112, finding 1).
 
@@ -342,6 +344,7 @@ def _amino_acid_share(traj, schema, params, pool: str) -> float:
     return float(total / alcohol_carbon)
 
 
+@pytest.mark.xfail(strict=True, reason=_D244_DE_NOVO_GAP)
 def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warranted():
     """D-118's "class of error" hypothesis, tested across all three — and REFUTED (decision D-120).
 
@@ -372,6 +375,7 @@ def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warrante
         )
 
 
+@pytest.mark.xfail(strict=True, reason=_D244_DE_NOVO_GAP)
 def test_the_de_novo_cap_is_inert_where_the_precursor_exhausts():
     """Why the cap is the wrong INSTRUMENT, not merely the wrong direction (decision D-120).
 

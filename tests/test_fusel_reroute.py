@@ -31,7 +31,12 @@ from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import simulate
-from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.scenario import (
+    Scenario,
+    TemperaturePoint,
+    amino_acid_dose_nitrogen_mgl,
+    compile_scenario,
+)
 from fermentation.validation import assert_conserved, total_carbon, total_nitrogen
 from tests.conftest import seed_amino_acids
 
@@ -360,6 +365,11 @@ def _run(yan_mgl: float, *, amino_acids_gpl: float | None = None, days: float = 
     initial: dict[str, float] = {"brix": 24.0, "yan_mgl": yan_mgl, "pitch_gpl": 0.25}
     if amino_acids_gpl is not None:
         initial["amino_acids_gpl"] = amino_acids_gpl
+    # D-244: ``yan_mgl`` is the must's TOTAL assimilable nitrogen and the amino-acid dose is
+    # carved OUT of it. This fixture was authored when the two channels ADDED, so it declares
+    # the sum -- which leaves its pitch state bit-for-bit and moves only the point Coleman's
+    # yield fit is evaluated at, which is the defect D-243 found.
+    initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
     scenario = Scenario(
         name=f"wine-fusel-reroute-{yan_mgl:.0f}",
         medium="wine",
@@ -512,15 +522,29 @@ _ROLLERO_ESTER = 0.04
 
 
 def _rollero_run(amino_acids_gpl: float, *, days: float = 14.0):
+    initial: dict[str, float] = {
+        "brix": 24.0,
+        "yan_mgl": _ROLLERO_YAN,
+        "pitch_gpl": 0.25,
+        "amino_acids_gpl": amino_acids_gpl,
+    }
+    # D-244: ``yan_mgl`` is the must's TOTAL assimilable nitrogen and the amino-acid dose is
+    # carved OUT of it. This fixture was authored when the two channels ADDED, so it declares
+    # the sum -- which leaves its pitch state bit-for-bit and moves only the point Coleman's
+    # yield fit is evaluated at, which is the defect D-243 found.
+    initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
+    # AND IT IS ALSO WHERE D-244 FOUND A LIVE COMMENSURABILITY VIOLATION, recorded and NOT
+    # repaired here. The comment on the YAN constant above forbids scoring a richer must than
+    # the paper's, citing D-104. Because the two nitrogen channels ADDED before D-244, this
+    # probe was doing exactly that -- and the migration keeps it doing so, because the
+    # alternative (hold the declared total at the paper's number and carve the dose out of it)
+    # would substitute a GRAPE-must nitrogen partition for a DEFINED SYNTHETIC medium whose
+    # composition is in the paper and not in this repo. Preserving the validated pitch state
+    # is the honest move; closing the gap needs the paper.
     scenario = Scenario(
         name=f"d115-enrichment-{amino_acids_gpl}",
         medium="wine",
-        initial={
-            "brix": 24.0,
-            "yan_mgl": _ROLLERO_YAN,
-            "pitch_gpl": 0.25,
-            "amino_acids_gpl": amino_acids_gpl,
-        },
+        initial=initial,
         temperature_schedule=[TemperaturePoint(day=0.0, celsius=_ROLLERO_TEMP)],
         duration_days=days,
     )
@@ -587,11 +611,22 @@ def test_the_ester_carries_valine_label_at_its_parent_alcohols_enrichment():
         f"model ester enrichment {ester:.4f} is not even the right order against Rollero's "
         f"~{_ROLLERO_ESTER:.2f} - something structural, not a calibration drift"
     )
-    # And the alcohol's own gap is UNCHANGED by this beat: still just under D-111's band.
-    lo, _hi = _ROLLERO_ALCOHOL_BAND
-    assert 0.5 * lo < alcohol < lo, (
-        f"alcohol enrichment {alcohol:.4f} moved out of its known just-under-band position - "
-        "the re-route was supposed to cost the alcohol pool almost nothing (mass-negligible)"
+    # THE ALCOHOL ENTERED ITS BAND AT D-244, and that is worth stating as a gain rather than
+    # buried as a re-record. It ran at ~0.018, just UNDER D-111's measured 2.1-7.5 %, for as
+    # long as this probe existed. Correcting the yield fit's evaluation point (this must
+    # declares 475.4 mg N/L and is fitted there, not at 250) roughly halves the biomass, so
+    # de-novo synthesis dilutes the valine label less and the enrichment rises to 0.0264 --
+    # inside the band. Pinned two-sided INSIDE it now; the old just-under assertion would
+    # forbid the improvement.
+    lo, hi = _ROLLERO_ALCOHOL_BAND
+    assert lo < alcohol < hi, (
+        f"alcohol enrichment {alcohol:.4f} left D-111's measured 2.1-7.5 % band, which it "
+        "entered at D-244 - the re-route was supposed to cost the alcohol pool almost "
+        "nothing (mass-negligible)"
+    )
+    assert alcohol == pytest.approx(0.0264, abs=1e-3), (
+        f"alcohol enrichment {alcohol:.4f} moved off its D-244 position inside the band - "
+        "the band alone is 3.6x wide and would not notice"
     )
 
 

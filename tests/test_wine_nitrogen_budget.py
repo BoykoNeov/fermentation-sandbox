@@ -54,6 +54,7 @@ import numpy as np
 import pytest
 
 from fermentation.core.chemistry import nitrogen_mass_fraction
+from fermentation.core.tiers import Tier
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
 from fermentation.scenario.compile import CompiledScenario
 from fermentation.validation import assert_conserved, total_nitrogen
@@ -145,64 +146,104 @@ def test_the_amino_acid_channel_census_names_every_nitrogen_bearing_pool():
     )
 
 
-def test_the_yield_fit_is_evaluated_at_the_declared_yan_not_the_run_s_actual_nitrogen():
-    """Forbid the two-channel gap being closed, widened, or restated without a decision.
+def test_the_declared_yan_is_the_run_s_actual_assimilable_nitrogen_and_the_fit_point():
+    """The D-243 gap, CLOSED at D-244 — and pinned so it cannot silently re-open.
 
-    ``biomass_N_fraction`` is overridden at compile from Coleman's regression evaluated at
-    ``yan_mgl`` alone (D-14). Dosing ``amino_acids_gpl`` adds assimilable nitrogen that the
-    growth Process eventually reaches through the D-32 swap, so the run's nitrogen leaves the
-    point its own yield was fitted at. The two errors compound in the same direction: more
-    nitrogen, and a yield appropriate to a poorer must.
+    **This test is the inverse of the one it replaces.** D-243 found two entry channels and one
+    evaluation point: ``yan_mgl`` seeded the ammonium slot *and* was where Coleman's regression
+    was evaluated, while ``amino_acids_gpl`` seeded eight more nitrogen-bearing pools on top, so
+    a wine declaring 250 mg N/L carried 362.7 and had its yield fitted for the poorer must. The
+    predecessor pinned that gap at 1.45x. D-244 makes ``yan_mgl`` the must's TOTAL assimilable
+    nitrogen and carves the amino-acid pools out of it, so all three numbers collapse onto each
+    other: declared == actual == the point the fit is evaluated at.
 
-    Pinned at the suite's commonest dose. A RED here means one of three things, and the message
-    should say which: the fit moved to total nitrogen (the repair — update D-243), the channels
-    started partitioning (also the repair), or the must amino-acid spectrum moved and changed how
-    much nitrogen 0.5 g/L carries (re-measure, do not re-band).
+    A RED here means the carve-out broke. The three assertions fail for different causes and say
+    so: the ammonium remainder is wrong (``_wine_ammonium_gpl``), the channel census misses a
+    pool (see the census test), or the fit stopped reading the declared total.
     """
     compiled = compile_scenario(_wine(amino_acids_gpl=0.5), strict=True)
     ammonium, amino = _channel_nitrogen(compiled)
-    declared_mgl = ammonium * 1000.0
+    declared_mgl = 250.0
     actual_mgl = (ammonium + amino) * 1000.0
 
-    assert declared_mgl == pytest.approx(250.0, abs=1e-9), (
-        "the ammonium channel is no longer the declared yan_mgl"
+    assert actual_mgl == pytest.approx(declared_mgl, abs=1e-9), (
+        f"a wine declaring yan_mgl=250 with amino_acids_gpl=0.5 carries {actual_mgl:.4f} mg N/L "
+        "of assimilable nitrogen. Since D-244 the declaration IS the total, so any difference "
+        "is the carve-out failing — not a channel to re-characterize"
     )
-    assert actual_mgl == pytest.approx(362.7, abs=0.5), (
-        f"a wine declaring yan_mgl=250 with amino_acids_gpl=0.5 now carries {actual_mgl:.1f} "
-        "mg N/L of assimilable nitrogen, not the characterized 362.7 — the amino-acid channel's "
-        "nitrogen content moved"
+    # The carve-out is a SPLIT of one number, so pin both halves, not just the sum: a sum that
+    # closes with both halves wrong is exactly what a one-sided read would miss.
+    assert amino * 1000.0 == pytest.approx(112.7, abs=0.5), (
+        f"the amino-acid channel carries {amino * 1000.0:.1f} mg N/L, not the characterized "
+        "112.7 — the must amino-acid spectrum moved; re-measure, do not re-band"
     )
-    assert actual_mgl / declared_mgl == pytest.approx(1.451, abs=5e-3), (
-        "the declared-vs-actual nitrogen ratio moved off its characterized 1.45x"
+    assert ammonium * 1000.0 == pytest.approx(137.3, abs=0.5), (
+        f"the ammonium remainder is {ammonium * 1000.0:.1f} mg N/L, not the characterized 137.3"
     )
 
-    # The fit is evaluated at the DECLARED number. This is the defect, pinned as an equality
-    # against a recompile at the SAME declared YAN with no dose — not against a literal, so the
-    # regression's own coefficients may move without touching this claim.
+    # The fit is evaluated at that same total. Asserted as an equality against a recompile of an
+    # UNDOSED wine at the same declared YAN — not against a literal — so Coleman's coefficients
+    # may move without touching the claim. Note this equality held before D-244 too and meant the
+    # OPPOSITE thing: there it said the fit ignored the dose, here it says the dose is inside the
+    # number the fit reads. The two halves above are what tell them apart.
     undosed = compile_scenario(_wine(amino_acids_gpl=0.0), strict=True)
     assert (
         compiled.param_values["biomass_N_fraction"] == undosed.param_values["biomass_N_fraction"]
-    ), (
-        "biomass_N_fraction now responds to the amino-acid dose — the yield fit has moved off "
-        "the declared YAN. That is the repair D-243 declined to pick; update the decision."
-    )
+    ), "biomass_N_fraction moved off the declared YAN — the D-14 evaluation point has shifted"
 
-    # And what it would have been at the run's own nitrogen, so the size of the gap is on record
-    # rather than inferred. Coleman's regression, evaluated where the run actually sits.
+    # And the gap D-243 measured is GONE, stated as its own quantity so the repair cannot be
+    # quietly reverted: the fit's value and the value at the run's own nitrogen are now one.
     a0 = compiled.parameters["biomass_N_yield_log_intercept"].value
     a1 = compiled.parameters["biomass_N_yield_log_slope"].value
     f_n_at_actual = 1.0 / math.exp(a0 + a1 * actual_mgl)
-    assert f_n_at_actual / compiled.param_values["biomass_N_fraction"] == pytest.approx(
-        1.502, abs=5e-3
-    ), "the size of the evaluation-point error moved off its characterized 1.50x"
-
-    # ...and 362.7 is OUTSIDE Coleman's own fitted range, which is why summing the channels into
-    # the fit is not a drop-in repair. Asserted so the next reader cannot take that route as
-    # obviously correct.
-    assert actual_mgl > 350.0, (
-        "the commonest dose no longer leaves Coleman's fitted 70-350 mg N/L range; the "
-        "'evaluate at total nitrogen' repair may now be admissible — re-open D-243"
+    assert f_n_at_actual / compiled.param_values["biomass_N_fraction"] == pytest.approx(1.0), (
+        "the evaluation-point error is back — D-243 measured it at 1.502x and D-244 closed it"
     )
+
+
+def test_the_dose_cannot_out_run_the_declaration_and_the_fit_is_held_at_colemans_edge():
+    """The two refusals-turned-behaviours D-244 ships, pinned together because they are a pair.
+
+    A must cannot hold more amino-acid nitrogen than it holds assimilable nitrogen, so the seam
+    REFUSES rather than flooring the ammonium at zero (which would put the run straight back into
+    the state D-243 named: carrying nitrogen it never declared). The refusal is what forces a
+    pre-D-244 scenario to declare its real total — and that total is often above the 70-350 mg
+    N/L span Coleman fitted, which before D-244 did not compile AT ALL: ``f_N`` left
+    ``biomass_N_fraction``'s [0.03, 0.15] bracket at 444.0 mg N/L and raised an opaque pydantic
+    band error naming neither nitrogen nor Coleman. Holding the fit at the fitted edge is what
+    makes the migration possible, so the two ship together or neither does.
+
+    **The hold is epistemic, and the tier is the claim.** Nothing here says Y_X/N saturates.
+    """
+    with pytest.raises(ValueError, match="more than the declared yan_mgl"):
+        compile_scenario(_wine(yan_mgl=250.0, amino_acids_gpl=2.0), strict=True)
+
+    # A must ABOVE Coleman's span compiles, holds, and says so in its tier.
+    high = compile_scenario(_wine(yan_mgl=500.0, amino_acids_gpl=2.0), strict=True)
+    edge = compile_scenario(_wine(yan_mgl=350.0), strict=True)
+    assert high.param_values["biomass_N_fraction"] == pytest.approx(
+        edge.param_values["biomass_N_fraction"]
+    ), "the fit is not held at biomass_N_yield_fit_yan_max — extrapolation is back"
+    assert high.parameters["biomass_N_fraction"].tier is Tier.SPECULATIVE, (
+        "a held fit must carry the admission in its tier, or the hold is invisible downstream"
+    )
+
+    # Anti-vacuity: the hold must not fire INSIDE the span, and must not drag the tier down there.
+    assert edge.parameters["biomass_N_fraction"].tier is not Tier.SPECULATIVE, (
+        "the hold is firing at the edge itself — every wine in the suite would go speculative"
+    )
+    assert edge.param_values["biomass_N_fraction"] < 0.15, (
+        "the held value left the bracket it exists to keep the fit inside"
+    )
+
+    # The LOW side is deliberately NOT held, and this is the pin that forbids adding one: it
+    # would move Varela's 50 mg N/L arm, the project's only independent wine dataset (D-56).
+    low = compile_scenario(_wine(yan_mgl=50.0), strict=True)
+    assert low.param_values["biomass_N_fraction"] == pytest.approx(0.036171, abs=1e-6), (
+        "the 50 mg N/L arm moved — a low-side hold was added, which re-anchors the Varela "
+        "comparison on a number Coleman never fitted there"
+    )
+    assert low.parameters["biomass_N_fraction"].tier is not Tier.SPECULATIVE
 
 
 def test_all_assimilable_nitrogen_reaches_biomass_whatever_channel_it_entered_by():
@@ -211,10 +252,20 @@ def test_all_assimilable_nitrogen_reaches_biomass_whatever_channel_it_entered_by
     D-32 designed the swap to be nitrogen-neutral *through the transfer*, and it is. But the pool
     it debits drains to ``N``, and ``N`` drains to biomass, so cumulatively the amino-acid pool is
     a second nitrogen reservoir rather than a substitute for the first. On a bare run the identity
-    is exact; with a dose it holds to ~0.6 %, the remainder being pool residue the aging tail
-    never re-assimilates.
+    is exact; with a dose it holds to a residue that is pool nitrogen the aging tail never
+    re-assimilates.
+
+    **THE RESIDUE GREW TWELVE-FOLD AT D-244 -- 0.6 % to 7.8 % -- and that is the carve-out
+    working, not a defect.** Before D-244 a dosed wine's nitrogen was mostly ammonium (250 mg
+    N/L of it, with the dose's 112.7 on top), and ammonium is what the growth Process reads
+    directly, so almost all of it arrived. The same wine now holds 137.3 mg N/L of ammonium and
+    112.7 in the amino-acid pools, and pool nitrogen only reaches biomass through the D-32 swap,
+    which does not run to completion. The identity is now a statement about a SLOWER channel and
+    its residue is a real shortfall: 45 % of this wine's nitrogen must be assimilated rather than
+    simply taken up. Pinned two-sided, because a residue with only an upper bound cannot catch
+    the swap speeding up either.
     """
-    for aa, tol in ((0.0, 1e-9), (0.5, 7e-3)):
+    for aa, tol in ((0.0, 1e-9), (0.5, 8.0e-2)):
         compiled = compile_scenario(_wine(amino_acids_gpl=aa), strict=True)
         f_n = compiled.param_values["biomass_N_fraction"]
         ammonium, amino = _channel_nitrogen(compiled)
@@ -227,6 +278,15 @@ def test_all_assimilable_nitrogen_reaches_biomass_whatever_channel_it_entered_by
             f"aa={aa}: biomass {biomass:.6f} g/L is not X0 + (both channels)/f_N = "
             f"{predicted:.6f} — a nitrogen sink is holding mass the identity says reaches X"
         )
+        if aa:
+            # The residue as its own quantity, two-sided. A one-sided tolerance would stay
+            # green if the swap got FASTER and the amino-acid channel stopped being
+            # distinguishable from the ammonium one, which is what this pin exists to catch.
+            assert 1.0 - biomass / predicted == pytest.approx(0.0775, abs=5e-3), (
+                f"aa={aa}: the unassimilated residue is {1.0 - biomass / predicted:.4f}, not "
+                "the characterized 0.0775 — the D-32 swap's completeness moved, in one "
+                "direction or the other; measure which before touching this number"
+            )
 
 
 def test_the_nitrogen_ledger_closes_through_every_wine_sink():
@@ -262,7 +322,7 @@ def test_autolysis_leaves_nearly_half_the_nitrogen_outside_biomass():
     """The sink census's one surprise, pinned — a pre-registered "no sink over 5 %" was wrong 5x.
 
     On a bare or merely aa-dosed run essentially all nitrogen ends in biomass (99.4 %+). Turn
-    autolysis on and 45.9 % of it ends in the amino-acid pools instead: lees self-digestion
+    autolysis on and 49.7 % of it ends in the amino-acid pools instead: lees self-digestion
     returns biomass nitrogen to the pool faster than anything re-assimilates it once the ferment
     is dry. Pinned because it is the only configuration in which wine's nitrogen budget is *not*
     "biomass and rounding", and because a change to the autolysis/re-assimilation balance would
@@ -282,12 +342,15 @@ def test_autolysis_leaves_nearly_half_the_nitrogen_outside_biomass():
         for slot, species in _AA_CHANNEL.items()
         if slot in schema
     )
-    assert in_pools / total0 == pytest.approx(0.459, abs=0.02), (
+    # D-243 characterized this at 45.9 %. D-244's carve-out moved it to 49.7 %: the same must
+    # now starts with 112.7 of its 250 mg N/L already IN the pools, and the swap does not
+    # clear all of it before autolysis starts refilling them.
+    assert in_pools / total0 == pytest.approx(0.497, abs=0.02), (
         f"autolysis now leaves {100 * in_pools / total0:.1f} % of the nitrogen in the amino-acid "
-        "pools, not the characterized ~45.9 % — the autolysis/re-assimilation balance moved"
+        "pools, not the characterized ~49.7 % — the autolysis/re-assimilation balance moved"
     )
 
-    # The same run WITHOUT autolysis is the control: without it the 45.9 % is just a number, and
+    # The same run WITHOUT autolysis is the control: without it the 49.7 % is just a number, and
     # nothing shows it is autolysis that puts the nitrogen there.
     control = compile_scenario(_wine(amino_acids_gpl=0.5), strict=True)
     ctl = control.run()
@@ -298,7 +361,11 @@ def test_autolysis_leaves_nearly_half_the_nitrogen_outside_biomass():
         for slot, species in _AA_CHANNEL.items()
         if slot in control.schema
     )
-    assert ctl_pools / total0 < 0.01, (
+    # The control's own floor moved with the carve-out: an aa-dosed wine now ends with the
+    # 7.8 % swap residue in its pools even with autolysis OFF (it was under 1 % when the dose
+    # was extra ammonium's worth of nitrogen). Still six times smaller than the arm, so the
+    # attribution holds -- but the bound has to state the residue, not pretend it is zero.
+    assert ctl_pools / total0 < 0.10, (
         "the autolysis-off control now leaves nitrogen in the pools too, so the arm above no "
         f"longer attributes anything to autolysis ({100 * ctl_pools / total0:.2f} %)"
     )

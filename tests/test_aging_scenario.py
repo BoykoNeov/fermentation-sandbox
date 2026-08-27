@@ -63,7 +63,13 @@ from fermentation.core.media import get_medium
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir
 from fermentation.runtime import ScheduledTrajectory
-from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
+from fermentation.scenario import (
+    Intervention,
+    Scenario,
+    TemperaturePoint,
+    amino_acid_dose_nitrogen_mgl,
+    compile_scenario,
+)
 from fermentation.sensory import load_thresholds, oav_series
 from fermentation.validation.conservation import (
     assert_conserved,
@@ -112,6 +118,11 @@ def _wine(
     initial: dict[str, float] = {"brix": brix, "yan_mgl": 250.0, "pitch_gpl": 0.25}
     if amino_acids_gpl > 0.0:
         initial["amino_acids_gpl"] = amino_acids_gpl
+    # D-244: ``yan_mgl`` is the must's TOTAL assimilable nitrogen and the amino-acid dose is
+    # carved OUT of it. This fixture was authored when the two channels ADDED, so it declares
+    # the sum -- which leaves its pitch state bit-for-bit and moves only the point Coleman's
+    # yield fit is evaluated at, which is the defect D-243 found.
+    initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
     if autolysis_rate_per_h > 0.0:
         initial["autolysis_rate_per_h"] = autolysis_rate_per_h
     if anthocyanin_gpl > 0.0:
@@ -1277,7 +1288,7 @@ def test_the_fermentation_phase_sotolon_offset_stays_a_small_absolute_constant()
     a wine that made twice as much sotolon later, which is the case that matters.
 
     So the claim under test is the one that survived measurement: **the fermentation-phase offset is
-    a fixed, sub-perceptual number**, ~0.3 % of the 8 µg/L perception threshold in a dry wine and
+    a fixed, sub-perceptual number**, ~0.4 % of the 8 µg/L perception threshold in a dry wine and
     ~3.6 % in the worst case found anywhere (the sweet calibration wine). If a later beat inflates
     fermentation acetaldehyde or the α-ketobutyrate residual — `k_alpha_kb_excretion`'s own declared
     band spans 5e-5…1e-3 around a 2e-4 nominal, a 5× lever — this term grows silently and, without
@@ -1287,14 +1298,21 @@ def test_the_fermentation_phase_sotolon_offset_stays_a_small_absolute_constant()
     threshold = float(thresholds["threshold_sotolon_wine"].value)  # 8.0 µg/L, from sensory.yaml
     # Each value below is PRINTED — measured on this model, not taken from literature. The ±30 %
     # window around it is CONSTRUCTED (see `_FERMENT_SOTOLON_REL`).
+    # ALL FOUR RE-MEASURED AT D-244, and the spread across them is the reason to read this
+    # rather than skim it. This wine doses 0.8 g/L of amino acids, so before D-244 it carried
+    # 430.3 mg N/L while declaring 250 and being fitted there; it now declares the 430.3 and
+    # the fit is HELD at Coleman's 350 edge. Less biomass means less growth-linked
+    # alpha-ketobutyrate, and the DRY arms move 1.38-1.43x on it. The SWEET arm moves 1.005x,
+    # because its offset is dominated by the sugar-driven route, not the growth-linked one --
+    # which is exactly why it has its own pin (see the comment on it below).
     arms = [
-        ("dry, unsulfited", [], False, 0.025302),
-        ("dry, must SO₂ 60", [_add_so2(0.0, 60.0)], False, 0.026757),
-        ("dry, must SO₂ 100", [_add_so2(0.0, 100.0)], False, 0.027669),
+        ("dry, unsulfited", [], False, 0.034853),  # D-244: was 0.025302
+        ("dry, must SO₂ 60", [_add_so2(0.0, 60.0)], False, 0.037929),  # D-244: was 0.026757
+        ("dry, must SO₂ 100", [_add_so2(0.0, 100.0)], False, 0.039630),  # D-244: was 0.027669
         # The largest fermentation-phase offset found anywhere, and it gets its OWN pin: a ceiling
         # loose enough to hold this arm is ~10× above the dry ones and would be blind to a 3× move
         # there. One shared threshold would make the dry pins decorative.
-        ("sweet calibration wine", [], True, 0.284710),
+        ("sweet calibration wine", [], True, 0.286151),  # D-244: was 0.284710 (1.005x)
     ]
     for label, interventions, sweet, expected in arms:
         measured = _sotolon_at_aging_start_ugl(interventions, sweet=sweet)

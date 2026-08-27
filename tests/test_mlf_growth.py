@@ -25,7 +25,12 @@ from fermentation.core.state import StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime.integrate import simulate
-from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
+from fermentation.scenario import (
+    Scenario,
+    TemperaturePoint,
+    amino_acid_dose_nitrogen_mgl,
+    compile_scenario,
+)
 from fermentation.validation import (
     assert_conserved,
     assert_nonnegative,
@@ -57,6 +62,11 @@ def _wine_scenario(*, days: float = 14.0, **initial_extra) -> Scenario:
         "initial_ph": 3.4,
     }
     initial.update(initial_extra)
+    # D-244: ``yan_mgl`` is the must's TOTAL assimilable nitrogen and the amino-acid dose is
+    # carved OUT of it. This fixture was authored when the two channels ADDED, so it declares
+    # the sum -- which leaves its pitch state bit-for-bit and moves only the point Coleman's
+    # yield fit is evaluated at, which is the defect D-243 found.
+    initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
     return Scenario(
         name="wine-mlf-growth",
         medium="wine",

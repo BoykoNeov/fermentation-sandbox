@@ -7,7 +7,11 @@ keeps the engine reusable across wine, beer, cider, and mead without code
 changes. Scenarios are schema-validated YAML/JSON — deliberately not a custom DSL.
 """
 
-from fermentation.scenario.compile import CompiledScenario, compile_scenario
+from fermentation.scenario.compile import (
+    CompiledScenario,
+    amino_acid_dose_nitrogen_mgl,
+    compile_scenario,
+)
 from fermentation.scenario.schema import Intervention, Scenario, TemperaturePoint
 
 __all__ = [
@@ -15,5 +19,6 @@ __all__ = [
     "Intervention",
     "Scenario",
     "TemperaturePoint",
+    "amino_acid_dose_nitrogen_mgl",
     "compile_scenario",
 ]

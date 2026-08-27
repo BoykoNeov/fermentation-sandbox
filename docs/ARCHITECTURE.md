@@ -216,6 +216,26 @@ parameter, not a constant in the seam (D-7).
 
 A `Scenario` is schema-validated YAML/JSON, **not** a custom DSL, and holds no physics.
 
+**Wine's `yan_mgl` is the must's TOTAL assimilable nitrogen, and an amino-acid dose is carved OUT
+of it (D-244).** The `N` slot gets `yan_mgl` minus the nitrogen in the eight speciated amino-acid
+pools (`amino_acid_nitrogen_gpl`, weighted off the same registry `total_nitrogen` uses), and the
+seam refuses when a dose out-runs the declaration rather than flooring the ammonium at zero.
+Before D-244 the two channels *added*: a wine declaring 250 mg N/L and dosing 0.5 g/L carried
+362.7 and said nothing (D-243 found it, D-244 repaired it). `amino_acid_dose_nitrogen_mgl` is the
+public migration aid — a pre-D-244 scenario adds its dose's nitrogen to its declared YAN and its
+pitch state is bit-identical.
+
+**Coleman's yield fit is evaluated at that total, and HELD at the domain it was fitted over
+(D-244).** `_apply_nitrogen_dependent_yield` computes `biomass_N_fraction` from
+`ln(Y_X/N) = a0 + a1·YAN` at the declared total, clamped above `biomass_N_yield_fit_yan_max`
+(350 mg N/L, Coleman's own upper treatment); when the hold bites, the derived parameter's tier
+drops to `SPECULATIVE` so the admission propagates to everything downstream. The hold is an
+epistemic rule, not a claim that `Y_X/N` saturates. The **low** edge
+(`biomass_N_yield_fit_yan_min`, 70) is recorded but NOT enforced: `f_N` is monotone in YAN and its
+infimum `1/exp(a0) = 0.0302` stays inside the parameter's own `[0.03, 0.15]` bracket. Before the
+hold existed, a must above 444.0 mg N/L did not compile at all — it raised an opaque band error
+naming neither nitrogen nor Coleman.
+
 **Intervention verbs dispatch through two tables (D-187).** Almost every verb is a function of its
 own `Intervention` alone (`_INTERVENTION_VERBS`). `_SCENARIO_INTERVENTION_VERBS` holds the ones
 whose *magnitude* comes from a scenario-level field, and `seal_bottle` is the first: it doses
