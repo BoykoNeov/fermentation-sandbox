@@ -164,8 +164,12 @@ def _identity(x: float) -> float:
 #: D-240 §3's eight ``LIVE SEED, NEVER DRAWN`` rows; the two it leaves out are
 #: ``biomass_N_yield_log_intercept``/``_slope``, which seed no slot at all — they derive the
 #: ``biomass_N_fraction`` override, and *that* parameter is itself sampled over a band which
-#: strictly contains (and is 2.11x wider than) the range the two coefficients' own bands imply,
-#: so drawing them too would double-count one physical quantity. Measured, not assumed: D-241 §2.
+#: contains (and is 2.11x wider than) the range the two coefficients' own bands imply **at the
+#: battery wine's YAN of 250 mg/L**, so drawing them too would double-count one physical
+#: quantity. Measured, not assumed: D-241 §2. The bracket is two fixed literals and the implied
+#: range slides with the evaluation point, so that nesting holds only over YAN 66.0-324.8 mg N/L
+#: (D-243) — outside it the coefficients reach f_N the sampler cannot draw, by 4.6 % of the low
+#: tail at YAN=50 and 1.1159x over the high edge at YAN=350.
 #:
 #: ``copper_typical`` is the seventh member of the same class and is NOT here — it kept D-236's
 #: hand-written rule, whose condition is a genuine branch on scenario intent rather than this

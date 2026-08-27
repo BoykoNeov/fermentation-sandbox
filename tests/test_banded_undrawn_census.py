@@ -97,6 +97,17 @@ _REPAIRED_AT_D241 = (
 #: [0.03, 0.15] and is 0.474 as wide. Drawing them as well would put two bands on one physical
 #: quantity and report the wider one as narrower. Still undrawn, still pinned, now with a reason
 #: that is a measurement instead of "different mechanism".
+#:
+#: **That containment is CONDITIONAL ON THE SCENARIO'S YAN, and D-241 measured it at one value
+#: (250 mg/L) and stated it for all (decision D-243).** The override's bracket is two fixed
+#: literals while the coefficients' implied range slides with the evaluation point, so the two
+#: only nest over a middle interval: `YAN ∈ [66.0, 324.8] mg N/L`
+#: (:func:`test_the_subsumed_verdict_is_scoped_to_the_yan_interval_that_contains_it`). Below it
+#: the implied range reaches f_N < 0.03; above it, f_N > 0.15 — and the "0.474 as wide" figure is
+#: 250 mg/L's value too, running 7.158x at YAN=50 and 1.219x at YAN=350. The escapes are small
+#: (4.6 % of the low tail at 50; 1.1159x over the high edge at 350), so SUBSUMED **stands** for
+#: the battery and for every scenario an ensemble is run on here — but it is a scoped verdict,
+#: not a property of the pair, and `test_validation_varela2004.py` already runs a YAN of 50.
 _SUBSUMED_FIT = (
     "biomass_N_yield_log_intercept",
     "biomass_N_yield_log_slope",
@@ -179,7 +190,9 @@ VERDICTS: Mapping[str, str] = {
         _SUBSUMED_FIT,
         "SUBSUMED — a live compile read that seeds NO slot: the two Coleman coefficients derive "
         "the `biomass_N_fraction` override, and that parameter IS sampled, over a band which "
-        "strictly contains the range these two imply and is 2.11x wider (D-241 §2). So the "
+        "contains the range these two imply and is 2.11x wider AT THE BATTERY WINE'S YAN OF 250 "
+        "mg/L (D-241 §2; the YAN qualifier is D-243's — containment holds only over "
+        "YAN 66.0-324.8 mg N/L and the width ratio runs 7.16x to 1.22x across it). So the "
         "uncertainty is not omitted from the reported spread — it is already in it, under "
         "another name and with margin. Drawing these too would double-count one quantity. This "
         "is the one verdict in the registry that says the gap is APPARENT rather than real",
@@ -494,6 +507,110 @@ def test_the_biomass_yield_coefficients_move_a_derived_parameter_not_a_slot():
         assert min(values.values()) < base.param_values[derived] < max(values.values()), (
             "the nominal must sit strictly inside the two edges, or the band is one-sided"
         )
+
+
+def _override_bracket(scenario: Scenario) -> tuple[float, float]:
+    """The bracket the sampler actually draws ``biomass_N_fraction`` over, READ from the seam.
+
+    Deliberately not a literal pair copied out of :func:`_apply_nitrogen_dependent_yield`. A
+    copy is a half-pinned read: the first two mutation arms written for the guard below moved
+    the seam's own ``low=``/``high=`` and the test stayed GREEN, because it was comparing two
+    numbers neither of which the engine uses [[feedback-a-half-pinned-read-is-green-until-the-
+    quantity-moves]]. Compiling and reading the override back is what gives the guard teeth on
+    the literals it is about.
+    """
+    u = compile_scenario(scenario).parameters["biomass_N_fraction"].uncertainty
+    return float(u.low), float(u.high)
+
+
+#: The YAN interval over which the bracket really does contain the two coefficients' implied
+#: range (decision D-243), solved to 0.1 mg/L. NOT a tuned pair: it is where the 9-corner
+#: implied range crosses each bracket edge, and it moves if either band or either literal moves —
+#: which is exactly what the guard below is for.
+_CONTAINMENT_YAN_MGL = (66.0, 324.8)
+
+
+def _implied_f_n_range(parameters: ParameterSet, yan_mgl: float) -> tuple[float, float]:
+    """The f_N range the two Coleman coefficients' own bands imply at ``yan_mgl``.
+
+    The same nine-corner evaluation D-241 §2 ran at one YAN, as a function of YAN.
+    """
+    a0, a1 = (parameters[n] for n in ("biomass_N_yield_log_intercept", "biomass_N_yield_log_slope"))
+    corners = [
+        1.0 / np.exp(x + y * yan_mgl)
+        for x in (a0.uncertainty.low, a0.value, a0.uncertainty.high)
+        for y in (a1.uncertainty.low, a1.value, a1.uncertainty.high)
+    ]
+    return float(min(corners)), float(max(corners))
+
+
+def test_the_subsumed_verdict_is_scoped_to_the_yan_interval_that_contains_it():
+    """SUBSUMED is a scoped verdict, not a property of the pair — forbid restating it as one.
+
+    Decision D-243, correcting D-241 §2/§3. That record measured nine corners at the battery
+    wine's YAN of 250 mg/L, found the coefficients' implied f_N range strictly inside the
+    override's ``[0.03, 0.15]`` bracket, and the verdict then entered :data:`_SUBSUMED_FIT`'s
+    registry text with **no YAN qualifier**. The bracket is two fixed literals; the implied range
+    slides with the evaluation point. They only nest over a middle interval.
+
+    What this forbids, in both directions:
+
+    * that containment is claimed where it does **not** hold — the two ends are pinned, so
+      widening either coefficient band or narrowing the bracket without re-scoping goes red;
+    * that the interval is quietly **shrunk** — the battery's own 250 mg/L and the M1 wine
+      benchmark's 80 mg/L must both stay inside, or SUBSUMED stops covering the scenarios it was
+      written for.
+
+    It is a **scoping** guard, not a defect pin: the escapes are small (4.6 % of the low tail at
+    YAN=50; 1.1159x over the high edge at YAN=350) and D-241's conclusion stands everywhere an
+    ensemble is actually run here. Do not "fix" a red by widening the bracket literals — that
+    changes what every wine ensemble draws for the single constant that governs biomass.
+    """
+    parameters = compile_scenario(WINE).parameters
+    lo_edge, hi_edge = _override_bracket(WINE)
+    inner_lo, inner_hi = _CONTAINMENT_YAN_MGL
+
+    # Reproduce D-241 §2's own numbers at its own YAN, so a drift there is caught here first.
+    at_250 = _implied_f_n_range(parameters, 250.0)
+    assert at_250 == pytest.approx((0.051432, 0.108338), abs=5e-7), (
+        f"D-241 §2's nine-corner range at YAN=250 no longer reproduces: {at_250}"
+    )
+
+    # Inside the interval: containment holds, which is what SUBSUMED asserts.
+    for yan in (inner_lo + 0.5, 80.0, 200.0, 250.0, 300.0, inner_hi - 0.5):
+        lo, hi = _implied_f_n_range(parameters, yan)
+        assert lo_edge <= lo and hi <= hi_edge, (
+            f"the coefficients' implied f_N range at YAN={yan} mg/L is [{lo:.6f}, {hi:.6f}], "
+            f"which escapes the override's drawn bracket ({lo_edge}, {hi_edge}) — SUBSUMED no "
+            "longer covers a YAN it is claimed for. Re-scope the verdict; do not widen the "
+            "bracket to hide it."
+        )
+
+    # Outside it: containment FAILS, which is the half D-241 never measured. Without this the
+    # test above would pass just as well on an interval claimed to be the whole real line.
+    for yan, edge in ((inner_lo - 1.0, "low"), (inner_hi + 1.0, "high")):
+        lo, hi = _implied_f_n_range(parameters, yan)
+        escaped = lo < lo_edge if edge == "low" else hi > hi_edge
+        assert escaped, (
+            f"at YAN={yan} mg/L the implied range [{lo:.6f}, {hi:.6f}] is still inside "
+            f"({lo_edge}, {hi_edge}), so the {edge} end of the containment interval "
+            f"{_CONTAINMENT_YAN_MGL} is stale — containment now reaches further than D-243 "
+            "measured and the interval must be re-solved, not left understated."
+        )
+
+    # The width ratio is 250 mg/L's value too, and D-241 reports it as the pair's. Pin the SPREAD
+    # so "2.11x" can never again be read as a constant.
+    ratios = {
+        yan: (hi_edge - lo_edge) / (lambda r: r[1] - r[0])(_implied_f_n_range(parameters, yan))
+        for yan in (50.0, 250.0, 350.0)
+    }
+    assert ratios[250.0] == pytest.approx(2.109, abs=5e-4), (
+        f"D-241's own width ratio at its own YAN moved: {ratios[250.0]:.4f}"
+    )
+    assert ratios[50.0] > 3.0 * ratios[350.0], (
+        f"the width ratio no longer varies strongly with YAN ({ratios}); D-241's '2.11x wider' "
+        "is a value at one nitrogen level, and this asserts it cannot be restated as a property"
+    )
 
 
 # ==========================================================================================
