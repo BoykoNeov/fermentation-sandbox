@@ -1657,9 +1657,7 @@ def _peyer_wort_bc(params: ParameterSet, capacity_gpl: float, pka_peptide: float
     # chains too — at the CALIBRATION wort's own assimilable nitrogen, which is a coordinate this
     # sample did not have before (the eight organic-acid seeds are nitrogen-blind). Read from the
     # parameter store rather than typed, because the shipped capacity is a root taken ON it.
-    totals |= acidbase.amino_buffer_from_gpl(
-        values["peyer_control_wort_yan_gpl"], "beer", values
-    )
+    totals |= acidbase.amino_buffer_from_gpl(values["peyer_control_wort_yan_gpl"], "beer", values)
     return acidbase.peyer_fast_bc(totals, pka)
 
 
@@ -4702,9 +4700,7 @@ def test_the_amino_buffer_is_in_the_ph_solve_and_out_of_the_TA_equivalents_sum()
     pka = acidbase.build_pka_map(resolved)
     totals = acidbase._totals_molar(compiled.y0, schema, resolved)
     byp = acidbase._byp_succinic_molar(compiled.y0, schema)
-    ph = acidbase.solve_ph(
-        totals, acidbase._cation(compiled.y0, schema, resolved), byp, 0.0, pka
-    )
+    ph = acidbase.solve_ph(totals, acidbase._cation(compiled.y0, schema, resolved), byp, 0.0, pka)
     h = 10.0 ** (-ph)
     rebuilt = byp * (acidbase.BYP_AS_SUCCINIC.protons - acidbase.mean_charge(h, pka["Byp"]))
     with_them = rebuilt

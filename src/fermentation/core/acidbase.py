@@ -1186,9 +1186,7 @@ def amino_buffer_molar(
     """
     if NITROGEN_KEY not in schema or not charge_balance_is_populated(y, schema):
         return {}
-    return amino_buffer_from_gpl(
-        float(y[schema.slice(NITROGEN_KEY)][0]), schema.medium, params
-    )
+    return amino_buffer_from_gpl(float(y[schema.slice(NITROGEN_KEY)][0]), schema.medium, params)
 
 
 def remix_nitrogen_charge_excess(

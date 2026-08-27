@@ -710,8 +710,7 @@ def test_the_beer_nitrogen_charge_is_reproduced_from_its_cited_composition(beer_
     assert min(edges) + adjustment == pytest.approx(param.uncertainty.low, abs=5e-4)
     assert max(edges) + adjustment == pytest.approx(param.uncertainty.high, abs=5e-4)
     assert param.value == pytest.approx(sum(edges) / 2.0 + adjustment, abs=5e-4), (
-        "the nominal must be the derivation's own midpoint plus the D-239 split, not a fitted "
-        "value"
+        "the nominal must be the derivation's own midpoint plus the D-239 split, not a fitted value"
     )
     # ...and the NET, which is the quantity comparable across D-209 and D-239 and the one a
     # later reader will want when they find 0.234 under a name D-209 shipped at 0.177. If this
@@ -745,9 +744,7 @@ def test_the_beer_nitrogen_charge_is_reproduced_from_its_cited_composition(beer_
         ("histidine_side_chain", "histidine"),
     ):
         mgl = PEYER_WORT_AMINO_ACIDS_MGL[source_name]
-        expected = (
-            mgl / AMINO_ACID_CHEMISTRY[source_name][0] * PEYER_WORT_DILUTION
-        ) / pool_n
+        expected = (mgl / AMINO_ACID_CHEMISTRY[source_name][0] * PEYER_WORT_DILUTION) / pool_n
         shipped = values[acidbase.AMINO_BUFFER_RATIO_PARAMS[species]]
         assert shipped == pytest.approx(expected, rel=1e-9), (
             f"{species} ships {shipped:.9f} mol per mole pool N but Peyer's Table 16 gives "
