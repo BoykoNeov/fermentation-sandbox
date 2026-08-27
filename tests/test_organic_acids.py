@@ -67,6 +67,7 @@ acids alone.
 
 import re
 import shutil
+import struct
 from pathlib import Path
 
 import numpy as np
@@ -1795,7 +1796,31 @@ def _beer_ensemble(scenario_extra: dict[str, float] | None = None, n_members: in
     return compiled, ens
 
 
-def test_the_runtime_solver_reproduces_the_shipped_capacity_at_the_nominal():
+def _ulps_apart(a: float, b: float) -> int:
+    """Distance between two positive doubles counted in representable steps, not in units.
+
+    A relative tolerance answers "how close in the quantity"; this answers "how many doubles
+    lie between them", which is the unit a root-finder's reproducibility actually lives in.
+    IEEE-754 doubles are ordered as their bit patterns are when read as signed integers, so
+    for two positives the difference of those integers IS the count of representable values
+    between them.
+    """
+    ia = struct.unpack("<q", struct.pack("<d", a))[0]
+    ib = struct.unpack("<q", struct.pack("<d", b))[0]
+    return int(abs(ia - ib))
+
+
+#: How far the runtime back-solve may land from the shipped literal, in representable doubles.
+#: **Four, because the claim is portability of a root-find and not of a bit pattern.** The literal
+#: was produced by an offline root-find on one machine; a different libm/scipy build starts the
+#: same bracket and stops a step or two away. Measured: **0 ULP on Windows, 1 ULP on CI at D-238,
+#: 3 ULP on CI at D-239's re-rooted value** — so an exact-equality assertion is a claim about the
+#: author's platform, and it was RED on both CI Pythons from D-238 until D-241 replaced it.
+#: At this magnitude 4 ULP is ~1.9e-15 relative; the nearest wrong answer is nowhere near it.
+_CAPACITY_ROOT_ULP_BUDGET = 4
+
+
+def test_the_runtime_solver_reproduces_the_shipped_capacity_at_the_nominal(monkeypatch):
     """The control, and the reason the repair re-derives the shipped root rather than competing.
 
     [[feedback-the-setting-where-a-change-is-exact-is-the-control]]. Two claims, and the second
@@ -1837,11 +1862,45 @@ def test_the_runtime_solver_reproduces_the_shipped_capacity_at_the_nominal():
     shipped = compiled.parameters["peptide_buffer_capacity_beer"].value
     target = compiled.parameters["wort_buffering_capacity_peyer"].value
 
+    # What makes the nominal member exact is asserted FIRST, and it is not this root-find.
+    # `y0_for_member`'s rule 3 SKIPS the re-solve when every name the back-solve reads is at its
+    # nominal, so the nominal member keeps the compiled slot by an early `return` rather than by
+    # a root-finder landing on the same double. That is structural, holds on every platform, and
+    # is the property D-24's byte-for-byte nominal claim actually rests on (D-238 says so in the
+    # rule's own comment: "resting D-24's byte-for-byte nominal claim on a root-finder's
+    # tolerance surviving a scipy upgrade is not the same as guaranteeing it").
+    peptide_slot = compiled.schema.slice("peptide_buffer")
+    build = compiled.y0_for_member()
+    assert build is not None
+    assert float(build(resolved)[peptide_slot][0]) == float(compiled.y0[peptide_slot][0]), (
+        "the nominal member no longer keeps the compiled peptide capacity. The exact-nominal skip "
+        "is what makes the nominal member exact; if it stopped firing, every nominal run now "
+        "depends on a root-finder reproducing a literal, which is precisely what D-238 refused."
+    )
+
+    # …and the skip really is what delivered that, rather than the root-find happening to land on
+    # the same double. On the author's machine it DOES land there (0 ULP), so the assertion above
+    # passes either way here and would go quiet the day the skip was deleted — the D-240 Arm C
+    # shape, appearing in a line written to avoid it. Making the solver raise settles it with no
+    # platform argument at all: if the nominal build still succeeds, it never called the solver
+    # [[feedback-a-control-needs-mechanical-reach]].
+    def _refuse(*_args: object, **_kwargs: object) -> float:
+        raise AssertionError("the nominal member re-solved the capacity instead of skipping")
+
+    monkeypatch.setattr(acidbase, "peptide_capacity_for_wort_bc", _refuse)
+    skipped = build(resolved)
+    monkeypatch.undo()
+    assert float(skipped[peptide_slot][0]) == float(compiled.y0[peptide_slot][0])
+
     solved = acidbase.peptide_capacity_for_wort_bc(compiled.y0, compiled.schema, resolved, target)
-    assert solved == shipped, (
-        f"the runtime back-solve returns {solved!r} against the shipped {shipped!r}. It is meant "
-        "to RE-DERIVE the offline root, which is what makes the nominal member exact rather than "
-        "close — do not paper over this with a tolerance"
+    assert _ulps_apart(solved, shipped) <= _CAPACITY_ROOT_ULP_BUDGET, (
+        f"the runtime back-solve returns {solved!r} against the shipped {shipped!r} — "
+        f"{_ulps_apart(solved, shipped)} ULP apart, over a budget of {_CAPACITY_ROOT_ULP_BUDGET}. "
+        "It is meant to RE-DERIVE the offline root. This budget is NOT the tolerance D-238 "
+        "forbade: "
+        "it is four representable doubles, ~1e-15 relative, which cannot hide a solver that landed "
+        "on a different root or a literal that drifted — widen it and you are papering over one of "
+        "those, which is what that instruction was protecting."
     )
 
     # The YAN dependence itself, pinned — the price of the qualifier above. A wort that is not
