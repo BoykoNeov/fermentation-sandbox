@@ -1,6 +1,6 @@
 ---
 name: wine-nitrogen-budget
-description: "D-243/D-244 — wine's nitrogen budget is AUDITED and its two channels now PARTITION: yan_mgl is the total, the yield fit is evaluated there and held at Coleman's edge, and six fusel guards are strict xfails naming the cost"
+description: "D-243->D-248 — wine's nitrogen budget: the two channels PARTITION (D-244), uptake is UN-COUPLED from growth demand (D-248, four fusel xfails closed), and yan_mgl's two meanings are measured-and-REFUSED"
 metadata:
   node_type: memory
   type: project
@@ -104,6 +104,61 @@ unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings
   is untouched — and note that re-referencing erases, by construction, the very effect a spike
   scenario exists to study. [[feedback-a-uniform-rescale-cannot-test-a-composition-claim]]
 
+- **Assimilable-N uptake is UN-COUPLED from growth demand — BUILT at D-248. Never re-propose the
+  40.8 % residual, and never re-propose it as a parameter.** The cause was arithmetic: the D-32
+  swap ran at `psi*gate*f_N*base_dx`, strictly **below** growth's own `f_N*base_dx` draw, so
+  ammonium could only fall — and at zero, growth's Monod stopped growth and the swap (proportional
+  to `base_dx`) stopped with it, freezing the pools at 61.394 % of initial.
+  `AssimilableNitrogenUptake` draws the identity-agnostic pair at `r*mu_max*f_N*X*gate(aa)` — a
+  **capacity**, reading `mu_max` as a constant and **never** `biomass_growth_rate`. Residual
+  **40.8 % -> 0.62 %** (Crepin 0.2 %).
+  - **The load-bearing anchor is INTERNAL and unfitted**: the seam already sets
+    `f_N = 1/Y_X/N(N_init)` so biomass lands at `Y_X/N x N_init`, an identity needing complete
+    consumption. **61.6 % -> 98.4 %.** Crepin's 0.2 % is the independent check, not the target.
+  - **The shipped `r = 1.0` is a BOUND, not a level.** Residual, biomass and every fusel share are
+    unmoved across a **200x** sweep; the residual is set by `K_amino_acids`'s asymptote, not by
+    `r`. **The TIMING is separate and it MISSES** — 18.6 h to 90 % consumed vs Crepin's N_T of
+    28 h. Never read "insensitive across 200x" as "the time course was checked".
+  - **The carbon must NOT go to sugar and this is not stylistic.** The swap's no-hexose guarantee
+    is a property of its RATE being proportional to growth's draw; an un-coupled flux has no such
+    bound and would create hexose at `base_dx = 0`. Skeleton parks in `amino_acid_skeleton_carbon`
+    — **elemental carbon, weight 1.0** (the `N`-slot idiom, NOT the `debris`/glucan one).
+  - **FOUR strict fusel xfails CLOSED and no sourced threshold moved.** Propanol 0.7744 -> 0.8062
+    (fixture) and 0.7963 -> 0.8784 (Crepin's must) against an untouched 0.80; band 0.2256 ->
+    0.1938 against an untouched 0.20; **both Minebois legs 1.73x/1.68x -> 1.01x/0.98x her
+    published shares**. Uptake draws **no precursor**, so the one channel is the biomass
+    denominator. Suite **2015 + 6 xfail**. **D-120's DIRECTION leg is BACK** (D-245's `Flags`
+    reverses); its INSTRUMENT leg is only thinner (cap bite 12.7 % -> 4.82 %), so the fifth stays.
+  - **D-247 is REINFORCED, not overturned:** both gate rescalings are now **inert** (+1.4e-5,
+    +4.3e-6). Do not revisit them.
+  - **REFUSED on the way: a storage-quota / NCR feedback.** Crepin's yeast consume 180 mg N/L and
+    build ~3 g/L, which at `f_N ~ 0.06` **is** 180 mg N — there is **no extent surplus to bound**;
+    the phenomenon is timing. Such a knob is inert where it can be scored and load-bearing only
+    where nothing measures it. Do not build it.
+  - **RESIDUE, `Flags: D-100`, owner's call:** MLF/Brett draw **only** the amino-acid pair and
+    cannot read the `N` slot uptake fills, so the model **over-states yeast/bacteria nitrogen
+    competition**. Those tests **isolate the competitor** (the D-33 re-route precedent) — never
+    disable the Process globally and never put it behind a scenario flag. `MaillardBrowning`'s
+    N-park now reads exactly 0.0 without lees: that EXTENDS D-100/D-104's recorded
+    "autolysis-sourced" position from the precursors to the pair; it is not a new decision.
+
+- **`yan_mgl`'s two meanings — MEASURED and REFUSED at D-248. Do NOT re-propose it as open, and
+  do NOT ship the compile-seam half alone.** The conflation is **one species wide** on this
+  registry (arginine, 4 N vs 3 assimilable; every precursor is 1-N, glutamine's two both release,
+  and trp/his are not pools). **The frames CANCEL as an identity**: the seam carves out at TOTAL
+  nitrogen and every deamination releases TOTAL, so what the run makes available equals what was
+  declared, exactly, for any dose — driven against the DECLARATION (250 -> `X0 + 250/f_N` within
+  0.04 % at 0.5 g/L). **Repairing the declaration alone makes the OUTCOME worse: +15.28 mg N/L at
+  0.5 g/L (6.1 %) and +30.55 at 1 g/L**, all now realised because D-248's uptake consumes it —
+  which is why this could not be measured before that landed, and why the two are ONE repair.
+  The complete version is **priced, not built**: `draw_assimilable_nitrogen` books arginine 3-of-4
+  and parks the fourth as **excreted urea** (elemental `g N/L`, weight 1.0 on `total_nitrogen`),
+  confined to that helper, moving five consumers. Urea = the **ethyl-carbamate precursor**, so a
+  beat that builds it gets independent fidelity value.
+
 Measurements: `M:\claud_projects\temp\ferment\d243-wine-nitrogen-audit\` and
 `d244-wine-n-evaluation-point\` — `FINDINGS-pre.md`, `probe_band.py`, `probe_ceiling.py`,
 `probe_partition_stall.py`, `probe_denovo2.py`, `probe_pins.py`, and the `patch*.py` migrations.
+D-248: `d248-nitrogen-uncoupling\` — `measure.py` (the 200x sweep), `probe_residual.py`,
+`probe_control.py` (the all-ammonium control), `probe_pins.py`, `probe_phe.py`,
+`probe_frame.py` + `probe_cancel.py` (the refusal), and the `fix_*.py` / `rewrite_*.py` edits.
