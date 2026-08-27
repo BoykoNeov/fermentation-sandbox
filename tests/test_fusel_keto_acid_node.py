@@ -138,9 +138,14 @@ _D245_DE_NOVO_FLOOR_GAP = (
     "all (threonine exhausts either way), so the share rises through its denominator. The same "
     "correction removed a ~2x over-production that had been clearing this floor for the model. "
     "STRICT: the floor is a sourced target (Crepin 81 % newly-synthesised 2-KB; Rollero >90 % "
-    "CCM) and is NOT to be lowered to fit the model. It is also scored on a must carrying 2.25x "
-    "its source's nitrogen, which D-244 section 6 recorded and declined to repair -- closing it "
-    "needs Crepin's own synthetic-medium composition, not a grape-must partition."
+    "CCM) and is NOT to be lowered to fit the model. "
+    "D-246 SOURCED THE MEDIUM AND IT DOES NOT CLOSE THIS: on Crepin's own must (its Data Set S1, "
+    "measured, mean of 14) propanol reads 0.7963 against the 0.80 floor -- the commensurability "
+    "violation D-244 section 6 recorded was 86 % of the gap and not the whole of it. What is left "
+    "is smaller than the span of an UNREPAIRED defect one layer down: depletion_gate scales its "
+    "half-saturation by the must-SPECTRUM shares, which a per-species override bypasses, and "
+    "rescaling it to the pool it actually gates carries propanol over the floor. See "
+    "tests/test_defined_media.py, which pins all of that; do NOT re-cite 'we lack the medium'."
 )
 
 #: Why the two D-120 guards are STRICT xfails. Separate from the floor gap above because the
@@ -159,7 +164,13 @@ _D245_D120_LEGS_GONE = (
     "2-PE's realised share 1.603 % -> 1.400 %, a 12.7 % relative bite. STRICT: this is D-120's "
     "own tripwire firing as written, so the de-novo-entry build genuinely re-opens -- but the "
     "parameter it needs is unsourced for isoamyl, and deriving one from the model's own "
-    "abundances is refused (D-206). Sourcing beat, not a re-pin."
+    "abundances is refused (D-206). "
+    "D-246 SCORED BOTH LEGS ON MINEBOIS'S OWN MUST AND THEY GET WORSE, NOT BETTER: isoamyl "
+    "0.0926 and isobutanol 0.1474 against her 0.0534 and 0.0878, i.e. ~1.7x each where the "
+    "fixture read ~1.1x. That also retires D-245's own caveat that the isoamyl trip (1.5 % "
+    "relative) sat inside this harness's cap-window systematic -- 73 % over is an order of "
+    "magnitude outside it, so the over-attribution is a property of the model at her nitrogen "
+    "rather than an artefact of a richer must. Pinned in tests/test_defined_media.py."
 )
 
 #: The routes that ALSO eat the speciated precursors. Disabled where the ``f : (1−f)`` split
@@ -411,16 +422,28 @@ def _de_novo_share(spec, *, f_override: float | None = None) -> float:
     sibling, because a floor asserted against a primary-only number is the same class of thing
     D-245 just repaired one alcohol over. Named so the next beat does not rediscover it as new.
     """
-    precursor = spec.precursor_amino_acid
-    param = non_ehrlich_fraction_param(precursor)
+    param = non_ehrlich_fraction_param(spec.precursor_amino_acid)
     overrides = {} if f_override is None else {param: f_override}
     traj, schema = _run(aging=False, drop=_OTHER_PRECURSOR_CONSUMERS, set_params=overrides)
+    params = compile_scenario(_scenario(aging=False)).param_values
+    return de_novo_share_of(traj, schema, params, spec, f_override=f_override)
 
+
+def de_novo_share_of(traj, schema, params, spec, *, f_override: float | None = None) -> float:
+    """:func:`_de_novo_share`'s arithmetic, on a run the CALLER supplies (decision D-246).
+
+    Split out so a probe scoring this share on a *different must* runs the identical arithmetic
+    rather than a fourth copy of it — the D-106/D-245 shared-helper discipline, applied before
+    the copy exists this time instead of after it has silently diverged for 134 records.
+    :mod:`tests.test_defined_media` scores Crepin's and Minebois's own defined media through
+    this helper, and the anchor that licenses the comparison is that doing so on the D-109
+    fixture reproduces the shipped numbers to 4 dp.
+    """
+    precursor = spec.precursor_amino_acid
     consumed = float(traj.y[schema.slice(precursor), 0][0]) - _end(traj, schema, precursor)
     made = _end(traj, schema, spec.pool)
     assert consumed > 0.0 and made > 0.0, "vacuous: nothing consumed or nothing made"
 
-    params = compile_scenario(_scenario(aging=False)).param_values
     share = ehrlich_primary_share(params, precursor, f_override=f_override)
     n_alc = CARBON_ATOMS[spec.species]
     draw_carbon = share * consumed * carbon_mass_fraction(precursor)
