@@ -622,7 +622,7 @@ def test_the_gates_OWN_commensurate_rescaling_leaves_propanol_where_it_was(crepi
         f"{shipped:.6f}) — D-246 §6's direction would be back, which is a re-decision"
     )
     covered = (rescaled - shipped) / (_SOURCED_DE_NOVO_FLOOR - shipped)
-    assert -0.15 <= covered <= 0.0, (
+    assert -0.15 <= covered < 0.0, (
         f"the composition correction now covers {covered:+.1%} of the gap to the floor; D-247 "
         "measured -6.9 %, and anything approaching +100 % would restore D-246 §6's claim"
     )
