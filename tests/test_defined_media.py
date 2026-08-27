@@ -20,12 +20,20 @@ memory note sharpened it to **one sourcing ask gating four of the five remaining
 4. **What the sourcing did buy is a different, upstream finding.** Crépin's Data Set S1 also
    reports the *residual* nitrogen, and it is ~0.2 % of the must's YAN at end of fermentation.
    This model leaves **40.8 %** standing, at any duration. That divergence sits underneath every
-   number in this file — biomass is the denominator of every de-novo share — and the residual
-   propanol miss is smaller than the span of one unfixed commensurability defect in the
-   availability gate. See the last two tests.
+   number in this file — biomass is the denominator of every de-novo share. See the last three
+   tests.
+5. **D-247 corrects §6 of that record.** D-246 read the last 0.46 % of propanol's miss as fitting
+   inside the availability gate's own commensurability defect. The correction it *described* —
+   re-referencing each pool's half-saturation from the must-spectrum share to the share the
+   declared must really holds — is measured here and moves propanol **0.796275 → 0.796017**,
+   6.9 % of the gap in the wrong direction. Its probe cleared the floor only because scaling the
+   shared constant uniformly is a **level** change, bit-identical to scaling all eight spectrum
+   shares by that same factor. The residual miss is therefore still unattributed, and the repair
+   is measured-and-refused rather than owed.
 
-**Nothing here is tuned.** No parameter file and no ``src/`` file changed for this record; the one
-knob turned below is turned in a probe, and its shipped value is left exactly where it was.
+**Nothing here is tuned.** No parameter file and no ``src/`` file changed for this record or for
+D-247; every knob turned below is turned in a probe, and their shipped values are left exactly
+where they were.
 
 **The comparison is ANCHORED, not merely plausible.** Every share below is computed by
 :func:`~tests.test_fusel_keto_acid_node.de_novo_share_of` and
@@ -36,13 +44,17 @@ re-implementation. Run on the D-109 fixture they reproduce D-245's published 0.7
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import pytest
 
 from fermentation.core.chemistry import MOLAR_MASS, NITROGEN_ATOMS, nitrogen_mass_fraction
 from fermentation.core.kinetics.amino_acid_pools import (
     AMINO_ACID_SPECS,
+    ARGININE_POOL,
     ASSIMILABLE_SPECS,
     GENERIC_POOL,
+    AminoAcidSpec,
 )
 from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
 from fermentation.runtime import simulate_scheduled
@@ -201,6 +213,43 @@ def commensurate_pools(mm: dict[str, float]) -> tuple[dict[str, float], float]:
     lump_n_mm = sum(mm[s] * _n_atoms(s) for s in _LUMPED)
     pools[f"{GENERIC_POOL}_gpl"] = (lump_n_mm / _n_atoms("glutamine")) * _mw("glutamine") / 1000.0
     return pools, model_frame_mgn(mm)
+
+
+def _override_key(spec: AminoAcidSpec) -> str:
+    """The ``initial`` key overriding one pool, by the compile seam's own rule (D-100)."""
+    return "arginine_gpl" if spec.pool == ARGININE_POOL else f"{spec.pool}_gpl"
+
+
+def commensurate_gate_scales(mm: dict[str, float], values: Mapping[str, float]) -> dict[str, float]:
+    """Per-species multipliers on ``K·f_i`` that re-reference the gate to the declared must (D-247).
+
+    :func:`~fermentation.core.kinetics.amino_acid_pools.depletion_gate` scales its
+    half-saturation by ``f_i``, the **must-spectrum** share, so that at spectrum composition
+    ``gate_i`` collapses to the pre-split lumped ``aa/(K + aa)`` (D-100's reduction property).
+    A per-species override breaks the premise: the pool no longer holds ``D·f_i/Σf``, so the
+    scale belongs to a composition the run does not have. This returns the multipliers that
+    restore the property for the composition it *does* have —
+
+        ``f_eff_i = (held_i / Σheld) · Σf``   ⇒   ``multiplier_i = f_eff_i / f_i``
+
+    — i.e. the realised shares renormalised to the spectrum's own sum. **Σf is preserved on
+    purpose**: it is what keeps the correction a statement about composition only. Under it every
+    gate reads ``Σheld/(K·Σf + Σheld)`` at t=0, the lumped gate at the must's *real* total, so
+    the run's nitrogen level still reaches the gate through the numerator — where it always did.
+
+    Each multiplier is therefore ``(realised share)/(spectrum share)``, a pure ratio of two
+    compositions, and the weighted set averages to 1 by construction. That is what distinguishes
+    it from the probe D-246 ran: see
+    :func:`test_the_uniform_rescaling_that_clears_propanol_is_a_LEVEL_change_not_a_composition_one`.
+    """
+    pools, _ = commensurate_pools(mm)
+    held = {spec: pools[_override_key(spec)] for spec in AMINO_ACID_SPECS}
+    fractions = {spec: values[spec.fraction_param] for spec in AMINO_ACID_SPECS}
+    sum_held, sum_f = sum(held.values()), sum(fractions.values())
+    return {
+        spec.fraction_param: (held[spec] / sum_held) / (fractions[spec] / sum_f)
+        for spec in AMINO_ACID_SPECS
+    }
 
 
 _MUSTS = {
@@ -458,24 +507,31 @@ def test_the_model_leaves_two_fifths_of_crepins_nitrogen_standing(crepin_run):
     )
 
 
-def test_the_residual_propanol_miss_fits_inside_the_gates_own_commensurability_defect(crepin_run):
-    """The 0.46 % that is left is smaller than one unfixed defect one layer down (D-246).
+def test_the_uniform_rescaling_that_clears_propanol_is_a_LEVEL_change_not_a_composition_one(
+    crepin_run,
+):
+    """The probe that carries propanol over the floor moves the LEVEL, not the composition (D-247).
 
-    :func:`~fermentation.core.kinetics.amino_acid_pools.depletion_gate` scales its half-saturation
-    by ``Σ params[must_aa_fraction_*]`` — the **must-spectrum** shares, i.e. the composition a
-    1.0 g/L dose would produce. A per-species override bypasses that spectrum, so on a real must
-    the gate is scaled for a pool it is not gating: Crépin's two identity-agnostic pools hold
-    0.5796 g/L where the spectrum implies 0.810.
+    **Kept, renamed, and its claim corrected.** D-246 §6 ran this probe and read the result as
+    "the residual propanol miss fits inside the gate's own commensurability defect". The
+    arithmetic below is unchanged and the number still stands — 0.7963 shipped, 0.8028 rescaled —
+    but the reading was wrong, and the assertion that now closes this test is what shows it:
+    scaling ``K_amino_acids`` by 0.7155 is **indistinguishable from scaling all eight**
+    ``must_aa_fraction_*`` **shares by 0.7155**, because
+    :func:`~fermentation.core.kinetics.amino_acid_pools.depletion_gate` only ever reads the
+    product ``K·f_i``. A uniform scaling of every share changes no share *relative to any other*.
+    It is a statement that the availability constant is too big, which nothing here sources —
+    not a statement about Crépin's must having a different composition from a typical one.
 
-    Rescaling the constant by that ratio — **derived from the two numbers, not fitted to an
-    outcome** — carries propanol across the floor. The knob is turned in this probe only; its
-    shipped value is untouched, and this test asserts the shipped run still misses so the two can
-    never be confused.
+    The ratio it uses (0.5796 held against the 0.810 a 1.0 g/L dose at spectrum composition would
+    seed) compares a real pool mass against a *declared dose* the fixture only carries to keep the
+    D-32 isolability gate open — so it folds the run's nitrogen level into what was presented as a
+    composition correction. The composition-only correction is measured in the next test and is
+    worth −0.0003. **What survives of D-246 §6 is the number, not the attribution.**
 
-    So the honest verdict on propanol is neither pass nor defect: on its source's own must the
-    model lands ON the sourced floor to within the span of a commensurability defect that has not
-    been repaired, with the sign unfavourable. Repairing that gate is a core change and the
-    owner's call; it is named here so the next beat does not re-derive it.
+    The two runs are compared at ``rel=1e-12`` rather than bit-for-bit: they differ only in
+    whether the solver sees ``(K·a)·f_i`` or ``K·(f_i·a)``, and float multiplication is not
+    associative, so a bit-for-bit pin would be a platform pin — exactly D-238's scar.
     """
     _, _, shipped_params, cs = crepin_run
     spectrum = sum(cs.parameters[s.fraction_param].value for s in ASSIMILABLE_SPECS)
@@ -489,12 +545,85 @@ def test_the_residual_propanol_miss_fits_inside_the_gates_own_commensurability_d
     rescaled = de_novo_share_of(traj, schema, params, propanol)
 
     assert rescaled >= _SOURCED_DE_NOVO_FLOOR, (
-        f"rescaling the gate to the pool it actually gates leaves propanol at {rescaled:.4f}, "
-        f"still under the {_SOURCED_DE_NOVO_FLOOR:.0%} floor — this record's claim that the "
-        "residual miss fits inside that defect would then be false"
+        f"the uniform rescaling leaves propanol at {rescaled:.4f}, still under the "
+        f"{_SOURCED_DE_NOVO_FLOOR:.0%} floor — D-246's measured number would then be gone too, "
+        "and D-247's attribution of it to the level rests on this run reproducing it"
     )
     assert 0.800 <= rescaled <= 0.810
     assert params["K_amino_acids"] < shipped_params["K_amino_acids"], (
         "the probe must scale K_amino_acids DOWN; if this stops holding the two runs are the "
         "same run and the comparison is vacuous"
     )
+
+    # The correction of D-246 §6, as an identity rather than an argument: the same run comes back
+    # from scaling every spectrum share instead of the constant, so no share moved against any
+    # other and nothing about composition was tested.
+    uniform = {spec.fraction_param: ratio for spec in AMINO_ACID_SPECS}
+    by_shares, share_schema, share_params, _ = _run("crepin", scale=uniform)
+    assert de_novo_share_of(by_shares, share_schema, share_params, propanol) == pytest.approx(
+        rescaled, rel=1e-12
+    ), (
+        "scaling all eight must_aa_fraction_* by the same factor no longer reproduces the "
+        "K_amino_acids probe — if the gate has stopped reading only the product K·f_i, D-247's "
+        "reason for calling this probe a level change needs re-deriving"
+    )
+
+
+def test_the_gates_OWN_commensurate_rescaling_leaves_propanol_where_it_was(crepin_run):
+    """Re-referencing the gate to the must actually declared is worth −0.0003 (D-247).
+
+    :func:`commensurate_gate_scales` is the correction D-246 §6 *described* — each pool's
+    half-saturation re-scaled from the spectrum's share to the share the declared must really
+    holds, with ``Σf`` preserved so nothing about the level moves. It is derived from two
+    compositions and fitted to nothing.
+
+    **It does not close propanol and it does not even point that way.** 0.796275 shipped,
+    0.796017 rescaled: 6.9 % of the remaining gap to the floor, in the wrong direction, against
+    D-246 §6's "it spans the whole of what is left of propanol's miss". The move is stable to six
+    decimals across rtol/atol from 1e-6/1e-9 to 1e-10/1e-13, so it is a real (tiny) result and not
+    solver noise; measured with every Process live it moves no fusel by more than 0.5 %.
+
+    **So the defect is real and the repair is refused** — measured, not inherited, the D-120 /
+    D-189 / D-195 pattern. What the gate scales by is an unsourced modelling device either way:
+    D-100 justified the spectrum scaling as dynamic range with *zero new parameters* and
+    explicitly declined per-species Michaelis constants as "eight unsourced numbers wearing the
+    costume of fidelity" (the D-98 trap). Re-referencing to the run's own must does not source
+    anything either — it swaps one unsourced reference for another, and buys nothing measurable.
+    The reference is the open question; **only per-species half-saturations from literature can
+    settle it**, and that is a sourcing ask, not a core change.
+
+    The three multipliers pinned below are the shape of Crépin's must against the shipped
+    spectrum, and they are why the effect cancels: arginine is poorer than typical, the generic
+    remainder richer, and the tiny methionine pool nearly 4x its spectrum share.
+    """
+    traj_shipped, schema_shipped, shipped_params, _ = crepin_run
+    propanol = next(s for s in FUSEL_SPECS if s.pool == "propanol")
+    shipped = de_novo_share_of(traj_shipped, schema_shipped, shipped_params, propanol)
+    scales = commensurate_gate_scales(CREPIN_MUST_MM, shipped_params)
+
+    assert scales["must_aa_fraction_arginine"] == pytest.approx(0.574, abs=0.01)
+    assert scales["must_aa_fraction_generic"] == pytest.approx(1.406, abs=0.01)
+    assert scales["must_aa_fraction_methionine"] == pytest.approx(3.726, abs=0.05)
+    assert scales["must_aa_fraction_arginine"] < 1.0 < scales["must_aa_fraction_generic"], (
+        "the two identity-agnostic pools no longer move in opposite directions — the "
+        "reconstruction's shape against the spectrum has changed and every number here with it"
+    )
+
+    traj, schema, params, _ = _run("crepin", scale=scales)
+    rescaled = de_novo_share_of(traj, schema, params, propanol)
+
+    assert rescaled < _SOURCED_DE_NOVO_FLOOR, (
+        f"the composition-only rescaling now carries propanol to {rescaled:.4f}, over the "
+        f"{_SOURCED_DE_NOVO_FLOOR:.0%} floor — D-247's central finding is that it does not, so "
+        "this is a re-decision and not an assertion to relax"
+    )
+    assert rescaled < shipped, (
+        f"the commensurate rescaling now moves propanol TOWARD the floor ({rescaled:.6f} vs "
+        f"{shipped:.6f}) — D-246 §6's direction would be back, which is a re-decision"
+    )
+    covered = (rescaled - shipped) / (_SOURCED_DE_NOVO_FLOOR - shipped)
+    assert -0.15 <= covered <= 0.0, (
+        f"the composition correction now covers {covered:+.1%} of the gap to the floor; D-247 "
+        "measured -6.9 %, and anything approaching +100 % would restore D-246 §6's claim"
+    )
+    assert 0.7955 <= rescaled <= 0.7965
