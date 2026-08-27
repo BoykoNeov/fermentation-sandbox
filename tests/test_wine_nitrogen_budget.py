@@ -54,6 +54,7 @@ import numpy as np
 import pytest
 
 from fermentation.core.chemistry import nitrogen_mass_fraction
+from fermentation.core.kinetics.amino_acid_pools import AMINO_ACID_SPECS
 from fermentation.core.tiers import Tier
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint, compile_scenario
 from fermentation.scenario.compile import CompiledScenario
@@ -254,6 +255,11 @@ def test_the_dose_cannot_out_run_the_declaration_and_the_fit_is_held_at_colemans
     assert low.parameters["biomass_N_fraction"].tier is not Tier.SPECULATIVE
 
 
+#: The ``yan_mgl`` every :func:`_wine` scenario declares — named so the D-248 block below
+#: measures against the DECLARATION rather than against a re-derivation of it.
+_DECLARED_YAN_MGL = 250.0
+
+
 def test_all_assimilable_nitrogen_reaches_biomass_whatever_channel_it_entered_by():
     """The D-14 identity, generalised — and the reason the amino-acid dose IS extra biomass.
 
@@ -401,4 +407,156 @@ def test_autolysis_leaves_nearly_half_the_nitrogen_outside_biomass():
         "the autolysis-off control now leaves nitrogen in the pools too, so the arm above no "
         f"longer attributes anything to autolysis ({100 * ctl_pools / total0:.3f} %, against "
         "D-248's measured 0.0915 %)"
+    )
+
+
+# =====================================================================================
+# The SECOND meaning of ``yan_mgl`` — measured, and the repair REFUSED (decision D-248)
+# =====================================================================================
+
+#: Crépin *et al.* 2017's own nitrogen convention, DERIVED from its Data Set S1 rather than
+#: assumed: dividing each species' consumed mg N/L by its initial mM recovers an integer N count,
+#: and those counts are arginine **3**, tryptophan 1, histidine 1, everything else its formula's
+#: total (D-246 §2). Of the eight species this model tracks as pools, **arginine is the only one
+#: where assimilable differs from total** — every Ehrlich/Strecker precursor is a one-nitrogen
+#: molecule and glutamine's two are both released — which is what makes the whole of this
+#: question one species wide.
+#:
+#: The fate of arginine's fourth nitrogen is **excreted urea** (arginase gives ornithine + urea,
+#: and wine yeast excrete urea rather than fully degrading it). That is worth knowing beyond the
+#: ledger: urea is the ethyl-carbamate precursor, so a pool for it would carry independent
+#: fidelity value for a beat that builds the release-frame half.
+ASSIMILABLE_NITROGEN_ATOMS: dict[str, int] = {"arginine": 3}
+
+
+def _assimilable_nitrogen_fraction(species: str) -> float:
+    """``nitrogen_mass_fraction``'s assimilable twin, for the one species where they differ."""
+    from fermentation.core.chemistry import MOLAR_MASS, NITROGEN_ATOMS
+
+    atoms = ASSIMILABLE_NITROGEN_ATOMS.get(species, NITROGEN_ATOMS[species])
+    return atoms * 14.007 / MOLAR_MASS[species]
+
+
+def test_arginine_is_the_only_tracked_species_whose_two_nitrogen_FRAMES_differ():
+    """The scope of the whole question, asserted rather than assumed (decision D-248).
+
+    D-246 §2 recorded that ``yan_mgl`` is asked to be both *total* nitrogen and *assimilable*
+    nitrogen and that the two differ by 21 mg N/L on Crépin's must. Most of that 21 is tryptophan
+    and histidine, which this model does not track as pools — they lump into the generic bucket as
+    glutamine. So on the model's OWN registry the conflation is one species wide, and a repair
+    would be correspondingly narrow. If a ninth pool ever arrives carrying a non-assimilable
+    nitrogen, this fails and the design below has to be re-scoped before it is built.
+    """
+    differing = {
+        spec.species
+        for spec in AMINO_ACID_SPECS
+        if abs(_assimilable_nitrogen_fraction(spec.species) - nitrogen_mass_fraction(spec.species))
+        > 1e-12
+    }
+    assert differing == {"arginine"}, (
+        f"the species whose assimilable and total nitrogen frames differ are now {differing}, "
+        "not just arginine — D-248's scoping of the frame split as a one-species repair no "
+        "longer holds and its refusal must be re-derived over the wider set"
+    )
+
+
+def test_the_two_frames_CANCEL_so_the_shipped_seam_is_outcome_correct():
+    """Why the frame conflation is not costing anything measurable (decision D-248).
+
+    **The identity, and it is an identity rather than a coincidence.** The compile seam carves the
+    amino-acid pools out of ``yan_mgl`` at their *total* nitrogen, and every in-run deamination
+    releases that same *total* nitrogen. Same frame on both sides ⇒ the nitrogen the run makes
+    available equals the number declared, exactly, for any dose and any must spectrum. The
+    semantics in between are wrong — the pools' assimilable content is smaller than what was
+    carved out — but the two errors are the same error with opposite signs.
+
+    Driven here against the DECLARATION (250 mg N/L), not against a re-derivation of the channels,
+    because that is what makes the argument airtight: a user who types their lab's YAN gets
+    biomass built on their lab's YAN.
+
+    The small shortfall that remains is D-248's own uptake asymptote (the shared depletion gate
+    → 0 as the pool empties), not a frame effect: it grows with the dose because it is a fixed
+    fraction of pool nitrogen, and it is under half a percent at 1 g/L.
+    """
+    # The ceiling is 1 + 5e-9 rather than 1 + 1e-9 for the same reason
+    # ``test_all_assimilable_nitrogen_reaches_biomass_whatever_channel_it_entered_by`` carries a
+    # 5e-9 tolerance: D-248 added a state slot, and BDF's error norm is RMS-weighted over the
+    # state vector, so 97 -> 98 slots shifts step selection with no model change. The undosed arm
+    # reads 1.0000000023.
+    ceiling = 1.0 + 5e-9
+    for aa, floor in ((0.0, 1.0 - 1e-8), (0.25, 0.9990), (0.5, 0.9985), (1.0, 0.9955)):
+        compiled = compile_scenario(_wine(amino_acids_gpl=aa), strict=True)
+        f_n = compiled.param_values["biomass_N_fraction"]
+        x0 = float(np.asarray(compiled.y0)[compiled.schema.slice("X")][0])
+        traj = compiled.run()
+        assert traj.success, traj.message
+        biomass = float(np.asarray(traj.series("X"))[-1] + np.asarray(traj.series("X_dead"))[-1])
+        predicted = x0 + (_DECLARED_YAN_MGL / 1000.0) / f_n
+        ratio = biomass / predicted
+        assert floor <= ratio <= ceiling, (
+            f"aa={aa}: the run builds {ratio:.6f}x the biomass its DECLARED yan_mgl is worth "
+            f"({biomass:.6f} vs {predicted:.6f}). D-248 refused the frame split on the grounds "
+            "that the carve-out and release frames cancel exactly; if that has stopped holding, "
+            "the refusal is void and the split becomes owed rather than optional"
+        )
+
+
+def test_repairing_the_DECLARATION_alone_would_make_the_OUTCOME_worse():
+    """The measurement that turns D-248's refusal from a punt into a finding.
+
+    The tempting repair — carve the pools out of ``yan_mgl`` at their *assimilable* nitrogen, so
+    the field means what a lab means — is a compile-seam change and looks self-contained. It is
+    not. Carving out less leaves MORE ammonium, so the run holds more total nitrogen than the
+    declaration; and because the in-run release frame is untouched, every gram of that surplus is
+    still deaminated into ``N`` and built into biomass. **The declaration gets cleaner and the
+    number gets worse.**
+
+    Measured below at three doses. And the interaction with the other half of this beat is the
+    reason it could not have been measured this cleanly before: until assimilable-nitrogen uptake
+    was un-coupled from growth demand, 40.8 % of the pools' nitrogen was never consumed at all, so
+    most of this surplus would have sat in the pools and the regression would have been masked.
+
+    **So the two halves are ONE repair.** The complete version also re-frames the release —
+    ``draw_assimilable_nitrogen`` books arginine at 3 of its 4 nitrogens and parks the fourth as
+    excreted urea (an elemental ``g N/L`` slot weighted 1.0 on ``total_nitrogen``, the mirror of
+    D-248's skeleton-carbon park). It is confined to that helper because every Ehrlich/Strecker
+    precursor is a one-nitrogen species where the frames coincide, and it would move five
+    consumers: the D-32 swap, D-248's uptake, MLF growth, Brett growth and Maillard browning.
+    Priced here so a future beat does not re-derive it; **not built, because the shipped seam is
+    already outcome-correct** (the test above) and swapping an exactly-cancelling pair of errors
+    for a second core change earns nothing measurable.
+    """
+    surpluses = {}
+    for aa in (0.0, 0.5, 1.0):
+        compiled = compile_scenario(_wine(amino_acids_gpl=aa), strict=True)
+        y0 = np.asarray(compiled.y0)
+        by_pool = {s.pool: s for s in AMINO_ACID_SPECS}
+        surplus = 0.0
+        for pool, spec in by_pool.items():
+            if pool not in compiled.schema:
+                continue
+            mass = float(y0[compiled.schema.slice(pool)][0])
+            surplus += mass * (
+                nitrogen_mass_fraction(spec.species) - _assimilable_nitrogen_fraction(spec.species)
+            )
+        surpluses[aa] = surplus * 1000.0
+
+    assert surpluses[0.0] == pytest.approx(0.0, abs=1e-12), (
+        "an UNDOSED wine now carries a frame surplus, which it cannot: with no amino acids there "
+        "is no pool for the two frames to disagree about"
+    )
+    assert surpluses[0.5] == pytest.approx(15.28, abs=0.2), (
+        f"the declaration-only repair would add {surpluses[0.5]:.2f} mg N/L at a 0.5 g/L dose, "
+        "not D-248's measured 15.28 — the surplus this refusal is priced on has moved"
+    )
+    assert surpluses[1.0] == pytest.approx(30.55, abs=0.4)
+    # Linear in the dose, because it is one species' one nitrogen atom times a fixed spectrum
+    # share. Stated so the shape is pinned and not just two points on it.
+    assert surpluses[1.0] == pytest.approx(2.0 * surpluses[0.5], rel=1e-9), (
+        "the frame surplus is no longer linear in the dose — the arginine share of the spectrum "
+        "has stopped being fixed, and the two pins above are no longer one number"
+    )
+    # And the size that matters: it is 6.1 % of the declaration at the suite's commonest dose.
+    assert surpluses[0.5] / _DECLARED_YAN_MGL == pytest.approx(0.0611, abs=0.002), (
+        "the declaration-only repair's cost as a share of the declared YAN moved off 6.1 %"
     )

@@ -15,6 +15,9 @@ memory note sharpened it to **one sourcing ask gating four of the five remaining
    recipe, different nitrogen" looks like.
 2. **Neither paper's headline nitrogen number is this model's ``yan_mgl``**, and the difference is
    not rounding. See :func:`test_the_papers_own_nitrogen_convention_reproduces_their_own_number`.
+   **D-248 measured that conflation and REFUSED the repair** — the carve-out and release frames
+   cancel exactly, so the shipped seam is outcome-correct and fixing only the declaration would
+   cost 6.1 % of it. Do not re-propose it as an open item.
 3. **Scored on the media their own sources used, the four guards do not recover.** Propanol's
    floor closes 86 % of its gap and still misses; both Minebois legs get *materially worse*.
 4. **What the sourcing did buy is a different, upstream finding.** Crépin's Data Set S1 also
@@ -191,7 +194,19 @@ def model_frame_mgn(mm: dict[str, float]) -> float:
     for the conservation ledger (mass balance must count every atom) and wrong for "assimilable",
     since yeast releases neither tryptophan's indole nor histidine's imidazole nitrogen. The two
     meanings share one field, ``yan_mgl``, and that conflation is what the 201.11-vs-179.91 gap
-    below is made of. Named, not repaired — the fix is a core change and is the owner's call.
+    below is made of.
+
+    **MEASURED AND REFUSED AT D-248 — no longer "named, not repaired".** The conflation is real
+    and it is one species wide on this model's own registry (arginine, 4 N against 3 assimilable;
+    tryptophan and histidine are not tracked as pools). But the compile seam carves the pools out
+    of ``yan_mgl`` at their TOTAL nitrogen and every in-run deamination releases that same total,
+    so the two errors are the same error with opposite signs and the nitrogen the run makes
+    available equals the number declared, **exactly, for any dose**. Repairing the declaration
+    alone leaves more ammonium behind and the unchanged release frame still delivers all of it:
+    measured, +15.28 mg N/L at a 0.5 g/L dose (6.1 % of the declaration) and +30.55 at 1 g/L, all
+    of it now reaching biomass because D-248's uncoupled uptake consumes the must. So the halves
+    are one repair, the shipped seam is outcome-correct, and the complete version is priced rather
+    than built. See ``tests/test_wine_nitrogen_budget.py``'s D-248 block.
     """
     return sum(v * _n_atoms(s) * _M_N for s, v in mm.items() if s != "proline")
 
@@ -359,6 +374,10 @@ def test_the_papers_own_nitrogen_convention_reproduces_their_own_number():
     **And this model reads the same must 12 % heavier**, because ``nitrogen_mass_fraction`` counts
     tryptophan's indole and histidine's imidazole nitrogen. Both readings are correct for what
     they are — one is assimilable N, the other is total N — and ``yan_mgl`` is asked to be both.
+    **That conflation was measured and the repair REFUSED at D-248**, on the grounds that the
+    carve-out and release frames cancel exactly and repairing only the first would make the
+    outcome worse by 6.1 % of the declaration; see :func:`model_frame_mgn` and
+    ``tests/test_wine_nitrogen_budget.py``. It is not an open item and it is not unmeasured.
     """
     crepin_paper = paper_frame_mgn(CREPIN_MUST_MM)
     assert crepin_paper == pytest.approx(CREPIN_NASS_MGN, rel=0.005), (
