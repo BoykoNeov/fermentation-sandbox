@@ -123,7 +123,11 @@ from fermentation.core.kinetics.amino_acid_pools import (
     draw_assimilable_nitrogen,
 )
 from fermentation.core.kinetics.carbon_routing import refund_carbon_to_sugar
-from fermentation.core.kinetics.growth import biomass_growth_rate
+from fermentation.core.kinetics.growth import (
+    STORED_NITROGEN_KEY,
+    add_assimilable_nitrogen,
+    biomass_growth_rate,
+)
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -151,7 +155,7 @@ class AminoAcidAssimilation(Process):
     #: (growth builds biomass; this only re-sources its atoms), and does not touch the six
     #: precursor pools — yeast build biomass from any assimilable amino acid, but leucine's
     #: fate in this model is the Ehrlich pathway (D-33/D-99), not protein.
-    touches = (*(spec.pool for spec in ASSIMILABLE_SPECS), "N", "S")
+    touches = (*(spec.pool for spec in ASSIMILABLE_SPECS), "N", STORED_NITROGEN_KEY, "S")
     #: ``mu_max``/``K_s``/``K_n``/``biomass_N_fraction`` reach it through the shared
     #: growth-rate helper (the swap anchors to the same base rate); ``ψ``, ``K_amino_acids``
     #: and the two assimilable ``must_aa_fraction_*`` shares (which scale the D-100
@@ -196,7 +200,12 @@ class AminoAcidAssimilation(Process):
         # carbon refund stays strictly below growth's demand and the swap still cannot create
         # hexose for any ψ ≤ 1 (the guarantee is structural for the blend, not just for arginine).
         carbon = draw_assimilable_nitrogen(d, y, schema, nitrogen)
-        d[schema.slice("N")] = nitrogen  # refund displaced biomass nitrogen to ammonium
+        # Refund the displaced biomass nitrogen on the SAME split growth drew it on (D-250).
+        # This is a correctness coupling, not tidiness: growth's draw is now shared between the
+        # must pool and the intracellular store, so a refund booked wholly to `N` would credit a
+        # pool growth only partly debited and `N` would drift UP -- the D-248 charge defect
+        # returning through a second door.
+        add_assimilable_nitrogen(d, y, schema, nitrogen)
 
         # Refund the displaced biomass carbon to sugar — the inverse of growth's draw,
         # distributed across sugar slots by their current carbon content so that
@@ -303,7 +312,11 @@ class AssimilableNitrogenUptake(Process):
     #: carbon in ``amino_acid_skeleton_carbon``. Touches neither ``X`` (it funds no biomass of its
     #: own — growth does that, out of the ammonium this fills) nor ``S`` (see the docstring: a
     #: sugar refund here would create hexose) nor any of the six precursor pools.
-    touches = (*(spec.pool for spec in ASSIMILABLE_SPECS), "N", "amino_acid_skeleton_carbon")
+    touches = (
+        *(spec.pool for spec in ASSIMILABLE_SPECS),
+        STORED_NITROGEN_KEY,
+        "amino_acid_skeleton_carbon",
+    )
     #: ``mu_max`` and ``biomass_N_fraction`` set the *capacity scale* (peak specific nitrogen
     #: demand) — read as constants, never as the instantaneous growth rate, which is the whole
     #: point. ``K_amino_acids`` and the pair's two ``must_aa_fraction_*`` shares are the shared
@@ -345,7 +358,11 @@ class AssimilableNitrogenUptake(Process):
         # D-100 idiom, so this and the swap can never drift apart on the arithmetic), and take
         # the carbon that mass carried.
         carbon = draw_assimilable_nitrogen(d, y, schema, nitrogen)
-        d[schema.slice("N")] = nitrogen  # surplus nitrogen into the assimilable ammonium pool
+        # The surplus goes INTO THE CELL (D-250), not into the must's ammonium. D-248 booked it
+        # in `N`, which the acid-base balance reads at the must's mean nitrogen charge -- so
+        # nitrogen the yeast had already transported in went on titrating the must, worth up to
+        # +0.215 pH mid-run on a 2 g/L dosed must. `stored_nitrogen` is in no charge balance.
+        d[schema.slice(STORED_NITROGEN_KEY)] = nitrogen
         # Park the skeleton. NOT refunded to sugar — see the docstring: unbounded by growth's
         # draw, a sugar refund would create hexose whenever growth is stopped.
         d[schema.slice("amino_acid_skeleton_carbon")] = carbon

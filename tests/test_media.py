@@ -60,7 +60,12 @@ WINE_AMINO_ACID_SLOTS = ("amino_acids",)
 # growth's anabolic demand (D-248). The second is held as ELEMENTAL carbon (g C/L, weight 1.0 on
 # total_carbon) rather than as a representative molecule: the surplus is an arginine/glutamine
 # blend no single species stands for.
-WINE_DEBRIS_SLOTS = ("debris", "amino_acid_skeleton_carbon")
+# `stored_nitrogen` sits beside the skeleton park because it is the other half of the same
+# transfer (D-250): AssimilableNitrogenUptake splits an amino acid it takes up into carbon (the
+# skeleton park) and nitrogen (this store). D-248 booked the nitrogen half in `N`, which the
+# acid-base balance reads, so nitrogen already inside the cell went on titrating the must; this
+# slot is in no charge balance, which is the whole point of it.
+WINE_DEBRIS_SLOTS = ("debris", "amino_acid_skeleton_carbon", "stored_nitrogen")
 # Brettanomyces volatile-phenol slots (decision D-40), appended last: the p-coumaric-branch
 # precursor/intermediate/readout (hydroxycinnamics/vinylphenols/ethylphenols), the ferulic-branch
 # precursor/intermediate/readout split out at decision D-55 (ferulic_acid/vinylguaiacols/
@@ -293,7 +298,7 @@ def test_wine_schema_has_single_sugar_slot():
     # + citrate (D-31) + cation_charge (D-18) + 1 free-SO₂ slot (D-22) + 1 oxofructose botrytis
     # SO₂-binder must input (D-130) + 1 mcfa MLF-inhibitor must input (D-131) + X_mlf + X_mlf_dead
     # slots (D-23 catalyst / D-39 bacterial lees) + 1 amino_acids slot (D-32) + 1 debris slot
-    # (D-34) + 1 amino_acid_skeleton_carbon slot (D-248)
+    # (D-34) + 1 amino_acid_skeleton_carbon slot (D-248) + 1 stored_nitrogen slot (D-250)
     # + 8 Brett slots (hydroxycinnamics, vinylphenols, ethylphenols — the p-coumaric
     # branch, D-40; ferulic_acid, vinylguaiacols, ethylguaiacols — the ferulic branch, D-55;
     # X_brett, X_brett_dead) + 1 mercaptans slot (D-45) + 2 keto-acid slots (pyruvate D-49,
@@ -374,7 +379,12 @@ def test_wine_schema_has_single_sugar_slot():
     # ratio. The second pair, after ascorbate, that is inert by default STATE: 0 unless dosed).
     # +1 for the D-248 amino_acid_skeleton_carbon park (98): the carbon of amino acids taken up
     # beyond growth's anabolic demand, held as elemental carbon and ON total_carbon at weight 1.0.
-    assert schema.size == 98
+    # +1 for the D-250 stored_nitrogen slot (99): the NITROGEN half of that same uptake, held
+    # intracellularly and ON total_nitrogen at weight 1.0. It exists because D-248 parked it in
+    # `N` instead, and `N` is read by the acid-base charge balance (D-209) — so nitrogen the
+    # yeast had already transported in went on titrating the must, worth up to +0.215 pH mid-run
+    # on a 2 g/L dosed must. This slot is in NO charge balance, which is the whole of the repair.
+    assert schema.size == 99
 
 
 def test_beer_schema_has_three_sequential_sugars():

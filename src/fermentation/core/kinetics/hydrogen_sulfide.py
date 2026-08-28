@@ -100,6 +100,7 @@ from collections.abc import Mapping
 from fermentation.core.kinetics.arrhenius import arrhenius_factor
 from fermentation.core.kinetics.autolysis import autolysis_flux
 from fermentation.core.kinetics.carbon_routing import fermentative_flux_shape
+from fermentation.core.kinetics.growth import assimilable_nitrogen_pools
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -140,7 +141,11 @@ class HydrogenSulfideProduction(Process):
         flux = fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
         if flux <= 0.0:
             return d
-        n = max(float(y[schema.slice("N")][0]), 0.0)
+        # Nitrogen-limitation DE-repression is a signal about the cell, so it reads the
+        # intracellular store as well as the must pool (D-250) -- pre-D-250 this read `N` alone
+        # and got the same number, uptake's surplus having been booked there. Reading `N` alone
+        # now would de-repress H2S in a cell that is nitrogen-replete.
+        n = sum(assimilable_nitrogen_pools(y, schema))
         k_n = params["K_h2s_n"]
         nitrogen_gate = k_n / (k_n + n)  # ~0 when N replete, -> 1 as N -> 0 (de-repression)
         d[schema.slice("h2s")] = params["k_h2s"] * flux * nitrogen_gate

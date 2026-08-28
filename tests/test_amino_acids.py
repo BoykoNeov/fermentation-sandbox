@@ -113,7 +113,16 @@ def test_metadata():
     # The swap draws the IDENTITY-AGNOSTIC pools (D-100): biomass needs amino-acid nitrogen and
     # does not care which molecule carried it. It never touches a precursor — leucine's fate in
     # this model is the Ehrlich pathway, not protein.
-    assert set(p.touches) == {"amino_acids", "amino_acids_generic", "N", "S"}
+    # `stored_nitrogen` from D-250: growth's nitrogen draw is split between the must pool and
+    # the intracellular store, and the swap refunds that draw, so it must refund on the SAME
+    # split or `N` drifts up and the D-248 charge defect returns through a second door.
+    assert set(p.touches) == {
+        "amino_acids",
+        "amino_acids_generic",
+        "N",
+        "stored_nitrogen",
+        "S",
+    }
     for precursor in (
         "leucine",
         "isoleucine",

@@ -51,6 +51,56 @@ from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 
+#: The intracellular assimilable-nitrogen store (decision D-250) — wine schemas only. ``N``
+#: keeps its D-209 meaning, EXTRACELLULAR assimilable nitrogen, and is the only one of the two
+#: the acid-base charge balance reads; this one titrates nothing because it is inside a cell.
+STORED_NITROGEN_KEY = "stored_nitrogen"
+
+
+def assimilable_nitrogen_pools(y: FloatArray, schema: StateSchema) -> tuple[float, float]:
+    """``(extracellular N, intracellular store)`` [g N/L], each clamped >= 0 (decision D-250).
+
+    Yeast growth is limited by, and draws on, *both*: nitrogen the cell has already transported
+    in is exactly as available to anabolism as nitrogen still in the must. The store is absent
+    from beer's schema (the amino-acid ledger is wine-only, D-30/D-32), which reads as 0.0 and
+    makes every caller reduce to its pre-D-250 form term-for-term.
+    """
+    n = max(float(y[schema.slice("N")][0]), 0.0)
+    if STORED_NITROGEN_KEY not in schema:
+        return n, 0.0
+    return n, max(float(y[schema.slice(STORED_NITROGEN_KEY)][0]), 0.0)
+
+
+def add_assimilable_nitrogen(
+    d: FloatArray, y: FloatArray, schema: StateSchema, flux: float
+) -> None:
+    """Book ``flux`` [g N/L/h] across ``N`` and the store **in proportion to what each holds**.
+
+    The single source of truth for how anabolic nitrogen moves between the two pools
+    (decision D-250, the D-8/D-32 idiom): growth's draw and the
+    :class:`~fermentation.core.kinetics.amino_acids.AminoAcidAssimilation` refund of that same
+    draw must use the *identical* split, or the swap refunds to a pool growth did not debit and
+    ``N`` drifts upward — which is the D-248 charge defect returning through a second door.
+
+    **Proportional rather than store-first**, deliberately: a preferential draw puts a C0 kink
+    exactly where the store empties, and the BDF Jacobian probe straddles precisely that kind of
+    gate ([[feedback-a-gate-is-a-discontinuity-the-solver-probes]]). Proportional splitting is
+    smooth, keeps the two pools' *ratio* invariant under drawdown — which is what lets the SUM
+    ``N + store`` follow exactly the trajectory ``N`` alone followed before D-250 — and cannot
+    drive either pool negative faster than it drives the total.
+
+    On an empty total the whole flux is booked to ``N``; both callers guard on a positive growth
+    rate, which requires a positive total, so that branch is unreachable and exists only so the
+    helper is total-function.
+    """
+    n, stored = assimilable_nitrogen_pools(y, schema)
+    total = n + stored
+    if total <= 0.0 or stored <= 0.0:
+        d[schema.slice("N")] += flux
+        return
+    d[schema.slice("N")] += flux * (n / total)
+    d[schema.slice(STORED_NITROGEN_KEY)] += flux * (stored / total)
+
 
 def biomass_growth_rate(y: FloatArray, schema: StateSchema, params: Mapping[str, float]) -> float:
     """Base (pre-modifier) biomass growth rate ``dX/dt = mu·X`` [g/L/h].
@@ -67,7 +117,10 @@ def biomass_growth_rate(y: FloatArray, schema: StateSchema, params: Mapping[str,
     the swap alike, so both track the realised rate (decision D-32).
     """
     x = float(y[schema.slice("X")][0])
-    n = max(float(y[schema.slice("N")][0]), 0.0)
+    # Both nitrogen pools limit growth (D-250): what is still in the must and what the cells
+    # have already transported in. Pre-D-250 this read `N` alone, which was the same number
+    # because uptake's surplus was booked there -- see `assimilable_nitrogen_pools`.
+    n = sum(assimilable_nitrogen_pools(y, schema))
     s_total = max(float(y[schema.slice("S")].sum()), 0.0)
     if x <= 0.0 or s_total <= 0.0 or n <= 0.0:
         return 0.0
@@ -86,6 +139,12 @@ class GrowthNitrogenLimited(Process):
     name = "growth_nitrogen_limited"
     tier = Tier.PLAUSIBLE
     touches = ("X", "S", "N")
+    #: ``stored_nitrogen`` is medium-conditional (D-250): growth draws its nitrogen from the
+    #: extracellular pool and the intracellular store together, split by what each holds, but
+    #: the store is wine-only (it mirrors the wine-only amino-acid ledger, D-30/D-32). Growth is
+    #: the one primary-fermentation Process wired into BOTH media, so it is the case
+    #: :attr:`Process.touches_where_present` exists for.
+    touches_where_present = (STORED_NITROGEN_KEY,)
     #: Parameters this Process reads. :meth:`ProcessSet.tier_of` folds their tiers
     #: into the output tier of ``X``/``S``/``N`` (parameter-tier propagation, D-1),
     #: so a speculative parameter here caps those outputs at speculative.
@@ -104,7 +163,10 @@ class GrowthNitrogenLimited(Process):
         if dx <= 0.0:
             return d
         d[schema.slice("X")] = dx
-        d[schema.slice("N")] = -params["biomass_N_fraction"] * dx  # YAN into biomass
+        # YAN into biomass, split across the must pool and the intracellular store in
+        # proportion to what each holds (D-250). The shared helper is what keeps this draw and
+        # the D-32 swap's refund of it on the same split.
+        add_assimilable_nitrogen(d, y, schema, -params["biomass_N_fraction"] * dx)
 
         # Carbon skeleton for the new biomass is drawn from sugar. Distribute the
         # carbon demand across the available sugar slots in proportion to their

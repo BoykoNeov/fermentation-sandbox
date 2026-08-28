@@ -60,6 +60,8 @@ from tests.test_fusel_keto_acid_node import de_novo_share_of
 UPTAKE = AssimilableNitrogenUptake.name
 GROWTH = GrowthNitrogenLimited.name
 SKELETON = "amino_acid_skeleton_carbon"
+#: The D-250 intracellular store — where the nitrogen half of the same transfer goes.
+STORED = "stored_nitrogen"
 
 #: Crépin's own N_T — the time her Data Set S1 records the must's assimilable nitrogen exhausted
 #: at, 28 h against an end of fermentation at 150 h.
@@ -137,8 +139,10 @@ def test_the_uptake_rate_does_not_read_the_growth_rate(full_params):
 
     d_fast = ps.total_derivatives(0.0, fast, full_params)
     d_slow = ps.total_derivatives(0.0, slow, full_params)
-    n_fast = float(d_fast[schema.slice("N")][0])
-    n_slow = float(d_slow[schema.slice("N")][0])
+    # Read at the STORE since D-250: the nitrogen goes intracellular, not into the must's
+    # ammonium. The claim under test is unchanged — it is about the rate, not the destination.
+    n_fast = float(d_fast[schema.slice(STORED)][0])
+    n_slow = float(d_slow[schema.slice(STORED)][0])
     assert n_fast > 0.0
     assert n_fast == pytest.approx(n_slow, rel=1e-12), (
         f"uptake drew {n_fast:.6e} g N/L/h at the fast-growing state and {n_slow:.6e} at the "
@@ -160,10 +164,14 @@ def test_uptake_runs_at_a_state_where_growth_is_entirely_stopped(full_params):
     assert biomass_growth_rate(y, schema, full_params) == 0.0
 
     d = _uptake_only(schema).total_derivatives(0.0, y, full_params)
-    assert float(d[schema.slice("N")][0]) > 0.0, (
-        "uptake contributes nothing at a stopped-growth state, so the ammonium pool can still "
-        "only fall and the deadlock D-248 names is back"
+    assert float(d[schema.slice(STORED)][0]) > 0.0, (
+        "uptake contributes nothing at a stopped-growth state, so the assimilable nitrogen the "
+        "cells can reach can still only fall and the deadlock D-248 names is back"
     )
+    # ...and it must not do it through `N` any more (D-250): the must's ammonium is where
+    # D-248 parked the surplus, which is what put nitrogen already inside the cell back into
+    # the acid-base balance.
+    assert float(d[schema.slice("N")][0]) == 0.0
     for spec in ASSIMILABLE_SPECS:
         assert float(d[schema.slice(spec.pool)][0]) < 0.0
 
@@ -298,9 +306,12 @@ def test_the_process_is_speculative_and_declares_what_it_touches():
     assert set(AssimilableNitrogenUptake.touches) == {
         "amino_acids",
         "amino_acids_generic",
-        "N",
+        STORED,
         SKELETON,
     }
+    # `N` is NOT touched since D-250, and that is the repair, not a tidy-up: the surplus is
+    # inside the cell, and `N` is the slot the acid-base charge balance reads (D-209/D-210).
+    assert "N" not in AssimilableNitrogenUptake.touches
     # The six precursor pools are NOT touched, which is what keeps the fusel result attributable
     # to the biomass denominator alone (D-248) and keeps D-100's cross-subsystem starvation shut
     # against the Ehrlich re-route.

@@ -488,9 +488,11 @@ def test_growth_accelerates_phenols():
     # the yeast's own uptake from its growth demand, so the yeast now strips the must to ~0.6 %
     # the way Crépin measures instead of stopping at 40.8 %. That is the sourced behaviour and it
     # is NOT disabled globally — it is isolated here for exactly the reason the re-route is. The
-    # competition it creates is real and is recorded as D-248's own residue: Brett draws ONLY the
-    # amino-acid pair and cannot touch the `N` slot the uptake fills, so the model over-states
-    # yeast/bacteria nitrogen competition. Repairing that is a bacterial-nitrogen beat.
+    # competition it creates is real, and D-250 settled that it is CORRECT rather than the residue
+    # D-248 recorded: the surplus sits INSIDE the yeast cell (`stored_nitrogen`, in no charge
+    # balance), so Brett's blindness to it is right and real yeast really do take essentially all
+    # the assimilable nitrogen. The model's gap is a bacterial nitrogen source yeast do not
+    # compete for (peptides) — not this store. Isolating the competitor here is permanent.
     _ISOLATED = ("fusel_amino_acid_reroute", "assimilable_nitrogen_uptake")
     _, dynamic = _run(
         days=120.0,

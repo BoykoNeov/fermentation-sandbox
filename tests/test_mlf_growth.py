@@ -103,10 +103,12 @@ def test_growth_accelerates_conversion():
     # shared identity-agnostic pool to ~0 during primary fermentation — the sourced behaviour
     # (Crépin measures 0.2 % of the must's YAN left) but also a competitor that would leave this
     # co-inoculated bacterium with nothing to grow on. Isolated in BOTH arms below, which is the
-    # same remedy the re-route already gets. The competition is REAL and is D-248's recorded
-    # residue: MLF draws only the amino-acid pair and cannot touch the `N` slot uptake fills, so
-    # the model over-states yeast/bacteria nitrogen competition. That is a bacterial-nitrogen
-    # beat, not a reason to hold the yeast side back.
+    # same remedy the re-route already gets. D-248 recorded the competition as a defect (MLF
+    # could not touch the `N` slot uptake filled) and D-250 CLOSED that reading: the surplus is
+    # inside the yeast cell, so bacterial blindness to it is correct, and starving a co-inoculated
+    # bacterium is the model being right — real yeast take essentially all the assimilable
+    # nitrogen. What the model lacks is a bacterial nitrogen source yeast do not compete for
+    # (peptides). Isolating the competitor here is therefore permanent, not a stopgap.
     # Disable the benign senescence baseline (MLF v2, D-41) in BOTH runs: it erodes X_mlf on its own
     # slow timescale regardless of growth, which would confound this GROWTH-isolation contrast (the
     # fixed-X_mlf control below could no longer be exactly constant). Senescence is exercised on its
@@ -230,8 +232,8 @@ def test_mid_run_pitch_growth_is_emergently_gated_by_ethanol():
         # D-248 adds the larger competitor for that same pool — the yeast's own uptake, now
         # un-coupled from its growth demand, which strips the must to ~0.6 % as Crépin measures.
         # Isolated here for the same reason, in BOTH arms so it cannot bias the difference. The
-        # competition is real and is D-248's recorded residue (MLF cannot draw the `N` slot the
-        # uptake fills), which is a bacterial-nitrogen beat rather than a defect in this test.
+        # competition is real, and D-250 settled that it is CORRECT rather than a residue: the
+        # nitrogen is inside the yeast, and what the model lacks is bacterial peptide substrate.
         cs.process_set.disable("assimilable_nitrogen_uptake")
         if not growth:
             cs.process_set.disable("malolactic_growth")  # survives pitch_mlf (aa-gated, not pitch)

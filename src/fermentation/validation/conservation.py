@@ -490,6 +490,13 @@ def total_nitrogen(
     w = schema.zeros()
     if "N" in schema:
         w[schema.slice("N")] = 1.0
+    # The D-250 intracellular store: assimilable nitrogen the yeast has transported in but not
+    # yet built into biomass. Elemental g N/L, exactly like `N`, so weight 1.0 -- and
+    # AssimilableNitrogenUptake moves nitrogen from the amino-acid pools into it while growth
+    # draws it back out, so the ledger closes through both. Wine-only; a constant 0 term on any
+    # beer run and on any wine run with the amino-acid ledger disabled.
+    if "stored_nitrogen" in schema:
+        w[schema.slice("stored_nitrogen")] = 1.0
     # Amino-acid pool (decision D-32): the aa pool carries nitrogen (arginine, 4 N per
     # molecule) and the AminoAcidAssimilation swap moves that nitrogen aa → N (ammonium
     # refund) mole-for-mole, so weighting the pool at arginine's nitrogen fraction keeps

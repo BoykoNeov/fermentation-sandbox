@@ -680,10 +680,27 @@ def wine_schema() -> StateSchema:
             "`N`-slot idiom rather than the debris/glucan one: the surplus is a blend of "
             "arginine and glutamine skeletons and no single molecule represents it. "
             "AssimilableNitrogenUptake parks it here because the nitrogen it came in with is "
-            "refunded to `N` while growth still draws every gram of biomass carbon from sugar — "
+            "refunded to `stored_nitrogen` while growth still draws every gram of biomass "
+            "carbon from sugar — "
             "so the skeleton is genuinely surplus and must NOT be credited back to `S` (that "
             "would create hexose at zero growth rate, which the D-32 swap's bound forbids). "
             "ON total_carbon at weight 1.0, nitrogen-free",
+        ),
+        VarSpec(
+            "stored_nitrogen",
+            "g N/L",
+            default=0.0,
+            description="assimilable nitrogen already taken up by the yeast and held "
+            "INTRACELLULARLY, ahead of growth's anabolic demand (decision D-250). The "
+            "destination AssimilableNitrogenUptake (D-248) parks its nitrogen in; growth "
+            "draws from this and `N` together, in proportion to what each holds. "
+            "Deliberately NOT in the acid-base charge balance: nitrogen inside a cell "
+            "titrates nothing in the must, which is exactly what booking it in `N` got "
+            "wrong -- D-248 raised must pH by up to 0.215 on a dosed must. `N` therefore "
+            "keeps its D-209 meaning (EXTRACELLULAR assimilable nitrogen) and the "
+            "`nitrogen_charge_excess` invariant that no Process adds differently-charged "
+            "nitrogen to `N` (D-210) holds again. ON total_nitrogen at weight 1.0, "
+            "carbon-free",
         ),
         VarSpec(
             "hydroxycinnamics",

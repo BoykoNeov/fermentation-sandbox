@@ -72,6 +72,14 @@ class Process(ABC):
     tier: Tier
     #: State variable names this Process is allowed to contribute to.
     touches: tuple[str, ...]
+    #: Declared touches that exist in SOME media only (decision D-250). A name here is
+    #: allowed-but-not-required: it is exempt from the "touches unknown variables" check, and
+    #: permitted in the strict leak check only in a schema that actually has it. This is for a
+    #: Process wired into both media that writes a slot only one medium carries — growth and the
+    #: wine-only intracellular nitrogen store is the first case. It is NOT a relaxation: a slot
+    #: absent from this tuple and from :attr:`touches` still fails strict mode, and a Process
+    #: writing a slot the schema does not have still fails on the slice lookup.
+    touches_where_present: tuple[str, ...] = ()
     #: Parameters this Process reads. Declared so :meth:`ProcessSet.tier_of` can
     #: cap the Process's output tier by the tiers of its inputs (D-1): a VALIDATED
     #: mechanism running on speculative parameters reports speculative. Defaults to
@@ -282,8 +290,9 @@ class ProcessSet:
                 f"expected ({self.schema.size},)"
             )
         allowed = self.schema.zeros().astype(bool)
-        for var in p.touches:
-            allowed[self.schema.slice(var)] = True
+        for var in (*p.touches, *p.touches_where_present):
+            if var in self.schema:
+                allowed[self.schema.slice(var)] = True
         leaked = (contribution != 0.0) & ~allowed
         if leaked.any():
             bad = [n for n in self.schema.names if (contribution[self.schema.slice(n)] != 0).any()]
@@ -323,7 +332,9 @@ class ProcessSet:
         mods = self.active_modifiers
         tiers: list[Tier] = []
         for p in self.active:
-            if variable not in p.touches:
+            # `touches_where_present` counts here exactly like `touches` (D-250): in a schema
+            # that HAS the slot the Process really does shape it, so it must cap its tier.
+            if variable not in p.touches and variable not in p.touches_where_present:
                 continue
             tiers.append(p.tier)
             if param_tiers is not None:

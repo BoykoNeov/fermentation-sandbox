@@ -176,7 +176,10 @@ from fermentation.core.kinetics.carbon_routing import (
 from fermentation.core.kinetics.carbon_routing import (
     refund_carbon_to_sugar as _refund_carbon_to_sugar,
 )
-from fermentation.core.kinetics.growth import biomass_growth_rate
+from fermentation.core.kinetics.growth import (
+    assimilable_nitrogen_pools,
+    biomass_growth_rate,
+)
 from fermentation.core.process import Process
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
@@ -253,7 +256,10 @@ def fusel_rate_shape(
     flux = _fermentative_flux_shape(y, schema, params["K_sugar_uptake"])
     if flux <= 0.0:
         return 0.0
-    n = max(float(y[schema.slice("N")][0]), 0.0)
+    # The cell's nitrogen status, not the must's: both the extracellular pool and the
+    # intracellular store feed the Ehrlich pathway (D-250). Pre-D-250 this read `N` alone and
+    # got the same number, because uptake's surplus was booked there.
+    n = sum(assimilable_nitrogen_pools(y, schema))
     if n <= 0.0:  # Ehrlich needs assimilable nitrogen (amino acids)
         return 0.0
     nitrogen_gate = n / (params["K_n"] + n)

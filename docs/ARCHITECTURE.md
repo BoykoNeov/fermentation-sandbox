@@ -61,7 +61,7 @@ Current size, from `get_medium(...).schema`:
 
 | Medium | Named variables | Float slots | Sugar slots |
 |--------|-----------------|-------------|-------------|
-| wine   | 98 | 98 | 1 |
+| wine   | 99 | 99 | 1 |
 | beer   | 57 | 59 | 3 |
 
 Tier and uncertainty do **not** ride inside these floats — they are properties of Processes and
@@ -233,11 +233,31 @@ present, reading `mu_max` as a constant and never `biomass_growth_rate`. Before 
 the only route from the pools into biomass nitrogen and its rate sat strictly below growth's own
 draw, so ammonium could only fall; when it hit zero, growth's Monod shut growth off and the swap
 stopped with it, freezing 40.8 % of a reconstructed Crépin must unconsumed against her measured
-0.2 %. The drawn nitrogen goes to `N` and the carbon skeleton is **parked** in the new
-`amino_acid_skeleton_carbon` slot — elemental carbon, weight 1.0 on `total_carbon`, the `N`-slot
-idiom rather than the `debris`/glucan one — because an un-coupled flux has no bound against
-growth's carbon draw and a sugar refund would create hexose at zero growth rate. Not a rate-
-modifier target, so it carries no temperature dependence (a named simplification).
+0.2 %. Both halves of what it takes up are **parked** in slots of their own: the carbon
+skeleton in `amino_acid_skeleton_carbon` (elemental carbon, weight 1.0 on `total_carbon`, the
+`N`-slot idiom rather than the `debris`/glucan one) — because an un-coupled flux has no bound
+against growth's carbon draw and a sugar refund would create hexose at zero growth rate — and the
+nitrogen in `stored_nitrogen`. Not a rate-modifier target, so it carries no temperature
+dependence (a named simplification).
+
+**The nitrogen half is INTRACELLULAR, and that is a charge statement (D-250).** D-248 refunded it
+to `N`, which `acidbase` reads at the must's mean charge per mole of nitrogen (D-209) — so
+nitrogen the yeast had already transported in went on titrating the must, worth up to **+0.215
+pH** mid-run on a 2 g/L amino-acid-dosed wine, and violating `nitrogen_charge_excess`'s own
+recorded invariant that no Process adds differently-charged nitrogen to `N` (D-210). Mass was
+never at issue; the ledger always closed. `stored_nitrogen` is in **no charge balance**.
+`GrowthNitrogenLimited`'s Monod and its `f_N·dX` draw read the two pools **together**, split in
+proportion to what each holds, and the D-32 swap refunds that draw on the *same* split — a shared
+helper (`growth.add_assimilable_nitrogen`), because a refund booked wholly to `N` against a split
+draw lets the must's ammonium drift back up. Since both pools have the same source and the same
+sinks, the sum `N + stored_nitrogen` follows exactly the trajectory `N` alone followed before, so
+the repair's entire observable footprint is pH: beer is bit-identical and wine moves nowhere else.
+MLF and Brett stay blind to the store on purpose — it is inside a yeast cell.
+
+The store is the first user of `Process.touches_where_present`: a **medium-conditional declared
+touch**, for the case of a Process wired into both media that writes a slot only one of them
+carries. Growth is that case. The name is exempt from the "touches unknown variables" check and
+permitted by the strict leak check only in a schema that has it; anything undeclared still fails.
 
 **Coleman's yield fit is evaluated at that total, and HELD at the domain it was fitted over
 (D-244).** `_apply_nitrogen_dependent_yield` computes `biomass_N_fraction` from
@@ -547,7 +567,7 @@ Two disciplines, both as code:
 
 ## Testing & quality gates
 
-`uv run pytest -n auto` (87 test files; unit, integration, conservation, sampling-surface and
+`uv run pytest -n auto` (88 test files; unit, integration, conservation, sampling-surface and
 doc-consistency checks), `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`
 (strict on `src`). CI runs all **four** on Python 3.13 and 3.14 — the format check is a separate
 gate from the lint check and fails independently of it, which is how four consecutive commits

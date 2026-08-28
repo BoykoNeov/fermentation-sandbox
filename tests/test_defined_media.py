@@ -351,8 +351,22 @@ def minebois_run():
 
 
 def _assimilable_n_mgl(traj, schema, index: int) -> float:
-    """Assimilable N [mg N/L] standing in the ``N`` slot plus the eight pools, at ``index``."""
+    """Assimilable N [mg N/L] the yeast has NOT yet built into biomass, at ``index``.
+
+    The ``N`` slot, the eight pools, and — since D-250 — the intracellular store. The store is
+    part of this total because that is what the quantity has always meant here: D-248's
+    "40.8 % -> 0.62 % residual" was measured when uptake's surplus sat in ``N``, so dropping the
+    store would silently redefine the number rather than migrate it.
+
+    **D-250 makes a second, narrower reading possible for the first time**, and it is the one
+    Crépin actually measures: assimilable N still in the MEDIUM, i.e. this total minus the store.
+    The two were indistinguishable before D-250 because the model held them in one slot. See
+    ``test_nitrogen_stored_intracellularly.py`` for that reading and its number; D-249's
+    conclusion is unchanged under it.
+    """
     total = float(traj.y[schema.slice("N"), index][0])
+    if "stored_nitrogen" in schema:
+        total += max(float(traj.y[schema.slice("stored_nitrogen"), index][0]), 0.0)
     for spec in AMINO_ACID_SPECS:
         if spec.pool in schema:
             pool = max(float(traj.y[schema.slice(spec.pool), index][0]), 0.0)
