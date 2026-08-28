@@ -31,7 +31,7 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-28)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-250** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **2034 + 6 xfail** (D-250 adds 12 and one state slot, 98→99) (3 D-188 Herzan; 2 D-215's own; **1 fusel** — D-244's five became one at **D-248**, which closed four by un-coupling nitrogen uptake and lowered NO sourced threshold) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats. Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-250** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **2036 + 6 xfail** (D-250 adds 14 and one state slot, 98→99) (3 D-188 Herzan; 2 D-215's own; **1 fusel** — D-244's five became one at **D-248**, which closed four by un-coupling nitrogen uptake and lowered NO sourced threshold) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats. Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — and **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Beer acid-base = **NINE** beats BUILT (D-178→D-183, D-207→D-209, D-211, **D-239**), `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING** — day-1 pH admits an acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms. **D-239 BUILT D-209 §8's buffer-removal half and its day-7 cost puts the high `z̄` edge OUTSIDE Tyrell's envelope ON PURPOSE — never xfail that edge.**
@@ -400,8 +400,9 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   `stored_nitrogen` is in **no** charge balance; growth's Monod + draw and the swap's refund use **ONE proportional
   split helper** (refund wholly to `N` ⇒ net `dN/dt` POSITIVE and it returns). Footprint is pH ALONE: beer
   **bit-identical**, wine ≤1.9e-7 (schema, falsified on the undosed arm). **The bacterial residue is CLOSED as
-  NOT-a-defect** — the store is inside a yeast cell, Brett's 96 % loss is the model being RIGHT, and the real gap is
-  **peptides**. Never teach a bacterium to read it. → `prohibitions/nitrogen-storage-and-charge.md`
+  NOT-a-defect** — the store is inside a yeast cell, Brett's 96 % loss is the model being RIGHT, the real gap is
+  **peptides**, and the repair UN-MASKED the malate sign (it FLIPPED across the dose; now 4.66x/1.18x, both pinned).
+  Never teach a bacterium to read the store. → `prohibitions/nitrogen-storage-and-charge.md`
 
 ## Accepted deviations — recorded, NOT tuned (do not re-litigate as bugs)
 Realised Phe share under-shoots (guard-safe); static share ignores feedback inhibition; de-novo decarb CO₂

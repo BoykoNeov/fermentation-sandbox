@@ -51,11 +51,14 @@ on a dosed must, or "MLF/Brett are starved by yeast uptake". Sibling:
   nitrogen source the model lacks — PEPTIDES, which yeast do not take.** Isolating the competitor
   in the MLF/Brett tests is now PERMANENT, not a stopgap. Never teach a bacterium to read the store.
 
-- **The malate reading REVERSES across the dose — never quote the 2 g/L one alone.** At 0.5 g/L the
-  starved arm leaves **4.0× more** malate at day 3 (starvation showing through); at 2 g/L the
-  0.215 pH excursion lifts MLF's own pH logistic enough to over-compensate and the starved arm
-  converts MORE. Two errors in one observable. Brett's confound points the OTHER way (higher pH ⇒
-  less molecular SO₂ ⇒ less inhibition), which is what makes its 96 % attributable.
+- **The malate reading REVERSED across the dose, and D-250 FIXED that — the defect was the
+  sign's dose-dependence, not the ratio at either point.** Pre-repair: 4.00× more malate left by
+  the starved arm at 0.5 g/L, **0.853×** at 2 g/L (the 0.215 pH excursion lifting MLF's own pH
+  logistic past the catalyst it had lost). Post-repair **4.655× and 1.181× — same sign, both
+  doses**, and pinned there. Nothing in the repo exercised a co-inoculated MLF with uptake LIVE
+  (every shipped MLF/Brett test isolates the competitor in both arms), which is why it rode.
+  Brett's confound points the OTHER way (higher pH ⇒ less molecular SO₂ ⇒ less inhibition),
+  which is what makes its 96 % attributable despite a tailwind.
 
 - **`Process.touches_where_present` is a medium-conditional DECLARED touch, not an exemption.**
   For a Process wired into BOTH media that writes a slot only one carries — growth is the one
@@ -67,8 +70,11 @@ on a dosed must, or "MLF/Brett are starved by yeast uptake". Sibling:
   death or autolyse (conservation still closes; equally true of D-248's parking in `N`). And
   D-250 makes a **narrower reading separable for the first time** — nitrogen still OUTSIDE the
   cells, which is what Crépin sampled. `_assimilable_n_mgl` keeps counting the store, because that
-  is what D-248's "40.8 % → 0.62 %" meant. On the narrower quantity **D-249's gap reads 1.71×, not
-  1.59×** — and **D-249's verdict survives**: still slower than the 1.92× run containing it.
+  is what D-248's "40.8 % → 0.62 %" meant. On the narrower quantity **D-249's gap reads 1.7062×
+  (16.411 h) against 1.5902× (17.608 h)** — and **D-249's verdict survives**: still slower than
+  the 1.9184× run containing it. The store peaks at 32.753 mg N/L, 16.3 % of the must's
+  assimilable N. **Cross the curve INTERPOLATED** (D-249's `_cross`): the sample index reads it
+  0.5 h late and returns 1.66, incomparable with the 1.59 it is scored against.
   Re-deriving D-249's headline on it is a separate beat.
 
 Measurements: `M:\claud_projects\temp\ferment\d250-bacterial-nitrogen\` — `PREREG.md` and

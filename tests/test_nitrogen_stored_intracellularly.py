@@ -60,7 +60,7 @@ from fermentation.scenario import (
     amino_acid_dose_nitrogen_mgl,
     compile_scenario,
 )
-from fermentation.validation import assert_conserved, total_nitrogen
+from fermentation.validation import assert_conserved, assert_nonnegative, total_nitrogen
 from tests.test_defined_media import _assimilable_n_mgl, commensurate_scenario
 from tests.test_fusel_keto_acid_node import _OTHER_PRECURSOR_CONSUMERS
 
@@ -187,6 +187,34 @@ def test_the_ph_excursion_d248_shipped_is_gone():
     )
 
 
+@pytest.mark.parametrize("dose", [0.5, 2.0])
+def test_the_starved_bacterium_now_leaves_more_malate_at_both_doses(dose):
+    """The repair UN-MASKS the physical signal, and this is the one case nothing else runs.
+
+    Every shipped MLF and Brett test isolates the uptake competitor in both arms, which is why
+    the artefact could ride so long: nothing exercised a co-inoculated MLF with uptake LIVE.
+
+    Yeast uptake starves the bacterium, so the starved arm must leave MORE malate unconverted.
+    Before D-250 that held at 0.5 g/L (4.00x) and **reversed** at 2 g/L (0.853x) — the pH
+    excursion lifted MLF's own pH logistic `1/(1 + 10^(pH_half_mlf - pH))` enough to
+    over-compensate for the catalyst it had lost. The reading depended on the DOSE, which is the
+    defect, not the ratio at either point. It now reads 4.66x and 1.18x: same sign, both doses.
+    """
+    must = _dosed_must(dose)
+    must["mlf_pitch_gpl"] = 0.05
+    _, on = _run(dict(must), uptake=True)
+    _, off = _run(dict(must), uptake=False)
+
+    malic_on = float(np.interp(72.0, on.t, on.series("malic")))
+    malic_off = float(np.interp(72.0, off.t, off.series("malic")))
+    assert malic_on > malic_off, (
+        f"at {dose} g/L the starved arm left {malic_on:.4f} g/L malate against the control's "
+        f"{malic_off:.4f} — LESS, so losing its nitrogen made the bacterium convert more. Some "
+        "second channel is over-compensating in this observable; before D-250 it was a pH "
+        "excursion feeding MLF's own pH gate"
+    )
+
+
 # -- 2. The defect was CHARGE, never mass ---------------------------------------------------
 
 
@@ -198,6 +226,10 @@ def test_nitrogen_is_conserved_in_both_arms_so_the_slot_rise_was_never_creation(
     through the uptake transfer as well as through growth's draw back out of it.
     """
     compiled, traj = _run(_dosed_must(2.0), uptake=uptake)
+    # The store inherited no nonnegativity check from anywhere: it is a new slot. The draw out
+    # of it is proportional to its own share, so it is self-limiting, but that is an argument
+    # rather than a check.
+    assert_nonnegative(traj, (STORED_NITROGEN_KEY,))
     assert_conserved(
         traj,
         total_nitrogen(
@@ -406,15 +438,44 @@ def test_the_extracellular_reading_is_now_separable_and_d249s_verdict_survives_i
     outside = total - store
 
     def _hours_to(series: np.ndarray, fraction: float) -> float:
+        """First crossing, INTERPOLATED between the bracketing samples.
+
+        The same idiom ``test_nitrogen_timing_attribution._cross`` uses, and not a detail: taking
+        the sample index outright reads this crossing 0.5 h late on an output grid this coarse,
+        which moves the ratio below from 1.71 to 1.66 and makes it incomparable with the 1.59 the
+        record it is scored against derived. Error scales with the local slope, and the nitrogen
+        curve is steep exactly here.
+        """
         consumed = 1.0 - series / series[0]
         hit = np.nonzero(consumed >= fraction)[0]
         assert hit.size, "the run never consumes that much nitrogen"
-        return float(traj.t[hit[0]])
+        i = int(hit[0])
+        if i == 0:
+            return float(traj.t[0])
+        return float(
+            np.interp(
+                fraction,
+                [float(consumed[i - 1]), float(consumed[i])],
+                [float(traj.t[i - 1]), float(traj.t[i])],
+            )
+        )
 
     sugar = traj.y[schema.slice("S"), :].sum(axis=0)
     dry = np.nonzero(sugar <= 2.0)[0]
     assert dry.size, "the run never reaches dryness, so there is no clock to divide out"
-    run_h = float(traj.t[dry[0]])
+    j = int(dry[0])
+    # Sugar falls, so the bracketing pair is reversed to give np.interp an increasing x.
+    run_h = (
+        float(traj.t[0])
+        if j == 0
+        else float(
+            np.interp(
+                2.0,
+                [float(sugar[j]), float(sugar[j - 1])],
+                [float(traj.t[j]), float(traj.t[j - 1])],
+            )
+        )
+    )
 
     outside_h, total_h = _hours_to(outside, 0.9), _hours_to(total, 0.9)
     assert outside_h < total_h, (
@@ -426,6 +487,11 @@ def test_the_extracellular_reading_is_now_separable_and_d249s_verdict_survives_i
     # than the run containing it (Crépin's N_T = 28 h against her EF = 150 h).
     nitrogen_gap = 28.0 / outside_h
     clock_gap = 150.0 / run_h
+    # The number D-250's record and its prohibitions file both state, pinned rather than merely
+    # asserted — D-249's own idiom for this quantity. Its 1.59x is the wider reading.
+    assert nitrogen_gap == pytest.approx(1.71, abs=0.05), (
+        f"the extracellular nitrogen gap reads {nitrogen_gap:.2f}x, not the 1.71 D-250 measured"
+    )
     assert nitrogen_gap < clock_gap, (
         f"read outside the cells the nitrogen gap is {nitrogen_gap:.2f}x against the run's own "
         f"{clock_gap:.2f}x. D-249's attribution rests on the channel being slower than its own "

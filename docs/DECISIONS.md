@@ -35688,6 +35688,19 @@ Fixing the booking closes the residue for free; teaching bacteria to read `N` co
 
 The residual 1e-7 is the schema, not the physics, and that is **falsified rather than asserted**: the *undosed* wine — where uptake is disabled at compile and cannot contribute — moves 1.17e-7 on biomass too. 98 → 99 slots changes `solve_ivp`'s RMS-weighted BDF error norm and therefore step selection; this is the third recorded instance.
 
+### 6b. The repair UN-MASKS the physical signal, which §3's table only sets up
+
+"Wine moves nowhere except pH" is true of the thirteen observables diffed in §6 — and the thing *downstream* of pH is the malate reading §3 is about. Re-run on the repaired tree, same probe:
+
+| malate left at day 3, uptake ON / OFF | pre-D-250 | post-D-250 |
+|---|---|---|
+| 0.5 g/L must | 4.000 | **4.655** |
+| 2.0 g/L must | **0.853** | **1.181** |
+
+The starved arm now leaves more malate at **both** doses. The defect §3 identifies is not the ratio at either point — it is that the ratio's **sign depended on the dose**; that is what is fixed. Nothing in the repo exercised a co-inoculated MLF with uptake live (every shipped MLF and Brett test isolates the competitor in both arms), which is exactly why it could ride, and it is now pinned at both doses.
+
+**The extracellular reading of §7, exact and interpolated the way D-249 crosses:** 90 % consumed at **16.411 h** outside the cells against **17.608 h** on the model total, i.e. **1.7062×** and **1.5902×** against Crépin's 28 h, with the run at 78.189 h for **1.9184×**. The store peaks at **32.753 mg N/L**, 16.3 % of the must's assimilable nitrogen. Reading the crossing at the sample index instead of interpolating puts it 0.5 h late and returns 1.66 — incomparable with the 1.59 it is scored against, so the guard uses D-249's own `_cross` idiom.
+
 ### 7. What is NOT repaired, so a later beat does not re-find it
 
 **Bacteria stay blind, and Brett still loses 96 % of its growth increment.** That is the model being *right*: real yeast take essentially all the assimilable nitrogen (Crépin's 0.2 %), so a co-inoculated bacterium really is out-competed. The gap is a **bacterial nitrogen source this model lacks — peptides, which yeast do not take** — not blindness to the yeast's own store. Pinned so it cannot be "fixed" back.
@@ -35698,8 +35711,8 @@ The residual 1e-7 is the schema, not the physics, and that is **falsified rather
 
 ### 8. What is pinned
 
-New file `tests/test_nitrogen_stored_intracellularly.py` (12 tests, ~22 s). The ammonium inflation at both doses against a no-uptake control; the pH excursion, with D-248's 0.2147 and 0.108 quoted so the guard is about a known magnitude; nitrogen conservation in both arms; **the store's absence from the charge balance asserted structurally** — loading it must not move solved pH by one bit, with a non-vacuity arm loading `N` instead, so the test cannot pass in a build where the balance stopped reading nitrogen at all; the swap's split, driven at a state where the store holds 95 % of the reachable nitrogen; the helper's conservation and proportionality; growth on a full store and an empty must; the bacteria's deliberate blindness; and `touches_where_present`'s scope, with a leaky Process that must still raise.
+New file `tests/test_nitrogen_stored_intracellularly.py` (14 tests, ~47 s). The ammonium inflation at both doses against a no-uptake control; the pH excursion, with D-248's 0.2147 and 0.108 quoted so the guard is about a known magnitude; nitrogen conservation in both arms; **the store's absence from the charge balance asserted structurally** — loading it must not move solved pH by one bit, with a non-vacuity arm loading `N` instead, so the test cannot pass in a build where the balance stopped reading nitrogen at all; the swap's split, driven at a state where the store holds 95 % of the reachable nitrogen; the helper's conservation and proportionality; growth on a full store and an empty must; the bacteria's deliberate blindness; and `touches_where_present`'s scope, with a leaky Process that must still raise. Plus the corrected malate sign at **both** doses — the one case nothing else in the repo runs — the store's own `assert_nonnegative` (it inherited none), and §6b's 1.71 pinned rather than merely stated.
 
 **Three mutation arms verified RED**, restored from an on-disk snapshot and byte-checked between arms: uptake parking back in `N` (5 tests red), the swap refunding wholly to `N`, and growth's Monod reading `N` alone.
 
-Suite **2034 + 6 xfail**, measured off a green full run.
+Suite **2036 + 6 xfail**, measured off a green full run.
