@@ -31,3 +31,12 @@ once both were read daily, cf. [[feedback-read-a-fast-curve-on-a-fixed-grid]] on
 side); and a correction every existing guard is blind to is exactly the one that owes a new guard
 [[feedback-prefer-the-variant-your-guards-can-see]]. Related: [[feedback-agreement-can-be-a-frame-difference]],
 [[feedback-check-the-blocker-is-still-blocking]].
+
+**Second instance, D-249 — and this time the frame's input was absent from the source, not
+merely conventional.** The shared fixture for two papers' musts pitched at the wine benchmark's
+default 0.25 g/L. The target paper states **no inoculum at all**; the only sourced value for that
+medium is its sibling paper's 1e6 cells/mL = **0.04 g/L, 6.25x smaller**. Moving onto it took the
+missing timing from 17.6 h to 29.9 h against the paper's 28 h — i.e. the frame's unsourced input
+was most of the "limitation". But it is a **trade, not a repair**: the same move pushed peak
+biomass from +0.8 % to -5.2 % of measured and broke a shipped guard, so it was flagged and priced
+rather than taken [[feedback-a-paper-can-print-the-same-numbers-twice-differently]].
