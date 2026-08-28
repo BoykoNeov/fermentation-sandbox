@@ -35563,6 +35563,8 @@ At **both** pitches the nitrogen channel is slower than the run containing it. A
 
 That band is measured at `_PITCH_GPL_RESEARCH = cells_per_ml_to_pitch_gpl(1.0e6)` = **0.04 g/L**. So reading the shipped fixture's 1.92× as "inside the band" would compare runs pitched **6.25× apart** — an artifact, and this record does not make that claim. Reconstructed at Crépin's stated temperature *and* the sourced pitch the gap reads **1.68×**, inside the band: a different must at a different nitrogen level landing where the same engine already lands. §1 does not rest on this and stands without it.
 
+**The nearest counter-example is named rather than left for a reader to find.** `tests/test_organic_acids.py::test_the_model_ferments_tyrells_wort_on_tyrells_schedule` is a live xfail saying the model ferments Tyrell's **wort** ~3.2× too *slowly* — the opposite direction to everything above. The two coexist: different medium, different sugar spectrum, and a beer clock calibrated through its own lineage (D-215/D-222/D-223) rather than through Coleman. Nothing here claims a clock direction for beer, and "the model's clock runs fast" is a **wine** attribution only. Reconciling the two is neither attempted nor implied by this record.
+
 ### 3. The fixture's pitch is unsourced, and moving it is a TRADE rather than a repair
 
 Crépin never states an inoculum — `grep -c inocul` over the full PMC text is **0**. Minebois — the same Bely, Sablayrolles & Barre 1990 medium and the same lab lineage — states 1 × 10⁶ cells mL⁻¹, converted through the engine's own D-219 crossing to **0.0400 g/L**. The fixture carries **0.25**, inherited from the wine benchmark's default rather than chosen for these papers.
