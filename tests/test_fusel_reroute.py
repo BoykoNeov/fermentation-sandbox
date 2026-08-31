@@ -541,6 +541,20 @@ def _rollero_run(amino_acids_gpl: float, *, days: float = 14.0):
     # would substitute a GRAPE-must nitrogen partition for a DEFINED SYNTHETIC medium whose
     # composition is in the paper and not in this repo. Preserving the validated pitch state
     # is the honest move; closing the gap needs the paper.
+    #
+    # **CHECKED AT D-254, AND THIS BLOCKER IS STILL LIVE -- unlike its twin.** The identical
+    # comment on ``tests.test_fusel_keto_acid_node._scenario`` was DEAD: D-246 sourced Crepin's
+    # and Minebois's medium and put both musts in the repo. Rollero's is not there. What this
+    # repo holds of Rollero 2017 is per-condition OUTCOMES (``wine_generic.yaml``'s
+    # ``f_valine_to_isoamyl`` notes carry Fig. 3 and Table S1 in full), never the SM stock's
+    # composition, and no Rollero text sits under ``M:\claud_projects\temp\ferment\``.
+    #
+    # **But the ask is now much smaller than "the composition is not in this repo".** Rollero,
+    # Crepin and Minebois are one lab lineage and the other two both run Bely, Sablayrolles &
+    # Barre 1990. So the open question is the single checkable one -- *is Rollero's SM that same
+    # medium at 250 mg N/L?* -- and if it is, ``commensurate_pools`` already builds this must.
+    # Do NOT assume it: D-246 established the two-paper case by reading both Methods sections,
+    # and lineage is not a citation. Do not restate this as unreachable either.
     scenario = Scenario(
         name=f"d115-enrichment-{amino_acids_gpl}",
         medium="wine",

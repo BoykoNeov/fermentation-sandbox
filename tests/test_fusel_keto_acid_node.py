@@ -246,11 +246,25 @@ def _scenario(*, o2_mgl: float = 20.0, aging: bool = True) -> Scenario:
     # AND IT IS ALSO WHERE D-244 FOUND A LIVE COMMENSURABILITY VIOLATION, recorded and NOT
     # repaired here. The comment on the YAN constant above forbids scoring a richer must than
     # the paper's, citing D-104. Because the two nitrogen channels ADDED before D-244, this
-    # probe was doing exactly that -- and the migration keeps it doing so, because the
-    # alternative (hold the declared total at the paper's number and carve the dose out of it)
-    # would substitute a GRAPE-must nitrogen partition for a DEFINED SYNTHETIC medium whose
-    # composition is in the paper and not in this repo. Preserving the validated pitch state
-    # is the honest move; closing the gap needs the paper.
+    # probe was doing exactly that -- and the migration keeps it doing so.
+    #
+    # **THE REASON THIS USED TO GIVE IS DEAD (decision D-254).** It read: the alternative
+    # "would substitute a GRAPE-must nitrogen partition for a DEFINED SYNTHETIC medium whose
+    # composition is in the paper and not in this repo ... closing the gap needs the paper."
+    # D-246 SOURCED that medium -- Bely, Sablayrolles & Barre 1990, the same one Crepin and
+    # Minebois both run -- and put both musts in this repo as
+    # ``tests.test_defined_media._MUSTS`` / ``commensurate_pools``. So the paper is here, and a
+    # comment telling the next reader it is not was standing instruction to not even try. This
+    # is the 8th time in this archive that "blocked on external sourcing" outlived its blocker
+    # (D-191/196/199/208/209/211, and D-230's variant where the source was already on disk).
+    #
+    # **The fixture still does not migrate, and the reason is now a MEASURED one.** D-246 section 7
+    # keeps this must as a legitimate characterization object; what was illegitimate was reading
+    # paper numbers off it. The commensurate scoring lives beside it in
+    # ``tests/test_defined_media.py``, on the papers' own musts. D-254 measured what migrating
+    # the guards themselves would do and found it fails for one alcohol whichever estimator is
+    # used -- see ``tests/test_fusel_provenance_estimator.py``. Migration is therefore blocked
+    # on an OPEN MODEL QUESTION, not on a missing paper. Do not restore the old reason.
     return Scenario(
         name="d109-fusel-node",
         medium="wine",

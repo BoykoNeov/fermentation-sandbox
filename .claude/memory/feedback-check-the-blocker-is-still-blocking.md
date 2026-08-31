@@ -21,6 +21,19 @@ disagreement and nobody involved is wrong at the time. Sibling of
 blocked one stayed listed after its blocker was removed. Same hole — **an open list is a claim
 about the present, stored as prose written in the past.**
 
+**A third shape, and the worst one: the stale blocker living in CODE (D-254).** The reason two
+fusel fixtures could not be scored against their own papers was written as a comment inside the
+fixtures — "the composition is in the paper and not in this repo … closing the gap needs the
+paper". D-246 put both musts in the repo eight records later and neither comment moved. A comment
+is worse than an open list because it is read *at the moment someone is deciding*, it carries no
+date, and it reads as a fact about the world rather than as a note from a past beat. **Two more
+things that shape found.** The comment was duplicated **verbatim in two files** and only one copy
+had expired, so "fix the comment" was not a find-and-replace but a per-site re-check — and the
+live one (Rollero) narrowed from "not in this repo" to a single answerable question once the dead
+one was understood. And a *different* comment in the same beat, on a clamp, said it "never binds
+in practice" while the record that shipped it had measured it binding in the same document. So
+run the probe against code comments too, and when one expires, grep the repo for its twin.
+
 **How to apply:** One probe, before any design. At D-188 it was a sealed sulfited bottle read at
 the end: non-zero ⇒ the beat was a **measurement**, not a build, and the whole pitch to the owner
 changed before a line was written. Cheap, and it is what makes "still blocked" a finding rather

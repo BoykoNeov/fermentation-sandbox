@@ -486,6 +486,21 @@ def test_no_alcohol_over_attributes_to_amino_acids_so_no_de_novo_cap_is_warrante
     the other way, to ~10.4 % worst case, so the direction flip is real for it. Both are scored on
     a must carrying 1.0 g/L of amino acids against Minebois's own stock, which is the same
     commensurability caveat D-244 section 6 recorded and declined to repair.
+
+    **THIS IS A CLAIM ABOUT THE D-109 FIXTURE, NOT ABOUT MINEBOIS'S MUST — and D-254 measured the
+    difference rather than leaving it as a caveat.** Migrating this guard onto her own must is
+    the move D-246 §7 left to the owner. It cannot be made: there, one of the two valine-derived
+    alcohols over-attributes whichever estimator is used, and the two estimators name *different*
+    alcohols — ``_amino_acid_share`` as written says isoamyl at 1.014×, and the same quantity
+    measured from the draws the run actually applied says isobutanol at 1.049×. Relaxing the
+    assertion to fit either one would be fitting a threshold to an outcome.
+
+    On THIS fixture every alcohol is under both ways (isoamyl 0.873× / 0.854×, isobutanol
+    0.927× / 0.977×), so the guard is not living on a measurement error and correcting the
+    estimator in place would leave it green. See ``tests/test_fusel_provenance_estimator.py``,
+    which pins both halves and holds the reasoning. **Do not migrate this to a commensurate must
+    without re-deciding D-120's refusal**; and do not read the caveat above as merely unrepaired,
+    because what is unrepaired is now identified.
     """
     traj, schema = shipped_run
     params = compile_scenario(_scenario(aging=False)).param_values

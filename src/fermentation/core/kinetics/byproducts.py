@@ -522,11 +522,27 @@ def ehrlich_draws(
         # This alcohol cannot be sourced from more precursor than it is being made from. The
         # secondary branch is anchored off a DIFFERENT alcohol's draw, so nothing about its
         # arithmetic bounds it by this alcohol's own production — unlike a gated primary branch,
-        # which is a fraction of exactly that. Measured headroom is large (valine ~1.8% + leucine
-        # ~1.1% of isoamyl), so this never binds in practice; it is here because if it ever DID
-        # bind, the refund would hand back more sugar than the producer drew for this alcohol and
-        # the ledger would still close — the D-89/D-90 denominator-trap family, where conservation
-        # is blind and only an explicit guard is not.
+        # which is a fraction of exactly that. If it were unbounded the refund would hand back
+        # more sugar than the producer drew for this alcohol and the ledger would STILL close —
+        # the D-89/D-90 denominator-trap family, where conservation is blind and only an explicit
+        # guard is not.
+        #
+        # **IT BINDS, AND WHILE BINDING IT SETS A FATE SPLIT (decision D-254).** This comment
+        # used to read "Measured headroom is large … so this never binds in practice". That was
+        # false **the day it was written, and its own record says so**: D-111's Finding 5 measured
+        # this clamp's integrated cost — "realised 0.2233 against a sourced 0.23, isobutanol
+        # 0.1567 against 0.15" — and used it, crediting the clamp with isoamyl's 1.80 → 1.74.
+        # D-254 re-measured it on the papers' own musts (sourceable only since D-246): it binds at
+        # t=0 on all three fixtures, delivering 27–29 % of the designed branch, and on Minebois's
+        # own must stays bound to 8.44 h across 13.8 % of the valine consumed. Because the
+        # TOTAL Ehrlich draw on valine is pinned at (1 − f) whatever this does — so carbon this
+        # truncation takes off isoamyl is absorbed by isobutanol's primary, moving ~4.5 % of
+        # valine's Ehrlich carbon between two alcohols on the papers' own musts. It is invisible
+        # in the state (valine is supply-limited and each alcohol's amount is set by its own rate
+        # law), so only a provenance measurement can see it. The truncation itself is right; what
+        # is not commensurate is the ALGEBRAIC anchoring above, which asks for a share of a draw
+        # this alcohol is not yet making. Identifying a replacement anchoring is a rate-law
+        # question and is NOT taken at D-254. See tests/test_fusel_provenance_estimator.py.
         headroom = totals.get(alcohol, 0.0) - by_alcohol.get(alcohol.pool, 0.0)
         if alcohol_carbon > headroom:
             alcohol_carbon = max(0.0, headroom)

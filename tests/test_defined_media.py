@@ -562,6 +562,23 @@ def test_both_minebois_legs_land_on_her_own_measurement_once_uptake_is_uncoupled
     **The pin is deliberately two-sided and tight.** A rising ratio is the D-246 defect returning;
     a falling one puts the model UNDER her measurement, which re-opens D-120's direction leg from
     the other side and would mean the denominator has over-shot.
+
+    **FLAG (decision D-254): this band CONTAINS an over-attribution, and that is not an accident
+    of width.** ``_amino_acid_share`` credits each valine branch at its designed share, but
+    ``ehrlich_draws`` truncates the secondary branch at ``headroom`` and the total Ehrlich draw
+    on valine is pinned at ``1 − f``, so what the truncation takes off isoamyl isobutanol absorbs.
+    Measured from the draws the run actually applied, the two legs here are **0.989× and 1.049×**
+    rather than the 1.014× and 0.982× this test reads. Either way one alcohol sits above
+    Minebois, which by D-120's own logic — a ``(1 − f_de_novo)`` cap is warranted iff the model
+    over-attributes — re-opens the de-novo cap question on this must. It is NOT actionable,
+    because the two estimators disagree about which alcohol, and because isobutanol has no
+    sourced ``f_de_novo`` in this repo.
+
+    **The band is deliberately left as it is.** It was set at D-248 on this estimator and moving
+    it to the corrected one would re-pin a passing guard to make a flag look tidy. The estimator
+    correction lives in ``tests/test_fusel_provenance_estimator.py``, with the direction of the
+    bias pinned per alcohol; this docstring exists so nobody reads 0.90–1.12 as evidence that
+    every alcohol is under her measurement. It is not.
     """
     traj, schema, params, _ = minebois_run
     for pool in ("isoamyl_alcohol", "isobutanol"):
