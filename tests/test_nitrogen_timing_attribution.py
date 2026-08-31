@@ -342,9 +342,12 @@ def test_the_fixtures_pitch_is_unsourced_and_the_only_sourced_value_is_6_25x_sma
     medium is her sibling paper's 1 × 10⁶ cells mL⁻¹. Moving the fixture onto it is a **trade**
     and is the owner's call, not a beat's: it takes the nitrogen exhaustion from 17.6 h to
     29.9 h against her 28 h, and in the same move takes peak biomass from +0.8 % to −5.2 %
-    of her measured 3.39 g/L and the Coleman ratio from 0.984 to 0.925 — outside the band
-    ``test_biomass_now_reaches_the_coleman_yield_the_compile_seam_installs`` asserts. It buys
-    timing and sells the internal anchor D-248 rests on.
+    of her measured 3.39 g/L. **The Coleman-anchor half of this price is WITHDRAWN at D-252**:
+    the 0.984 → 0.925 was ``test_biomass_now_reaches_the_coleman_yield_the_compile_seam_installs``
+    predicting against a hardcoded 0.25 g/L inoculum the run did not have. Against the run's own
+    pitch the anchor reads 0.9848, inside the band, and it is *structurally insensitive* to the
+    inoculum — it drifts 0.0004 across the 6.25×. The move sells the anchor nothing; what it
+    still costs is the biomass level. See ``tests/test_inoculum_and_cell_nitrogen.py``.
     """
     assert abs(SOURCED_PITCH_GPL - 0.04) < 1e-6, (
         f"1e6 cells/mL now converts to {SOURCED_PITCH_GPL} g/L, not the 0.04 D-249 measured "

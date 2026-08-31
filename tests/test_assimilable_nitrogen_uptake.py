@@ -392,11 +392,19 @@ def test_biomass_now_reaches_the_coleman_yield_the_compile_seam_installs(sweep):
     holds only if the nitrogen is all consumed, and before this beat the speciated path reached
     **61.6 %** of it — the model silently violating a regression it compiles in. Nothing here is
     fitted to Coleman: ``f_N`` is the seam's own override and the target is arithmetic from it.
+
+    **The inoculum is read off the run, not written in (decision D-252).** This line carried
+    ``0.25`` as a literal — correct at the pitch this fixture runs, and brittle at any other,
+    because at pitch 0.04 it subtracted an inoculum the run did not have and read 0.925 instead
+    of 0.985. D-249 §3 published that 0.925 as the cost of moving the fixture onto its only
+    sourced pitch; it was the literal, and ``tests/test_inoculum_and_cell_nitrogen.py`` pins both
+    readings. The verdict at the shipped pitch is unchanged — this is a brittleness fix.
     """
     for ratio, expected, tol in ((0.0, 0.616, 0.02), (1.0, 0.984, 0.02)):
         traj, schema, params, _ = sweep[ratio]
         initial = _assimilable_n_mgl(traj, schema, 0) / 1000.0
-        predicted = 0.25 + initial / params["biomass_N_fraction"]
+        x0 = float(traj.y[schema.slice("X"), :][0][0])
+        predicted = x0 + initial / params["biomass_N_fraction"]
         peak = float(traj.y[schema.slice("X"), :][0].max())
         assert peak / predicted == pytest.approx(expected, abs=tol), (
             f"at r={ratio} peak biomass is {peak / predicted:.3f}x Coleman's own Y_X/N x N_init "

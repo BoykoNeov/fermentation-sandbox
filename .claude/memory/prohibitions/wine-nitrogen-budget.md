@@ -195,6 +195,37 @@ unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings
     (`stored_nitrogen` dips -2.34e-9 on Crepin's must at rtol 1e-6, -4.0e-20 at 1e-10 — solver
     noise, and LARGER at r = 1 than at 3.5). `Flags: D-250`. Recorded, tolerance NOT changed.
 
+- **BOTH prices standing against the fixture's unsourced pitch are VOID — D-252.**
+  - **The Coleman anchor costs an inoculum change NOTHING. Never re-charge it.**
+    `test_biomass_now_reaches_the_coleman_yield_the_compile_seam_installs` formed
+    `predicted = 0.25 + initial/f_N` with the pitch as a LITERAL, so at 0.04 it subtracted an
+    inoculum the run did not have and read 0.925. Against the run's own pitch it reads **0.9848**
+    vs 0.9844 — the ratio is **structurally insensitive** (drift 0.0004 across 6.25x), NOT
+    invariant. `f_N` compiles from `N_init` alone, identical at both pitches. The literal is fixed;
+    D-249 §3's "sells the anchor" is WITHDRAWN. Its other half — peak biomass +0.8 % -> -5.2 % vs
+    her 3.39 — STANDS. [[feedback-a-guard-that-hardcodes-an-input-cannot-price-it]]
+  - **D-251 §4's cell-nitrogen price was charged against the WRONG KIND OF BAND — do not re-charge
+    it either.** `biomass_N_fraction`'s [0.08, 0.14] is an END-STATE elemental composition; Crepin's
+    own end state is **< 0.0786** (model frame) / **< 0.0703** (paper), UNDER the low edge, from
+    `X0 < 0.83` (her first dry weight, curve rising) alone. At her 50 %-N landmark the landing
+    capacity holds **0.092/0.097** where her numbers imply **0.108-0.156** — it UNDER-loads, and
+    the shipped capacity under-loads further. The 0.1391 D-251 priced is a peak at **20.5 %** of
+    the N gone, before her first sample.
+    [[feedback-price-a-transient-against-a-ceiling-of-the-same-kind]]
+    **Two conditionals that must travel with this**: it is an INTERNAL-consistency reading on
+    `_apply_nitrogen_dependent_yield`'s "every assimilated gram enters biomass" (consumed != in
+    cells if yeast excrete N — unsourced either way), so it is **not** a source-side observation of
+    storage; and the moments are named, not matched.
+  - **Crepin's data CANNOT settle the inoculum, and it is not a reading problem.** `X0 = X_final -
+    YAN/f_N` is exact: the whole candidate range 0 -> 0.25 g/L moves the implied `f_N` by **8.0 %**,
+    and separating 0.04 from 0.25 needs it to **6.7 %** where its band spans **1.75x**. The point
+    estimate is frame-split and straddles the fixture: **0.168** (model) vs **0.507** (paper), and
+    the archive records **no assay frame for Coleman's own YAN** — D-248 §8's "the frames cancel"
+    is about the seam's internal carve-out/release and does NOT reach that external pairing.
+    [[feedback-an-exact-relation-can-have-the-wrong-gain]]
+  - **The pitch is UNCHANGED at 0.25 and the calibration is UNTAKEN.** D-252 voids two prices; it
+    makes no move and recommends none. Both remain the owner's call.
+
 Measurements: `M:\claud_projects\temp\ferment\d243-wine-nitrogen-audit\` and
 `d244-wine-n-evaluation-point\` — `FINDINGS-pre.md`, `probe_band.py`, `probe_ceiling.py`,
 `probe_partition_stall.py`, `probe_denovo2.py`, `probe_pins.py`, and the `patch*.py` migrations.
@@ -205,3 +236,6 @@ D-251: `d251-nitrogen-uptake-shape/` - `probe_shape.py` (both frames x the sweep
 `probe_quota.py`, `probe_ceiling.py`, `probe_landing.py` (the landing capacity per
 pitch), `probe_undershoot.py` (the tolerance scaling), `suite_r3.5.txt` + `suite_r3.9.txt` (the mutated
 full run), and `snapshot/` (the restore arms).
+D-252: `d252-pitch/` - `probe_pitch.py` (the mass balance both ways + the anchor read
+with and without the literal), `probe_transient.py` (the increment basis, superseded),
+`probe_total_basis.py` (the TOTAL-cell basis and the peak's location), `suite.txt`.

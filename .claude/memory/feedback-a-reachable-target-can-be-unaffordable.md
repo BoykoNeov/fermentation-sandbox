@@ -16,7 +16,14 @@ to 0.137-0.139 g N per g dry weight against the repo's own N-replete elemental r
 can spend a budget declared somewhere else — a mass, a charge, a per-cell content — and nothing in
 the band checks that. The test suite passing is not the same as the physics being affordable.
 
+**CORRECTED AT D-252 — the principle stands, this worked example does not.** The 0.114 used
+as the ceiling is an END-STATE elemental composition and the 0.139 is a TRANSIENT peak at a
+moment the source never sampled; her own whole-run value is under the band's LOW edge, and at
+her landmark the calibration UNDER-loads the cells. The price was not too high, it was not a price.
+
 **How to apply:** when a knob reaches a target, ask what physical quantity accumulates to pay for
 it, express it in the units the literature states that quantity in, and compare against a SOURCED
-ceiling before proposing the move. Report the price with the fit, in the same table.
+ceiling before proposing the move — then check that ceiling describes the same quantity, the same
+basis and the same moment ([[feedback-price-a-transient-against-a-ceiling-of-the-same-kind]]), and
+that the source's own value falls inside it. Report the price with the fit, in the same table.
 Related: [[feedback-a-band-is-per-parameter-a-claim-is-joint]], [[feedback-price-the-refusal-not-just-the-error]].
