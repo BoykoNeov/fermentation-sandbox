@@ -39,6 +39,14 @@ from fermentation.scenario import (
 )
 from fermentation.validation import assert_conserved, total_carbon, total_nitrogen
 from tests.conftest import seed_amino_acids
+from tests.test_defined_media import (
+    ROLLERO_SUGAR_GPL,
+    ROLLERO_TEMP_C,
+    SOURCED_PITCH_GPL,
+    _brix_for,
+    commensurate_pools,
+    rollero_must_mm,
+)
 
 REROUTE = FuselAminoAcidReroute.name
 PRODUCER = FuselAlcoholsEhrlich.name
@@ -504,9 +512,10 @@ def test_the_kic_branch_cannot_source_more_isoamyl_than_is_being_made(full_param
 
 #: Rollero *et al.* 2017's own SM250 condition - 250 mg N/L, 24 C. The enrichments below are
 #: quoted against that paper, so the probe must run on a COMMENSURATE must (D-104's lesson,
-#: where a ~470 mg N/L probe flattered the model against a 180 mg N/L source).
+#: where a ~470 mg N/L probe flattered the model against a 180 mg N/L source). **Since D-255 it
+#: does**: the number below is the paper's own headline, in the paper's own frame, and
+#: :func:`_rollero_run` builds his medium at it rather than approximating it with a dose.
 _ROLLERO_YAN = 250.0
-_ROLLERO_TEMP = 24.0
 
 #: What Rollero measures, and the ONLY thing this beat may be scored against.
 #:
@@ -517,49 +526,88 @@ _ROLLERO_TEMP = 24.0
 #: physical bound that an acetate's enrichment cannot exceed its parent alcohol's (by 3.1-5.3x),
 #: so they are excluded on chemistry rather than on a noise argument. Quoted loosely as
 #: "0-19.7%" the band would swallow almost any model output, including D-114's structural zero.
+#:
+#: **WHAT THE ALCOHOL BAND ACTUALLY SPANS, MEASURED AT D-255 -- and it is NOT a licence to
+#: tighten it.** Table S1's isoamyl-alcohol enrichment row is 24 cells: four sampling columns
+#: (N1/2, N3/4, NT, EF) x three nitrogen levels x two lipid levels. 2.1% is its minimum
+#: (SM70-2mg/l at EF) and 7.5% its maximum (SM425-8mg/l at NT), so the band is a WHOLE-ROW SPAN
+#: and this model, which is read at end of run, has been scored against a range containing
+#: mid-fermentation columns. The end-of-fermentation sub-column alone reads 3.4-4.0% at SM250.
+#: **The band is deliberately NOT re-scoped to it.** Doing so would turn a passing sourced guard
+#: red by narrowing a threshold to an outcome - the same act as loosening one to fit, which the
+#: comment on the ester assertion below already forbids. Recorded as a measurement of what the
+#: band is; :func:`test_the_alcohol_enrichment_rises_with_must_nitrogen_as_rollero_measures`
+#: is where the finer structure is used, and it asserts DIRECTION, never this magnitude.
 _ROLLERO_ALCOHOL_BAND = (0.021, 0.075)
 _ROLLERO_ESTER = 0.04
 
+#: Rollero's Table S1, isoamyl-alcohol isotopic enrichment at the **EF** (end-of-fermentation)
+#: column - the only column commensurate with a model read at the end of its run - for the two
+#: lipid levels at each nitrogen level: ``{yan: (2 mg/l, 8 mg/l)}``.
+#:
+#: **The lipid axis is the floor under any magnitude claim made from this table.** 2 vs 8 mg/l is
+#: a phytosterol level this model has NO coordinate for, and at SM250 the two disagree by 17.6%
+#: -- as large as the model-to-measurement ratios differ from each other. So this table may be
+#: read for DIRECTION and for a ratio quoted no tighter than that spread, and for nothing else.
+_ROLLERO_EF_ENRICHMENT = {70.0: (0.021, 0.023), 250.0: (0.040, 0.034), 425.0: (0.053, 0.054)}
 
-def _rollero_run(amino_acids_gpl: float, *, days: float = 14.0):
+
+def _rollero_run(
+    amino_acids_gpl: float,
+    *,
+    yan_paper_mgn: float = _ROLLERO_YAN,
+    zero_valine: bool = False,
+    days: float = 14.0,
+):
+    """D-115's probe, on Rollero's OWN must since D-255.
+
+    **THE QUESTION THIS COMMENT USED TO ASK IS ANSWERED: yes, and the must is now built here.**
+    What stood here from D-244 to D-254 was that migrating would "substitute a GRAPE-must
+    nitrogen partition for a DEFINED SYNTHETIC medium whose composition is in the paper and not
+    in this repo". D-254 checked that twin comment, found it still live where its sibling was
+    dead, and narrowed it to one checkable question -- *is Rollero's SM the same Bely,
+    Sablayrolles & Barre 1990 medium at 250 mg N/L?* -- while forbidding the lineage inference.
+
+    It is, and not on the citation: :data:`~tests.test_defined_media.ROLLERO_S3_PCT` reduces his
+    Table S3 to the same %YAN frame as Minebois's printed stock table and the 19 species agree to
+    within half of Rollero's last printed digit, with sugar and temperature identical too. So the
+    must below is the paper's own, at the paper's own nitrogen, and the D-104 violation this
+    fixture carried -- scoring a 475.4 mg N/L must against a 250 mg N/L source -- is CLOSED by
+    building the source's must rather than by relaxing anything.
+
+    **The dose is held positive and then overridden away pool by pool**, the
+    :func:`~tests.test_defined_media.commensurate_scenario` pattern: the compile seam disables
+    the re-route outright at ``amino_acids_gpl <= 0`` (D-32 isolability), so a pure-override
+    fixture would switch off the very Process these tests measure.
+
+    ``zero_valine`` keeps every other pool and empties valine alone -- a real ferment with no
+    tracer precursor, which is what gives
+    :func:`test_no_amino_acid_dose_means_no_label_anywhere`'s claim its teeth (D-255).
+
+    **WHAT IS INFERRED, so a future reader can re-open it rather than inherit it.** Rollero
+    states "only a single nitrogen compound was supplied as a labelled molecule" and that these
+    "each account[] for 1.3% of total yeast assimilable nitrogen" -- Table S3's own valine share.
+    That reads as SUBSTITUTION (the recipe's valine supplied labelled), which is what makes the
+    model's *valine-derived* fraction commensurate with his *labelled* fraction. It is not
+    verbatim. Were it instead addition-on-top, the must would hold 464 uM valine and the model's
+    fraction would be ~2x the labelled one, halving every comparison below.
+    """
+    pools, model_yan = commensurate_pools(rollero_must_mm(yan_paper_mgn))
+    if zero_valine:
+        pools = dict(pools) | {"valine_gpl": 0.0}
     initial: dict[str, float] = {
-        "brix": 24.0,
-        "yan_mgl": _ROLLERO_YAN,
-        "pitch_gpl": 0.25,
+        "brix": _brix_for(ROLLERO_SUGAR_GPL),
+        "yan_mgl": model_yan,
+        "pitch_gpl": SOURCED_PITCH_GPL,
         "amino_acids_gpl": amino_acids_gpl,
     }
-    # D-244: ``yan_mgl`` is the must's TOTAL assimilable nitrogen and the amino-acid dose is
-    # carved OUT of it. This fixture was authored when the two channels ADDED, so it declares
-    # the sum -- which leaves its pitch state bit-for-bit and moves only the point Coleman's
-    # yield fit is evaluated at, which is the defect D-243 found.
-    initial["yan_mgl"] += amino_acid_dose_nitrogen_mgl(initial)
-    # AND IT IS ALSO WHERE D-244 FOUND A LIVE COMMENSURABILITY VIOLATION, recorded and NOT
-    # repaired here. The comment on the YAN constant above forbids scoring a richer must than
-    # the paper's, citing D-104. Because the two nitrogen channels ADDED before D-244, this
-    # probe was doing exactly that -- and the migration keeps it doing so, because the
-    # alternative (hold the declared total at the paper's number and carve the dose out of it)
-    # would substitute a GRAPE-must nitrogen partition for a DEFINED SYNTHETIC medium whose
-    # composition is in the paper and not in this repo. Preserving the validated pitch state
-    # is the honest move; closing the gap needs the paper.
-    #
-    # **CHECKED AT D-254, AND THIS BLOCKER IS STILL LIVE -- unlike its twin.** The identical
-    # comment on ``tests.test_fusel_keto_acid_node._scenario`` was DEAD: D-246 sourced Crepin's
-    # and Minebois's medium and put both musts in the repo. Rollero's is not there. What this
-    # repo holds of Rollero 2017 is per-condition OUTCOMES (``wine_generic.yaml``'s
-    # ``f_valine_to_isoamyl`` notes carry Fig. 3 and Table S1 in full), never the SM stock's
-    # composition, and no Rollero text sits under ``M:\claud_projects\temp\ferment\``.
-    #
-    # **But the ask is now much smaller than "the composition is not in this repo".** Rollero,
-    # Crepin and Minebois are one lab lineage and the other two both run Bely, Sablayrolles &
-    # Barre 1990. So the open question is the single checkable one -- *is Rollero's SM that same
-    # medium at 250 mg N/L?* -- and if it is, ``commensurate_pools`` already builds this must.
-    # Do NOT assume it: D-246 established the two-paper case by reading both Methods sections,
-    # and lineage is not a citation. Do not restate this as unreachable either.
+    if amino_acids_gpl > 0.0:
+        initial |= pools
     scenario = Scenario(
         name=f"d115-enrichment-{amino_acids_gpl}",
         medium="wine",
         initial=initial,
-        temperature_schedule=[TemperaturePoint(day=0.0, celsius=_ROLLERO_TEMP)],
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=ROLLERO_TEMP_C)],
         duration_days=days,
     )
     compiled = compile_scenario(scenario, strict=True)
@@ -644,9 +692,28 @@ def test_the_ester_carries_valine_label_at_its_parent_alcohols_enrichment():
     # label with more de-novo synthesis. It stays comfortably inside D-111's band, so the gain
     # D-244 recorded is not undone -- the enrichment does not fall back toward the ~0.018 it sat
     # at before, because the two moves are not the same size.
-    assert alcohol == pytest.approx(0.0251, abs=1e-3), (
-        f"alcohol enrichment {alcohol:.4f} moved off its D-248 position inside the band (D-244 "
-        "measured 0.0264) - the band alone is 3.6x wide and would not notice"
+    #
+    # D-255 MIGRATES THE MUST and the pin moves 0.0251 -> 0.0244, which is 0.974x -- a re-measure
+    # of a POSITION, never a re-fit. Attributed one knob at a time from the old fixture, because
+    # the migration bundles four changes at once and the endpoint alone would not say which:
+    #
+    #     sugar   brix 24 -> Rollero's 200 g/L            1.006x
+    #     pitch   0.25 -> the sourced 0.04 (D-253)        1.000x   <- exactly nothing
+    #     pools   dose spectrum -> Rollero's own must     0.969x
+    #     ---- and the knob NOT taken, for contrast ----
+    #     yan alone 475.4 -> 250, dose left on top        1.328x
+    #
+    # Two things worth keeping. The pitch is inert HERE, which is not a general fact -- D-253
+    # found it load-bearing for the nitrogen clock and warned it is no neutral swap; an
+    # enrichment is a ratio of two pools that scale together, so it survives what a timing does
+    # not. And declaring the paper's headline 250 while still dosing 1 g/L on top would have
+    # moved this number 13x further than the honest migration did, in the opposite direction:
+    # the commensurate must is NOT "the old fixture with a smaller yan_mgl", and a future reader
+    # tempted by the one-line version should read that row before trying it.
+    assert alcohol == pytest.approx(0.0244, abs=1e-3), (
+        f"alcohol enrichment {alcohol:.4f} moved off its D-255 position inside the band (D-248 "
+        "measured 0.0251 on the pre-migration must, D-244 0.0264) - the band alone is 3.6x wide "
+        "and would not notice"
     )
 
 
@@ -669,6 +736,101 @@ def test_no_amino_acid_dose_means_no_label_anywhere():
     # ...and carry no label whatsoever.
     assert float(traj.y[schema.slice("isoamyl_alcohol_valine"), -1][0]) == 0.0
     assert float(traj.y[schema.slice("isoamyl_acetate_valine"), -1][0]) == 0.0
+
+    # THE ARM ABOVE CANNOT ACTUALLY CATCH THE MUTATION THIS DOCSTRING NAMES, and D-255 is where
+    # that was noticed rather than inherited. With no dose there is no leucine EITHER, so an
+    # implementation that credited the tracer off the leucine branch would also read zero here
+    # and pass. The arm tests the compile gate; it never tested the wiring.
+    #
+    # Rollero's own must makes the sharper arm buildable for the first time: keep every pool the
+    # paper specifies and empty VALINE alone. That is a real ferment with a full precursor
+    # spectrum -- isoamyl alcohol still reaches 0.1834 g/L against 0.1846 with valine present, so
+    # nothing is switched off -- and the label must STILL be exactly zero. A leucine-credited
+    # tracer goes red here and only here.
+    traj_nv, compiled_nv = _rollero_run(1.0, zero_valine=True)
+    schema_nv = compiled_nv.schema
+    assert float(traj_nv.y[schema_nv.slice("isoamyl_alcohol"), -1][0]) > 0.15, (
+        "vacuous: emptying valine alone should leave a working ferment, not switch the "
+        "amino-acid machinery off - if this fires the arm has become the one above"
+    )
+    assert float(traj_nv.y[schema_nv.slice("isoamyl_acetate"), -1][0]) > 0.0
+    assert float(traj_nv.y[schema_nv.slice("isoamyl_alcohol_valine"), -1][0]) == 0.0
+    assert float(traj_nv.y[schema_nv.slice("isoamyl_acetate_valine"), -1][0]) == 0.0
+
+
+def test_the_alcohol_enrichment_rises_with_must_nitrogen_as_rollero_measures():
+    """THE THREE-CONDITION CLAIM D-255 buys, and it asserts DIRECTION, not level.
+
+    Rollero ran SM70 / SM250 / SM425 and this repo had only ever scored the model at one of them,
+    against a band (2.1-7.5%) that is the min and max of a 24-cell row. Once his medium is built
+    (D-255) all three conditions are reachable, and his Table S1 end-of-fermentation column reads
+    2.1/2.3, 4.0/3.4, 5.3/5.4 % -- **isoamyl-alcohol enrichment RISES with must nitrogen.**
+
+    The model does too, and it was never fitted to: nothing in this engine has seen a
+    per-condition Rollero number. It reads 1.23 / 2.44 / 3.09 %, a 2.51x rise across his nitrogen
+    range against his measured 2.43x.
+
+    **WHY THE MAGNITUDE IS NOT ASSERTED.** Two independent reasons, either sufficient. The model
+    sits at 0.56-0.66x the measured level at every point -- a consistent shortfall, which is the
+    inherited D-111 gap this file already documents, and closing it means raising
+    ``f_valine_to_isoamyl``, the exact D-104 error the headline test's docstring forbids. And the
+    2 vs 8 mg/l lipid columns, which this model has no coordinate for, disagree by 17.6% at
+    SM250 -- as wide as the ratios differ from one another. A magnitude claim here would be a
+    claim about phytosterols, made by a model that does not represent them.
+
+    **WHAT GOES RED.** A change that flattens the nitrogen response, or inverts it. That is a
+    real defect class: the enrichment is the valine route's share against de-novo synthesis, so
+    a de-novo term that stopped responding to nitrogen would flatten this while leaving every
+    single-condition guard in this file green.
+
+    **SM70 sits BELOW the sourced band's floor (0.0123 against 0.021) and is reported, not
+    hidden.** It is newly visible -- the condition was unreachable before the medium was sourced
+    -- and it is NOT licence to widen ``_ROLLERO_ALCOHOL_BAND``, whose own comment explains why.
+    Band membership is therefore asserted only where it holds, and the miss is pinned as a miss
+    so that closing it registers as a change rather than passing unnoticed.
+    """
+    enrichments = []
+    for yan in (70.0, 250.0, 425.0):
+        traj, compiled = _rollero_run(1.0, yan_paper_mgn=yan)
+        enrichments.append(
+            _enrichment(traj, compiled.schema, "isoamyl_alcohol", "isoamyl_alcohol_valine")
+        )
+    low, mid, high = enrichments
+
+    # THE CLAIM: monotone, in Rollero's own direction, on his own three musts.
+    assert low < mid < high, (
+        f"enrichment {low:.4f}/{mid:.4f}/{high:.4f} is not monotone in must nitrogen - Rollero's "
+        "EF column rises 2.2 -> 3.7 -> 5.35 %, and a flat or inverted response is a de-novo term "
+        "that has stopped reading nitrogen"
+    )
+    # The SIZE of the rise, at a tolerance set by the lipid axis the model cannot represent
+    # (17.6% at SM250), never tighter. Measured 5.35/2.20 = 2.43x; the model 2.51x.
+    assert high / low == pytest.approx(2.43, rel=0.20), (
+        f"the enrichment rises {high / low:.2f}x across Rollero's nitrogen range against his "
+        "measured 2.43x - the SHAPE has moved, which no single-condition guard here would see"
+    )
+    # The level shortfall is consistent, and pinned as the inherited D-111 gap rather than
+    # tuned away. Quoted against the two-lipid mean at each condition.
+    for value, (lo_lipid, hi_lipid), name in zip(
+        enrichments, _ROLLERO_EF_ENRICHMENT.values(), ("SM70", "SM250", "SM425"), strict=True
+    ):
+        ratio = value / ((lo_lipid + hi_lipid) / 2.0)
+        assert 0.45 < ratio < 0.80, (
+            f"{name}: model {value:.4f} is {ratio:.2f}x Rollero's EF mean - the shortfall is "
+            "supposed to be the INHERITED D-111 gap, uniform across his conditions; a ratio "
+            "that has moved out of this range means the level and the shape have decoupled"
+        )
+
+    # SM70 IS BELOW THE SOURCED FLOOR. Pinned as the miss it is - not widened away, and not
+    # left unpinned so that a future repair would pass silently.
+    floor, ceiling = _ROLLERO_ALCOHOL_BAND
+    assert low < floor, (
+        f"SM70 enrichment {low:.4f} has RISEN INTO the sourced band (floor {floor}) - this is an "
+        "improvement and the guard is telling you to re-record it, not to revert it"
+    )
+    assert floor < mid < ceiling and floor < high < ceiling, (
+        "SM250 and SM425 must stay inside D-111's band - only SM70 is a known miss"
+    )
 
 
 def test_the_ester_needed_its_own_tracer_slot_because_the_alcohol_fraction_is_not_flat():

@@ -13,6 +13,13 @@ memory note sharpened it to **one sourcing ask gating four of the five remaining
    concentrations, mM, all 20 species, mean of 14 independent fermentations. Species by species
    the two musts sit at a near-constant ratio (1.40–1.86, median 1.55), which is what "same
    recipe, different nitrogen" looks like.
+
+   **THREE papers, since D-255.** Rollero 2017 — the third fixture in this repo scored against
+   this lab's work, and the one D-254 left as an open sourcing question — is the same recipe
+   again: same citation, same sugar and temperature as Minebois, and a Table S3 %YAN partition
+   agreeing with her stock table to within half its own last printed digit on all 19 species.
+   See :data:`ROLLERO_S3_PCT`. It is transcribed here rather than in the fixture that uses it,
+   because a medium is a property of the paper, not of the guard that happens to run on it.
 2. **Neither paper's headline nitrogen number is this model's ``yan_mgl``**, and the difference is
    not rounding. See :func:`test_the_papers_own_nitrogen_convention_reproduces_their_own_number`.
    **D-248 measured that conflation and REFUSED the repair** — the carve-out and release frames
@@ -171,6 +178,43 @@ _LUMPED = (
     "histidine", "lysine", "serine", "tryptophan", "tyrosine",
 )  # fmt: skip
 
+#: Rollero *et al.* 2017, Microb. Biotechnol. 10:1649-1662 (PMC5658611), supplemental Table S3,
+#: VERBATIM: "Percentage of yeast assimilable nitrogen provided by each nitrogen sources".
+#:
+#: **This is the THIRD paper on the same recipe, and it is the one D-254 left open** — its two
+#: siblings' medium was sourced at D-246 while this comment's twin still said Rollero's was "not
+#: in this repo". Methods, VERBATIM: "Cultures were performed in a synthetic medium (SM) that
+#: simulates standard grape juice (Bely et al., 1990)" — the same citation Crépin and Minebois
+#: give — with "100 g l−1 glucose and 100 g l−1 fructose" and nitrogen at "70, 250 or 425
+#: mg l−1", the levels "made up by a mixture of ammonium and amino acids, that kept the same
+#: proportion". Sugar and temperature are Minebois's exactly (200 g/L, 24 °C).
+#:
+#: **The citation is NOT what settles it — the composition is** (D-254 forbade the lineage
+#: inference explicitly). Against :data:`MINEBOIS_STOCK_GPL`, already in this repo and reduced to
+#: the same %YAN frame, every one of the 19 species agrees to **≤ 0.05 pp, i.e. within half of
+#: Rollero's last printed digit**, and the two tables even list the species in the same order.
+#: Read as *relative* error the two smallest entries are loose — tyrosine 0.3 % carries ±16.7 %
+#: from rounding alone and reads 12.9 % — so this table's resolution, not its agreement, is what
+#: bounds any per-species claim built on it. Everything at or above 1 % of YAN agrees to <4 %.
+#:
+#: **Cross-checked against a table it was not read from.** Valine is 1.3 % of YAN here, so the
+#: three levels start at 65.0 / 232.0 / 394.4 µM; ``wine_generic.yaml``'s ``f_valine_to_isoamyl``
+#: notes already carried Rollero's own *consumed* valine as 62 / 221 / 376 µM. That is
+#: 95.2 / 95.3 / 95.4 % consumed — one fraction at all three levels, spread 0.19 % — which
+#: confirms both the transcription and the "kept the same proportion" sentence at once.
+ROLLERO_S3_PCT = {
+    "tyrosine": 0.3, "tryptophan": 3.0, "isoleucine": 0.8, "aspartate": 1.1,
+    "glutamate": 2.8, "arginine": 22.0, "leucine": 1.3, "threonine": 2.2,
+    "glycine": 0.8, "glutamine": 23.6, "alanine": 5.6, "valine": 1.3,
+    "methionine": 0.7, "phenylalanine": 0.8, "serine": 2.5, "histidine": 0.7,
+    "lysine": 0.8, "cysteine": 0.4, "ammonium": 29.3,
+}  # fmt: skip
+#: Rollero's three stated nitrogen levels [mg N/L, the PAPER's frame], Methods verbatim.
+ROLLERO_YAN_LEVELS = (70.0, 250.0, 425.0)
+#: "100 g l−1 glucose and 100 g l−1 fructose", and 24 °C — both identical to Minebois.
+ROLLERO_SUGAR_GPL = 200.0
+ROLLERO_TEMP_C = 24.0
+
 _MUST_FERMENTABLE = 0.930  # ``must_fermentable_fraction``; asserted against the file below
 
 
@@ -179,6 +223,23 @@ def minebois_must_mm() -> dict[str, float]:
     mm = {s: g * MINEBOIS_STOCK_ML_PER_L / _mw(s) for s, g in MINEBOIS_STOCK_GPL.items()}
     mm["ammonium"] = MINEBOIS_NH4CL_GPL * 1000.0 / _M_NH4CL
     return mm
+
+
+def rollero_must_mm(yan_paper_mgn: float) -> dict[str, float]:
+    """Rollero's must [mM] at one of his stated nitrogen levels, from Table S3's partition.
+
+    ``yan_paper_mgn`` is in the **paper's** frame (Arg 3 N, Trp 1, His 1) because that is the
+    frame a %YAN table is written in; :func:`commensurate_pools` converts to the model's.
+
+    **Proline is absent and that is correct, not a gap.** Table S3 partitions *assimilable*
+    nitrogen and proline is not assimilable, so it never appears. The two sibling musts carry it
+    and :func:`commensurate_pools` discards it anyway — it is in neither ``_NAMED_POOLS`` nor
+    ``_LUMPED``, and :func:`model_frame_mgn` excludes it — so the three musts are built alike.
+    """
+    return {
+        s: (yan_paper_mgn * pct / 100.0) / (_PAPER_N_ATOMS.get(s, _n_atoms(s)) * _M_N)
+        for s, pct in ROLLERO_S3_PCT.items()
+    }
 
 
 def paper_frame_mgn(mm: dict[str, float]) -> float:
