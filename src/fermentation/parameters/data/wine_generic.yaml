@@ -253,31 +253,41 @@ amino_acid_assimilation_fraction:
 # transport is not the bottleneck, which is what over-accumulation MEANS: real yeast take up
 # assimilable nitrogen faster than they can build protein from it and store the surplus.
 #
-# THE VALUE IS A BOUND, NOT A MIDPOINT, AND IT IS NOT FITTED. What the model is asked to
-# reproduce is COMPLETE CONSUMPTION (Crepin et al. 2017 Data Set S1: 0.2% of the must's YAN
-# left at end of fermentation) and the Coleman Y_X/N identity the compile seam already
-# overrides biomass_N_fraction to satisfy. Both are properties of the SATURATED regime: above
-# the threshold where transport stops limiting, the residual and every downstream share are
+# THE EXTENT IS NOT FITTED AND CANNOT BE. What the model is asked to reproduce is COMPLETE
+# CONSUMPTION (Crepin et al. 2017 Data Set S1: 0.2% of the must's YAN left at end of
+# fermentation) and the Coleman Y_X/N identity the compile seam already overrides
+# biomass_N_fraction to satisfy. Both are properties of the SATURATED regime: above the
+# threshold where transport stops limiting, the residual and every downstream share are
 # insensitive to r. tests/test_assimilable_nitrogen_uptake.py pins that insensitivity across
-# two decades; a value inside the band is therefore a statement that uptake is fast, and the
-# outcome is not a function of which value inside it was chosen.
+# two decades -- the residual reads 0.623% at every r from 0.25 to 50 -- so no value inside
+# the band can be said to have been chosen to fit the extent, and moving the level does not
+# put the extent back in play. THAT IS WHY THE LEVEL WAS FREE TO BE LANDED ON SOMETHING ELSE.
 #
-# WHAT THE INSENSITIVITY DOES *NOT* COVER IS THE TIMING, AND THE DIRECTION IS KNOWN. The
-# EXTENT saturates (residual 0.622 % at every r from 0.25 to 50), but the exhaustion time
-# does not: the model strips 90 % of the assimilable nitrogen by 18.6 h at r = 1 against
-# Crepin's measured N_T of 28 h -- ~1.5x fast -- and r = 0.25 lands at 25.3 h. Do not read
-# 'insensitive across 200x' as 'the time course was checked'. It was checked and it misses,
-# and the miss is not repairable by moving r without giving up the saturated regime that
-# makes the extent unfitted.
+# WHAT THE INSENSITIVITY DOES NOT COVER IS THE SHAPE, AND THE SHAPE IS WHAT THE LEVEL IS NOW
+# SET BY (decision D-253). Crepin's Data Set S1 panel B reports dry weight at the nitrogen
+# landmarks: her yeast hold 24.5% of their final biomass with half the must's assimilable
+# nitrogen already gone, and 41.0% with three-quarters gone. Read on the EXTRACELLULAR
+# quantity she sampled -- separable only since D-250 -- this model holds 0.370 and 0.595 at
+# r = 1, and crosses her half-nitrogen landmark at r = 2.6. Her three-quarters landmark is
+# NOT free once the half is matched, and it comes along uninvited: 0.415 against her 0.410,
+# a landmark RATIO of 1.694 against her 1.673. One knob cannot tune two landmarks and their
+# ratio independently, which is what distinguishes this from fitting a number to itself.
+#
+# THE TIMING IS A THIRD OBSERVABLE AND IT IS NOT WHAT THIS VALUE ANSWERS. D-248 recorded the
+# model stripping 90% of the nitrogen by 18.6 h against Crepin's measured N_T of 28 h and
+# D-249 REFUSED to repair it through r -- a sweep to 1000x saturates at ~16.4 h and never
+# overtakes the run containing it. That refusal stands. What closed the timing was the
+# fixture's inoculum (D-253 part 1), not this knob: at the sourced pitch the same run reads
+# 29.3 h at r = 2.6. Do not re-derive a timing calibration from this parameter.
 amino_acid_uptake_capacity_ratio:
-  value: 1.0
+  value: 2.6
   unit: "dimensionless"
   tier: speculative
-  uncertainty: { low: 0.5, high: 10.0, note: "maximum specific assimilable-nitrogen uptake rate as a multiple of mu_max*biomass_N_fraction, growth's own peak specific nitrogen demand. Lower edge 0.5 = transport marginally slower than peak anabolic demand (uptake becomes partly limiting and a residual reappears); upper edge 10 = transport an order of magnitude faster, the deep-saturated regime. The SHIPPED 1.0 is the minimal statement that transport is not the bottleneck." }
+  uncertainty: { low: 0.5, high: 10.0, note: "maximum specific assimilable-nitrogen uptake rate as a multiple of mu_max*biomass_N_fraction, growth's own peak specific nitrogen demand. Lower edge 0.5 = transport marginally slower than peak anabolic demand (uptake becomes partly limiting and a residual reappears); upper edge 10 = transport an order of magnitude faster, the deep-saturated regime. The band is UNCHANGED by D-253: the shipped 2.6 sits inside the interval that was already declared for r when the value was 1.0, which is the whole reason landing Crepin's landmark needed no new parameter and no widened band. PRECISION: the landmark is read to +/-0.01 of a biomass share off a figure panel, which constrains r to about +/-0.2. Two significant figures is the honest width; do not restate 2.6 as 2.60 or re-derive a third digit from a finer grid." }
   provenance:
-    source: "author estimate"
+    source: "Crepin, Nidelet, Sanchez, Dequin & Camarasa 2017, Data Set S1 panel B (dry weight at the nitrogen landmarks); the RATE LAW it parameterises is an author construction"
     conditions: "generic S. cerevisiae wine ferment; assimilable amino acids taken up in excess of immediate anabolic demand and stored (vacuolar amino-acid pools)"
-    notes: "r in rho_N = r * mu_max * biomass_N_fraction * X * gate(aa). READ AS CAPACITY, NEVER AS DEMAND: mu_max is read as a constant and the instantaneous growth rate is deliberately NOT read, which is the whole of the un-coupling (decision D-248). Before D-248 the ONLY route from the speciated amino-acid pools into biomass nitrogen was the D-32 swap at psi*gate*f_N*base_dx, strictly BELOW growth's own f_N*base_dx draw, so ammonium could only fall; when it hit zero growth's N/(K_n+N) Monod shut growth off, the swap stopped with it, and the pools froze at 61.4% of their initial mass. Reconstructed on Crepin's own must the model left 40.8% of the assimilable nitrogen standing where she measures 0.2%, unchanged at 30 and 60 days. NOT FITTED TO THAT NUMBER: the value is the minimal ratio (1.0) that makes transport non-limiting, and the pinned claim is insensitivity across the band, not the level. The INTERNAL anchor is the load-bearing one and it is unfitted: _apply_nitrogen_dependent_yield overrides biomass_N_fraction to 1/Y_X/N(N_init) from Coleman, Fish & Block 2007 expressly so biomass comes out at Y_X/N * N_init, an identity that holds only under complete consumption -- measured, the all-ammonium control reached 3.445 g/L against the fit's own 3.472 while the speciated run reached 2.12, i.e. 61% of a regression the model itself compiles in. Temperature dependence is NOT modelled (this Process is not a modifier target): no sourced activation energy for amino-acid permease transport is in hand and borrowing E_a_growth would be an unsourced claim, the D-98 trap."
+    notes: "r in rho_N = r * mu_max * biomass_N_fraction * X * gate(aa). READ AS CAPACITY, NEVER AS DEMAND: mu_max is read as a constant and the instantaneous growth rate is deliberately NOT read, which is the whole of the un-coupling (decision D-248). Before D-248 the ONLY route from the speciated amino-acid pools into biomass nitrogen was the D-32 swap at psi*gate*f_N*base_dx, strictly BELOW growth's own f_N*base_dx draw, so ammonium could only fall; when it hit zero growth's N/(K_n+N) Monod shut growth off, the swap stopped with it, and the pools froze at 61.4% of their initial mass. Reconstructed on Crepin's own must the model left 40.8% of the assimilable nitrogen standing where she measures 0.2%, unchanged at 30 and 60 days. THE EXTENT IS NOT FITTED AND THE LEVEL NOW IS, AND THEY ARE DIFFERENT OBSERVABLES (decision D-253). Through D-252 the value was 1.0, the minimal ratio that makes transport non-limiting, and the only pinned claim was insensitivity across the band. The extent's insensitivity is unchanged and still un-fitted -- the residual reads 0.623% at every r from 0.25 to 50, so nothing about complete consumption or the Coleman identity was bought by moving the level. What the level is now set by is the SHAPE, on the extracellular frame D-250 made separable: r = 2.6 lands Crepin's half-nitrogen landmark (0.245 of final biomass), her three-quarters landmark comes along uninvited (0.415 against 0.410) and so does the landmark ratio (1.694 against 1.673). THE TIER STAYS SPECULATIVE AND THE CALIBRATION DOES NOT LIFT IT: one study, two landmarks read off a figure panel, and the functional form rho_N proportional to X is still an author construction that D-249 identified as wrong early and D-251 could only show was not DEMONSTRABLY wrong. The anti-fitting defence is the second landmark and the ratio, not the tier. Do not fit r to anything else -- the timing is REFUSED as a target (D-249, unreachable through this knob and closed by the inoculum instead) and the extent is saturated. The INTERNAL anchor is the load-bearing one and it is unfitted: _apply_nitrogen_dependent_yield overrides biomass_N_fraction to 1/Y_X/N(N_init) from Coleman, Fish & Block 2007 expressly so biomass comes out at Y_X/N * N_init, an identity that holds only under complete consumption -- measured, the all-ammonium control reached 3.445 g/L against the fit's own 3.472 while the speciated run reached 2.12, i.e. 61% of a regression the model itself compiles in. Temperature dependence is NOT modelled (this Process is not a modifier target): no sourced activation energy for amino-acid permease transport is in hand and borrowing E_a_growth would be an unsourced claim, the D-98 trap."
 
 K_amino_acids:
   value: 0.1

@@ -162,10 +162,17 @@ def test_the_nitrogen_channel_is_SLOWER_than_the_run_containing_it_at_both_pitch
     runs faster still, so the nitrogen cannot be what makes the run fast. Both gaps are measured
     on the same trajectory, so nothing about the must, the medium or the parameters differs
     between them; only the observable does.
+
+    **The four numbers moved at D-253 and the comparison did not.** D-249 measured them at
+    ``r = 1``; the shipped capacity is now 2.6, so the nitrogen channel is faster in absolute
+    terms at both pitches (1.59 → 1.65 house, 0.94 → 0.96 sourced) while the runs containing it
+    barely move (1.92 → 1.93, 1.54 → 1.55). The margin narrowed and the sign did not, which is
+    the honest way to state it: the refusal rests on the *ordering* below, and a beat that ever
+    closes that ordering has reversed D-249 rather than tightened it.
     """
     for pitch, (clock, nitro) in (
-        (HOUSE_PITCH_GPL, (1.92, 1.59)),
-        (SOURCED_PITCH_GPL, (1.54, 0.94)),
+        (HOUSE_PITCH_GPL, (1.93, 1.65)),
+        (SOURCED_PITCH_GPL, (1.55, 0.96)),
     ):
         course = courses[(pitch, False)]
         clock_gap = CREPIN_EF_H / course.hours_to_dryness
@@ -229,14 +236,14 @@ def test_time_free_the_model_exhausts_its_nitrogen_LATER_in_its_run_than_crepin_
     """The same claim with the clock divided out, so no rate calibration can be read into it.
 
     Crépin exhausts at 28 h of a 150 h fermentation — 18.7 % of the way in. Expressed the same
-    way the model is at 22.5 % (shipped pitch) and 30.8 % (sourced). Both are *later*, which is
+    way the model is at 21.8 % (house pitch) and 30.3 % (sourced). Both are *later*, which is
     the strongest form of "the nitrogen is not what is fast": it survives multiplying either
     run's time axis by any constant.
     """
     measured = CREPIN_EXHAUSTION_H / CREPIN_EF_H
     assert measured == pytest.approx(0.187, abs=0.002)
 
-    for pitch, expected in ((HOUSE_PITCH_GPL, 0.225), (SOURCED_PITCH_GPL, 0.308)):
+    for pitch, expected in ((HOUSE_PITCH_GPL, 0.218), (SOURCED_PITCH_GPL, 0.303)):
         course = courses[(pitch, False)]
         share = course.hours_to_n_consumed(0.90) / course.hours_to_dryness
         assert share == pytest.approx(expected, abs=0.01), (
@@ -275,13 +282,13 @@ def test_matched_to_varelas_own_research_pitch_the_clock_gap_lands_INSIDE_its_ba
     ``test_validation_varela2004.py`` pins [1.6, 2.2]× at 28 °C **at 0.04 g/L**, its own
     ``_PITCH_GPL_RESEARCH``. Comparing the shipped fixture's 1.92× to that band would be
     comparing runs pitched 6.25× apart, which is why D-249 does not lead with it. Reconstructed
-    at Crépin's stated temperature and the sourced pitch, the gap reads 1.68× — a different must
+    at Crépin's stated temperature and the sourced pitch, the gap reads 1.69× — a different must
     and a different nitrogen level landing in the same characterised band, on the same engine.
     """
     course = courses[(SOURCED_PITCH_GPL, True)]
     gap = CREPIN_EF_H / course.hours_to_dryness
-    assert gap == pytest.approx(1.68, abs=0.05), (
-        f"the matched-pitch isothermal gap reads {gap:.2f}x, not the 1.68x D-249 measured"
+    assert gap == pytest.approx(1.69, abs=0.05), (
+        f"the matched-pitch isothermal gap reads {gap:.2f}x, not the 1.69x D-253 measured"
     )
     assert 1.6 <= gap <= 2.2, (
         f"the matched gap {gap:.2f}x has left the band test_validation_varela2004.py pins for "

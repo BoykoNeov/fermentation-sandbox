@@ -341,7 +341,22 @@ def commensurate_scenario(which: str, *, days: float = _FERMENT_DAYS) -> Scenari
     )
 
 
-def _run(which: str, *, days: float = _FERMENT_DAYS, scale: dict[str, float] | None = None):
+def _run(
+    which: str,
+    *,
+    days: float = _FERMENT_DAYS,
+    scale: dict[str, float] | None = None,
+    override: dict[str, float] | None = None,
+):
+    """``scale`` MULTIPLIES the compiled value; ``override`` REPLACES it.
+
+    Both exist because callers mean different things. A commensurability probe means "this
+    constant, times that ratio" and must follow the shipped value wherever it goes. A capacity
+    sweep means "r = 2.6", full stop — and if it is written as a multiplier it silently becomes
+    a different sweep the moment the shipped value moves, which is exactly what D-253 would have
+    done to ``test_assimilable_nitrogen_uptake``'s grid (every ``r = 10`` in its prose would have
+    started meaning 26). Use ``override`` whenever the docstring names an absolute value.
+    """
     cs = compile_scenario(commensurate_scenario(which, days=days))
     for name in _OTHER_PRECURSOR_CONSUMERS:
         cs.process_set.disable(name)  # KeyErrors on a rename rather than silently no-op
@@ -349,6 +364,9 @@ def _run(which: str, *, days: float = _FERMENT_DAYS, scale: dict[str, float] | N
     for key, factor in (scale or {}).items():
         assert key in params, f"no such parameter {key!r}"
         params[key] = params[key] * factor
+    for key, value in (override or {}).items():
+        assert key in params, f"no such parameter {key!r}"
+        params[key] = value
     traj = simulate_scheduled(
         cs.process_set,
         params,

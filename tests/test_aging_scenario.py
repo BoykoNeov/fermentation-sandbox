@@ -2891,7 +2891,24 @@ def test_no_lees_leaves_no_branched_chain_strecker_substrate():
         assert float(aged.series(precursor)[-1]) < 1.0e-6, precursor
     # ⇒ their Strecker aldehydes are silent. These ARE degradations of the amino acid, so no
     # substrate must mean no product; that is the D-87 gate working, not a defect in it.
+    #
+    # THE BOUND IS A FLOOR, NOT AN EQUALITY, AND D-253 IS WHY. This line read ``== 0.0`` and it
+    # was reading the SIGN OF SOLVER NOISE on the precursor, not a structural property. The three
+    # precursors do not reach zero exactly: they end at -6.5e-11 (leucine), +3.0e-15 (isoleucine)
+    # and +1.1e-15 (valine). Leucine's lands on the negative side, so its aldehyde is clamped to
+    # an exact zero; the other two land on the positive side and leak 3.6e-17 and 6.3e-18 g/L.
+    # Which side each one lands on is an accident of the integration, and D-253's capacity move
+    # flipped one of them without changing anything about the mechanism. The floor below is
+    # 1e-12 g/L: five orders above what is measured here and six orders BELOW 2-methylbutanal's
+    # ~1 ug/L sensory threshold, so "silent" survives intact while the accident cannot fail it.
+    # A real regression here -- the route firing on substrate it should not have -- would be
+    # many orders larger, because it would be a concentration rather than a rounding residue.
     for pool in ("3_methylbutanal", "2_methylbutanal", "2_methylpropanal"):
-        assert float(aged.series(pool)[-1]) == 0.0, pool
+        assert 0.0 <= float(aged.series(pool)[-1]) < 1.0e-12, pool
+    # Non-vacuity: the floor is only meaningful while the premise above is at noise scale too.
+    # If a precursor ever ends at a real concentration, "no substrate" is false and the aldehyde
+    # bound is answering a question nobody asked.
+    for precursor in ("leucine", "isoleucine", "valine"):
+        assert abs(float(aged.series(precursor)[-1])) < 1.0e-9, precursor
     # …while sotolon survives on the de-novo route (D-104) — the whole point of that flag.
     assert float(aged.series("sotolon")[-1]) > 0.0

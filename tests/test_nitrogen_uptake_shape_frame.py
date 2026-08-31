@@ -22,18 +22,31 @@ three-quarters landmark at the same capacity, and the landmark *ratio* — which
 free to choose independently — lands with it (1.648 against her 1.673).
 
 So the form is not shown to be wrong: the level was never identifiable on any observable this repo
-could express before D-250 split the two frames. What is **not** settled is whether the capacity
-that lands is affordable. Front-loading is paid for in stored nitrogen, and at the landing
-capacity the cells carry a total of **0.133–0.139 g N per g dry weight** against the repo's own
-sourced N-replete elemental reference of **0.114** (band [0.08, 0.14]) — it spends essentially the
-whole band, at both pitches. That, and the fact that the landing capacity is not pitch-invariant
-(3.9 at the fixture's unsourced 0.25 g/L, ~2.65 at the only sourced pitch), is why this file
-measures the calibration and does **not** take it. Moving ``r`` is the owner's trade.
+could express before D-250 split the two frames.
+
+**The calibration is TAKEN at D-253, and this file now measures a shipped value rather than a
+candidate.** ``amino_acid_uptake_capacity_ratio`` is **2.6**, landed at the fixture's own pitch —
+which D-253 part 1 moved onto the sourced inoculum first, because the landing capacity is not
+pitch-invariant (3.9 at the old house 0.25 g/L, 2.6 at the sourced 0.04). The order matters and
+is not cosmetic: landing ``r`` first would have fitted it to an inoculum nobody published.
+
+**What the calibration cost, and what it did not.** It did not cost the extent — the residual
+reads 0.623 % at every capacity from 0.25 to 50, so complete consumption and the Coleman identity
+are untouched (``tests/test_assimilable_nitrogen_uptake.py``). It did not cost the timing, which
+D-253 part 1 had already closed through the pitch. It did not cost Minebois, whose two in-study
+fusel shares are flat in ``r``. What it does is load the cells: the store peaks at 35 % of the
+must's nitrogen against 17 % at ``r = 1``, putting total cell nitrogen at **0.136 g N/g dry
+weight** against the repo's N-replete elemental reference of 0.114, inside that reference's own
+[0.08, 0.14] band. **D-252 voided reading that as a ceiling breach** — the band is an *end-state*
+elemental composition and Crépin's own end state falls below the whole of it, while this is a
+transient peaking at a moment she never sampled. It is the calibration's footprint, measured and
+bounded, not a violation.
 
 **What this file forbids.** Re-proposing "the uptake rate law's functional form is wrong early" as
-a settled finding; re-running the capacity sweep against the timing (D-249 §4 did it, it
-saturates, it is refused); and taking the front-loading calibration without pricing the cell
-nitrogen it costs.
+a settled finding; re-running the capacity sweep against the *timing* (D-249 §4 did it, it
+saturates, it is refused, and the inoculum is what closed it); re-deriving the landing capacity at
+the house pitch and shipping that; and re-charging the transient store against
+``biomass_N_fraction``'s end-state band as though it were a ceiling (D-252).
 """
 
 from __future__ import annotations
@@ -68,13 +81,29 @@ STORED = "stored_nitrogen"
 #: — see :func:`test_the_third_landmark_discriminates_NOTHING_and_is_labelled_so`.
 CREPIN_SHARE = {f: CREPIN_DRY_WEIGHT_GPL[f] / CREPIN_FINAL_BIOMASS_GPL for f in (0.50, 0.75, 1.00)}
 
-#: The capacity that lands Crépin's half-nitrogen landmark, per pitch. NOT shipped — the shipped
-#: value is 1.0 and this file does not move it. Measured on the grid in :func:`sweep`.
-LANDING_R = {HOUSE_PITCH_GPL: 3.9, SOURCED_PITCH_GPL: 2.65}
+#: What ``wine_generic.yaml`` ships, read from the file so this module cannot drift from it.
+SHIPPED_R = float(
+    load_parameters(default_data_dir() / "wine_generic.yaml")[
+        "amino_acid_uptake_capacity_ratio"
+    ].value
+)
 
-#: The grid each pitch is read on. 1000 is D-249 §4's own saturation point, kept so the
-#: total-frame flatness claim is made against the same extreme that record used.
-GRID = {HOUSE_PITCH_GPL: (1.0, 2.0, 3.9, 5.0, 1000.0), SOURCED_PITCH_GPL: (1.0, 2.65)}
+#: The capacity that lands Crépin's half-nitrogen landmark, per pitch — 3.9 at the house pitch
+#: D-252 measured it at, 2.6 at the sourced pitch the fixture now runs. The second of these **is
+#: the shipped value** since D-253, and :func:`test_the_landing_capacity_at_the_fixtures_pitch_
+#: IS_the_shipped_value` asserts that identity rather than leaving it to a reader to notice.
+#: D-251 recorded 2.65 here off a two-point grid (1.0, 2.65), which spot-checks an answer instead
+#: of bracketing one; re-measured on the grid below the crossing is 2.6.
+LANDING_R = {HOUSE_PITCH_GPL: 3.9, SOURCED_PITCH_GPL: 2.6}
+
+#: The grid each pitch is read on. 1000 is D-249 §4's own saturation point, kept at the house
+#: pitch so the total-frame flatness claim is made against the same extreme that record used.
+#: The sourced arm is the one that must BRACKET rather than spot-check, since the shipped value
+#: is read off it.
+GRID = {
+    HOUSE_PITCH_GPL: (1.0, 2.0, 3.9, 5.0, 1000.0),
+    SOURCED_PITCH_GPL: (1.0, 2.0, 2.6, 5.0, 10.0),
+}
 
 
 def _cross(t: FloatArray, series: FloatArray, level: float) -> float:
@@ -206,13 +235,36 @@ def test_in_the_TOTAL_frame_the_capacity_knob_is_INVISIBLE_which_is_why_d249_saw
     )
 
 
+def test_the_landing_capacity_at_the_fixtures_pitch_IS_the_shipped_value(sweep):
+    """The identity D-253 creates, asserted rather than left for a reader to notice.
+
+    Everything else in this file is a measurement of a *candidate* capacity. Since D-253 the
+    candidate at the fixture's own pitch is what ships, and if the two ever come apart — someone
+    edits the YAML, or re-lands ``r`` at the house pitch — then every price and every landmark
+    below is being quoted against a run the engine does not perform by default.
+    """
+    assert LANDING_R[SOURCED_PITCH_GPL] == pytest.approx(SHIPPED_R), (
+        f"the shipped capacity is {SHIPPED_R} and the capacity this file lands Crépin's landmark "
+        f"at is {LANDING_R[SOURCED_PITCH_GPL]}. D-253 shipped the landing value; if the YAML was "
+        "moved, re-land it on the grid here rather than editing this constant to match"
+    )
+    assert LANDING_R[HOUSE_PITCH_GPL] != pytest.approx(SHIPPED_R), (
+        "the house-pitch landing capacity has become the shipped one, which would mean the level "
+        "was fitted at an inoculum neither paper published — the thing D-253's ordering avoids"
+    )
+    # Non-vacuity: the shipped capacity is genuinely a point on the grid that was integrated,
+    # not a constant compared against itself.
+    assert (SOURCED_PITCH_GPL, SHIPPED_R) in sweep
+
+
 def test_the_shipped_knob_REACHES_crepins_landmark_inside_its_own_declared_band(sweep, wine_params):
-    """D-249 §5's "wrong functional form" does not survive the frame correction (decision D-251).
+    """D-249 §5's "wrong functional form" does not survive the frame correction (D-251, D-253).
 
     In Crépin's frame the half-nitrogen share falls monotonically with capacity and crosses her
-    0.245 at ``r ≈ 3.9`` — inside the ``[0.5, 10]`` uncertainty the parameter already declares, so
-    reaching her landmark needs no new parameter, no widened band and no new rate law. What this
-    does **not** establish is that the crossing capacity is affordable; that is the next test.
+    0.245 at ``r ≈ 3.9`` at the house pitch and ``r = 2.6`` at the sourced one — inside the
+    ``[0.5, 10]`` uncertainty the parameter already declares, so reaching her landmark needs no
+    new parameter, no widened band and no new rate law. **D-253 took the sourced one**; the band
+    is unchanged, which is the point of asserting its edges as literals below.
     """
     band = wine_params["amino_acid_uptake_capacity_ratio"].uncertainty
     assert band is not None and (band.low, band.high) == (0.5, 10.0), (
@@ -256,7 +308,7 @@ def test_one_capacity_lands_BOTH_discriminating_landmarks_and_their_RATIO(sweep)
     This is the anti-D-98 arm: the record is entitled to say the form reproduces her landmarks
     only while the *second* landmark and the ratio come along uninvited.
     """
-    for pitch, expected in ((HOUSE_PITCH_GPL, 1.648), (SOURCED_PITCH_GPL, 1.701)):
+    for pitch, expected in ((HOUSE_PITCH_GPL, 1.648), (SOURCED_PITCH_GPL, 1.694)):
         shares = sweep[(pitch, LANDING_R[pitch])]["shares"]["medium"]
 
         assert shares[0.75] == pytest.approx(CREPIN_SHARE[0.75], abs=0.015), (
@@ -299,18 +351,26 @@ def test_the_third_landmark_discriminates_NOTHING_and_is_labelled_so(sweep):
 
 
 def test_the_front_loading_is_PAID_FOR_in_stored_nitrogen_at_the_cell_N_ceiling(sweep, wine_params):
-    """The price of landing Crépin's landmarks, against the repo's OWN sourced ceiling (D-251).
+    """What the calibration costs, now that it has been taken (D-251 priced it, D-253 took it).
 
     Nitrogen taken up ahead of anabolic need has to sit somewhere, and D-250's store is where.
     ``biomass_N_fraction``'s shipped 0.114 g N/g dry weight is the canonical N-**replete** yeast
     elemental reference (Roels 1983 / Heijnen, CH1.8O0.5N0.2) — *total* cell nitrogen, band
     [0.08, 0.14]. The wine seam overrides it downward per Coleman's ``Y_X/N(N_init)``, to 0.0624
-    on this must, so the headroom a stored pool may occupy is what is left below the ceiling.
+    on this must, so the headroom a stored pool may occupy is what is left below the reference.
 
-    At the shipped capacity the store is comfortably inside it. At the landing capacity the cells
-    carry 0.133–0.139 g N/g DW: past the reference value by 17–22 % and within a hair of the
-    band's top edge, at **both** pitches. The calibration is therefore not free, and this test
-    exists so that a beat which takes it has to say so.
+    At ``r = 1`` the store is comfortably inside it. At the landing capacity the cells carry
+    0.136–0.139 g N/g DW: past the reference value by ~20 % and inside the band's top edge, at
+    **both** pitches. **This is the footprint, not a veto** — D-252 established that the band is
+    an *end-state* elemental composition, that Crépin's own end state falls below the whole of it,
+    and that the model's cell-nitrogen peak happens at ~11–21 % of the nitrogen gone, well before
+    her first landmark at 50 %. So the comparison below is a bound the transient must respect, not
+    a measurement it is failing. What would make the calibration inadmissible is crossing the
+    band's own high edge, and the last assertion is that line.
+
+    The ``r = 1`` arm is kept as the **control**: without it, "the loaded cells are near the top
+    of the band" could equally be a property of the model at any capacity, and the number would
+    say nothing about the calibration.
     """
     ceiling = wine_params["biomass_N_fraction"]
     assert ceiling.value == pytest.approx(0.114) and ceiling.uncertainty is not None
@@ -325,14 +385,18 @@ def test_the_front_loading_is_PAID_FOR_in_stored_nitrogen_at_the_cell_N_ceiling(
         "measured against a different cell"
     )
 
-    shipped = structural + sweep[(HOUSE_PITCH_GPL, 1.0)]["quota_max"]
-    assert shipped == pytest.approx(0.083, abs=0.005)
-    assert shipped < ceiling.value, (
-        "at the SHIPPED capacity the cells must stay below the N-replete reference — this is the "
-        "control that makes the ceiling pressure below a property of the calibration"
-    )
+    for pitch, expected in ((HOUSE_PITCH_GPL, 0.0833), (SOURCED_PITCH_GPL, 0.0910)):
+        control = structural + sweep[(pitch, 1.0)]["quota_max"]
+        assert control == pytest.approx(expected, abs=0.005), (
+            f"pitch {pitch}: the r=1 control reads {control:.4f} g N/g DW, not {expected}"
+        )
+        assert control < ceiling.value, (
+            f"pitch {pitch}: at r=1 the cells must stay below the N-replete reference — this is "
+            "the control that makes the loading below a property of the calibration rather than "
+            "of the model"
+        )
 
-    for pitch, expected in ((HOUSE_PITCH_GPL, 0.1391), (SOURCED_PITCH_GPL, 0.1371)):
+    for pitch, expected in ((HOUSE_PITCH_GPL, 0.1391), (SOURCED_PITCH_GPL, 0.1358)):
         reading = sweep[(pitch, LANDING_R[pitch])]
         loaded = structural + reading["quota_max"]
         assert loaded == pytest.approx(expected, abs=0.005), (
@@ -355,20 +419,40 @@ def test_the_front_loading_is_PAID_FOR_in_stored_nitrogen_at_the_cell_N_ceiling(
         )
 
 
-def test_the_stores_nonnegativity_dip_is_SOLVER_NOISE_and_is_there_at_the_shipped_capacity():
-    """Why the −2.3e-9 dip in ``stored_nitrogen`` is not an over-draw (decision D-251).
+def test_the_stores_nonnegativity_dip_is_SOLVER_NOISE_and_on_THIS_must_moved_inside_the_guard():
+    """Why the dip in ``stored_nitrogen`` is not an over-draw, and where it now sits (D-251/D-253).
 
     Growth's draw is split between ``N`` and the store in proportion to what each holds, so the
     store's own share of the draw goes to zero as the store empties and no over-draw is possible
     by construction. The falsifiable consequence is that the dip must scale with **solver
-    tolerance** and not with the uptake capacity. It does: at the shipped capacity on this must
-    the store reaches −2.3e-9 at ``rtol=1e-6`` and −4e-20 at ``rtol=1e-10``, a collapse of eleven
-    orders for four of tolerance.
+    tolerance**, and it does — four orders of tolerance collapse it by five or more. That arm is
+    the load-bearing one and it is unchanged.
 
-    It is recorded because :func:`~fermentation.validation.assert_nonnegative`'s 1e-9 default sits
-    *below* that excursion: the guard is already within a factor of two of firing on shipped
-    parameters, and no shipped test happens to integrate a trajectory where it does. That is a
-    tolerance calibration, not a physics defect, and the arms below are what license saying so.
+    **What changed is the size, and it is the one place D-253 improved something nobody was
+    aiming at.** D-251 measured −2.3e-9 on this must, *past*
+    :func:`~fermentation.validation.assert_nonnegative`'s 1e-9 default — the guard was within a
+    factor of two of firing on shipped parameters and only escaped because no shipped test
+    integrates that trajectory. At the configuration D-253 ships the dip is **−1.4e-10**, a factor
+    of seven *inside* the default. Both moves contribute and **neither is sufficient alone**:
+
+    ======================  ==============  ==============
+    pitch / capacity        ``r = 1``       ``r = 2.6``
+    ======================  ==============  ==============
+    house 0.25 g/L          −2.3e-9         −1.6e-9
+    sourced 0.04 g/L        −1.8e-9         **−1.4e-10**
+    ======================  ==============  ==============
+
+    Read that as an interaction, not as two savings multiplied: the singles are worth ×0.70 and
+    ×0.77 and their product is ×0.54, where the pair is worth ×0.058. **This is solver noise, so
+    its magnitude is not a smooth function of either knob**, and the improvement is emphatically
+    not a design property.
+
+    **The brittleness did not go away — it moved, and on another must it FIRED.** On the 2 g/L
+    dosed must of ``tests/test_nitrogen_stored_intracellularly.py`` the same shipped configuration
+    puts the dip at **−2.36e-9**, and ``assert_nonnegative``'s 1e-9 default raised a real failure
+    there when D-253 landed the capacity. That call site now names its own bound and pairs it with
+    a tightened-solver control; D-251's finding is **live**, not retired, and this test's scope is
+    one must. The assertion below is what would notice the excursion returning on *this* one.
     """
     minima = {}
     for rtol, atol in ((1e-6, 1e-9), (1e-10, 1e-13)):
@@ -388,11 +472,13 @@ def test_the_stores_nonnegativity_dip_is_SOLVER_NOISE_and_is_there_at_the_shippe
         assert traj.success, traj.message
         minima[rtol] = float(traj.y[compiled.schema.slice(STORED), :][0].min())
 
-    assert -1e-8 < minima[1e-6] < -1e-9, (
-        f"the default-tolerance dip reads {minima[1e-6]:.3e}; D-251 measured −2.3e-9, i.e. past "
-        "assert_nonnegative's 1e-9 default. If it is now inside that default the guard's "
-        "brittleness has gone away and the record should say so"
+    assert -1e-9 < minima[1e-6] < -1e-12, (
+        f"the default-tolerance dip reads {minima[1e-6]:.3e}. Past −1e-9 the excursion is back "
+        "outside assert_nonnegative's default and D-251's brittleness finding is live again — a "
+        "finding to record, not a bound to widen. Inside −1e-12 the dip has effectively vanished "
+        "and the tolerance-scaling arm below stops being able to say anything"
     )
+
     assert abs(minima[1e-10]) < abs(minima[1e-6]) / 1e4, (
         f"tightening the solver took the dip from {minima[1e-6]:.3e} only to "
         f"{minima[1e-10]:.3e}. A dip that does NOT collapse with tolerance is an over-draw in "

@@ -101,8 +101,20 @@ def _dosed_must(amino_acids_gpl: float) -> dict[str, float]:
     return initial
 
 
-def _run(initial: dict[str, float], *, uptake: bool, days: float = 14.0):
-    """One arm. Compiled INSIDE the call: a reused CompiledScenario carries event state."""
+def _run(
+    initial: dict[str, float],
+    *,
+    uptake: bool,
+    days: float = 14.0,
+    rtol: float | None = None,
+    atol: float | None = None,
+):
+    """One arm. Compiled INSIDE the call: a reused CompiledScenario carries event state.
+
+    ``rtol``/``atol`` are for the one caller that needs the SAME arm at two solver accuracies
+    (D-253's noise-versus-over-draw discriminator); left unset the engine's defaults apply and
+    every other caller integrates exactly what it always did.
+    """
     scenario = Scenario(
         name="d250",
         medium="wine",
@@ -115,7 +127,15 @@ def _run(initial: dict[str, float], *, uptake: bool, days: float = 14.0):
         compiled.process_set.disable(UPTAKE)
     t_eval = np.linspace(0.0, days * 24.0, 400)
     traj = simulate(
-        compiled.process_set, compiled.param_values, compiled.y0, compiled.t_span_h, t_eval=t_eval
+        compiled.process_set,
+        compiled.param_values,
+        compiled.y0,
+        compiled.t_span_h,
+        t_eval=t_eval,
+        # These literals MIRROR simulate()'s own defaults (integrate.py) rather than overriding
+        # them; only the one caller that passes explicit values integrates anything different.
+        rtol=1e-6 if rtol is None else rtol,
+        atol=1e-9 if atol is None else atol,
     )
     assert traj.success, traj.message
     return compiled, traj
@@ -229,7 +249,33 @@ def test_nitrogen_is_conserved_in_both_arms_so_the_slot_rise_was_never_creation(
     # The store inherited no nonnegativity check from anywhere: it is a new slot. The draw out
     # of it is proportional to its own share, so it is self-limiting, but that is an argument
     # rather than a check.
-    assert_nonnegative(traj, (STORED_NITROGEN_KEY,))
+    #
+    # THE atol IS RAISED FROM THE 1e-9 DEFAULT AND THE REASON IS MEASURED (decision D-253).
+    # D-251 recorded this guard as within a factor of two of firing on solver noise; at D-253's
+    # shipped capacity it fired here, at -2.36e-9 on the 2 g/L dosed must. It is noise, and the
+    # discriminator is not the size but the SCALING: tightening the solver two orders takes the
+    # same dip to -1.4e-12 and four orders takes it to -3.4e-14, while the store's own peak is
+    # unchanged to five decimals. An over-draw does not do that -- it is a property of the
+    # derivative and survives any tolerance. So the loosened bound below is paired with the
+    # tightened run that follows, and it is that pair, not either number, that forbids an
+    # over-draw. Do not raise this further without re-measuring the scaling.
+    assert_nonnegative(traj, (STORED_NITROGEN_KEY,), atol=1e-8)
+
+    tight = _run(_dosed_must(2.0), uptake=uptake, rtol=1e-8, atol=1e-11)[1]
+    assert_nonnegative(tight, (STORED_NITROGEN_KEY,))  # the DEFAULT bound, not loosened
+    worst_default = float(np.min(traj.series(STORED_NITROGEN_KEY)))
+    worst_tight = float(np.min(tight.series(STORED_NITROGEN_KEY)))
+    assert abs(worst_tight) < abs(worst_default) / 100.0 or worst_default >= 0.0, (
+        f"the store's dip went {worst_default:.3e} -> {worst_tight:.3e} across two orders of "
+        "solver tolerance. A dip that does NOT collapse is an over-draw in the proportional "
+        "split -- a physics defect, and the loosened atol above would then be hiding it"
+    )
+    assert float(np.max(tight.series(STORED_NITROGEN_KEY))) == pytest.approx(
+        float(np.max(traj.series(STORED_NITROGEN_KEY))), rel=1e-4
+    ), (
+        "the store's PEAK moved with solver tolerance, so the two runs are not the same "
+        "trajectory read at two accuracies and the comparison above is not about noise"
+    )
     assert_conserved(
         traj,
         total_nitrogen(

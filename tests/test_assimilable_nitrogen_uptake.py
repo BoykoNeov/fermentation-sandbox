@@ -21,12 +21,20 @@ parameter is not fitted to either, and the tests below pin that by sweeping it.
 **Two things this file is careful to keep separate.**
 
 * The **extent** saturates. Residual, biomass and every fusel share are unmoved from
-  ``r = 0.25`` to ``r = 50`` — a 200× sweep — so the shipped ``r = 1.0`` is a *bound* ("transport
-  is not the bottleneck"), not a level anyone chose. The residual that remains is set by
-  ``K_amino_acids``'s own asymptote, not by ``r``.
-* The **timing** does not, and it misses. The model strips 90 % of the assimilable nitrogen by
-  ~18.6 h against Crépin's measured N_T of 28 h. Pinned below so that "insensitive across 200×"
-  can never be read as "the time course was checked".
+  ``r = 0.25`` to ``r = 50`` — a 200× sweep — so no value inside the band was ever chosen to fit
+  the extent. The residual that remains is set by ``K_amino_acids``'s own asymptote, not by ``r``.
+  **This is unchanged by D-253** and is the reason that record was free to move the level: the
+  extent cannot be bought or sold with this knob in either direction.
+* The **timing** does not saturate, and through D-252 it missed — 90 % of the nitrogen gone by
+  ~18.6 h against Crépin's measured N_T of 28 h. D-249 refused to repair that through ``r`` and
+  **D-253 part 1 closed it with the fixture's inoculum instead**; at the sourced pitch the same
+  run reads ~30.4 h. It is still pinned below, so that "insensitive across 200×" can never be
+  read as "the time course was checked".
+* The **shape** is what the level is now set by (**D-253 part 2**): ``r = 2.6`` lands Crépin's
+  half-nitrogen landmark on the extracellular frame, and her three-quarters landmark and the
+  landmark ratio come along uninvited. That measurement lives in
+  ``tests/test_nitrogen_uptake_shape_frame.py`` and is not re-derived here — what this file owns
+  is the claim that moving the level cost the extent nothing.
 
 **The carbon-park is the design's crux, and it has its own test.** The D-32 swap may refund its
 drawn carbon to ``S`` only because its rate is proportional to growth's draw, which bounds the
@@ -65,6 +73,15 @@ STORED = "stored_nitrogen"
 
 #: Crépin's own N_T — the time her Data Set S1 records the must's assimilable nitrogen exhausted
 #: at, 28 h against an end of fermentation at 150 h.
+#: The value ``wine_generic.yaml`` actually ships, read from the file rather than written here.
+#: D-253 moved it 1.0 -> 2.6 and every arm below that means "the shipped capacity" keys off this,
+#: so the grid cannot silently stop containing what ships.
+SHIPPED_R = float(
+    load_parameters(default_data_dir() / "wine_generic.yaml")[
+        "amino_acid_uptake_capacity_ratio"
+    ].value
+)
+
 CREPIN_EXHAUSTION_H = 28.0
 
 
@@ -326,10 +343,23 @@ def test_the_process_is_speculative_and_declares_what_it_touches():
 
 @pytest.fixture(scope="module")
 def sweep():
-    """Crépin's must at five uptake capacities — computed ONCE (the D-245 pattern)."""
+    """Crépin's must at five uptake capacities — computed ONCE (the D-245 pattern).
+
+    The keys are ABSOLUTE values of ``r``, set through ``_run(override=...)``. They used to be
+    multipliers of the compiled value, which read identically while the shipped value was 1.0 and
+    would have quietly become a 2.6× larger sweep at D-253 — every ``r = 10`` in this file's prose
+    turning into 26 with nothing going red. See :func:`~tests.test_defined_media._run`.
+    """
+    grid = (0.0, 0.25, SHIPPED_R, 10.0, 50.0)
+    assert len(set(grid)) == len(grid), (
+        f"the shipped capacity {SHIPPED_R} has collided with one of this grid's fixed arms, so "
+        "two claims below are reading the same run and one of them is silently vacuous"
+    )
     out = {}
-    for ratio in (0.0, 0.25, 1.0, 10.0, 50.0):
-        traj, schema, params, cs = _run("crepin", scale={"amino_acid_uptake_capacity_ratio": ratio})
+    for ratio in grid:
+        traj, schema, params, cs = _run(
+            "crepin", override={"amino_acid_uptake_capacity_ratio": ratio}
+        )
         out[ratio] = (traj, schema, params, cs)
     return out
 
@@ -348,7 +378,7 @@ def test_the_must_is_now_consumed_where_it_used_to_freeze(sweep):
     lose; the exact 0.62 % is a pin that may legitimately move.
     """
     before = _residual(sweep[0.0])
-    after = _residual(sweep[1.0])
+    after = _residual(sweep[SHIPPED_R])
 
     assert before == pytest.approx(0.408, abs=0.01), (
         f"the pre-D-248 residual reads {before:.4f}, not the 40.8 % D-246 §5 measured — the "
@@ -370,12 +400,14 @@ def test_the_residual_is_set_by_the_availability_GATE_not_by_the_new_parameter(s
     """The single most load-bearing line in the beat: the outcome is not a function of ``r``.
 
     Across a **200×** sweep of ``amino_acid_uptake_capacity_ratio`` the residual does not move in
-    the third decimal. That is what makes the shipped 1.0 a *bound* — "transport is not the
-    bottleneck" — rather than a level fitted to Crépin's 0.2 %. What sets the residual instead is
+    the third decimal — and the sweep brackets the shipped value at both ends, so this is a
+    statement about where the value sits and not only about the interval's width. That is what
+    keeps the extent un-fitted after D-253 moved the level onto Crépin's *shape*: the two are
+    different observables and only one of them is a target. What sets the residual instead is
     ``K_amino_acids``'s own asymptote: the shared D-100 depletion gate → 0 as the pool empties, so
     the last of the nitrogen is drawn ever more slowly whatever the capacity.
     """
-    residuals = {r: _residual(sweep[r]) for r in (0.25, 1.0, 10.0, 50.0)}
+    residuals = {r: _residual(sweep[r]) for r in (0.25, SHIPPED_R, 10.0, 50.0)}
     lo, hi = min(residuals.values()), max(residuals.values())
     assert hi - lo < 5e-4, (
         f"the residual now spans {lo:.5f}–{hi:.5f} across a 200x capacity sweep {residuals}; it "
@@ -408,7 +440,7 @@ def test_biomass_now_reaches_the_coleman_yield_the_compile_seam_installs(sweep):
     set by how much biomass was pitched rather than by how much nitrogen was consumed. The two
     arms moving differently is the finding, not noise — it is the same separation D-248 rests on.
     """
-    for ratio, expected, tol in ((0.0, 0.591, 0.02), (1.0, 0.985, 0.02)):
+    for ratio, expected, tol in ((0.0, 0.591, 0.02), (SHIPPED_R, 0.985, 0.02)):
         traj, schema, params, _ = sweep[ratio]
         initial = _assimilable_n_mgl(traj, schema, 0) / 1000.0
         x0 = float(traj.y[schema.slice("X"), :][0][0])
@@ -443,7 +475,7 @@ def test_the_exhaustion_TIME_now_LANDS_on_crepins_and_it_was_the_INOCULUM(sweep)
     time course is a live observable of that same knob — the second half of this test drives it
     — while the residual it is measured beside is flat to the fifth decimal.
     """
-    traj, schema, _, _ = sweep[1.0]
+    traj, schema, _, _ = sweep[SHIPPED_R]
     series = np.array([_assimilable_n_mgl(traj, schema, i) for i in range(traj.y.shape[1])])
     below = np.nonzero(series <= 0.10 * series[0])[0]
     assert below.size, "the must is never 90 % consumed at the shipped capacity"
@@ -490,14 +522,15 @@ def test_uptake_touches_no_precursor_pool_in_a_driven_run(sweep):
 
     The ``touches`` contract already forbids it, but what the beat's fusel result rests on is the
     stronger claim that uptake moves those pools through **one** channel only — the biomass
-    denominator. So the six precursor pools are compared between ``r = 0`` and ``r = 1`` at
-    *pitch*, where nothing downstream has run yet: any difference there would be a direct draw.
+    denominator. So the six precursor pools are compared between ``r = 0`` and the shipped
+    capacity at *pitch*, where nothing downstream has run yet: any difference there would be a
+    direct draw.
     """
     for spec in AMINO_ACID_SPECS:
         if spec in ASSIMILABLE_SPECS:
             continue
         before = float(sweep[0.0][0].y[sweep[0.0][1].slice(spec.pool), 0][0])
-        after = float(sweep[1.0][0].y[sweep[1.0][1].slice(spec.pool), 0][0])
+        after = float(sweep[SHIPPED_R][0].y[sweep[SHIPPED_R][1].slice(spec.pool), 0][0])
         assert before == pytest.approx(after, rel=1e-12), (
             f"{spec.pool} is seeded differently under uptake, so the two columns are not one "
             "knob apart and no fusel move below can be attributed"
@@ -515,7 +548,7 @@ def test_every_fusel_de_novo_share_rises_and_none_falls(sweep):
     """
     deltas = {}
     before_traj, before_schema, before_params, _ = sweep[0.0]
-    after_traj, after_schema, after_params, _ = sweep[1.0]
+    after_traj, after_schema, after_params, _ = sweep[SHIPPED_R]
     for spec in FUSEL_SPECS:
         a = de_novo_share_of(before_traj, before_schema, before_params, spec)
         b = de_novo_share_of(after_traj, after_schema, after_params, spec)
