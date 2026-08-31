@@ -23,8 +23,18 @@ from fermentation.core.kinetics import (
     FuselAminoAcidReroute,
     fusel_carbon_draw,
 )
-from fermentation.core.kinetics.byproducts import ehrlich_draws, fusel_carbon_draw_by_species
-from fermentation.core.kinetics.carbon_routing import DE_NOVO_FUSEL_ROUTES, FUSEL_SPECS
+from fermentation.core.kinetics import byproducts as byproducts_module
+from fermentation.core.kinetics.byproducts import (
+    ehrlich_draws,
+    fusel_carbon_draw_by_species,
+    fusel_rate_shape,
+)
+from fermentation.core.kinetics.carbon_routing import (
+    DE_NOVO_FUSEL_ROUTES,
+    FUSEL_SPECS,
+    fermentative_flux_shape,
+)
+from fermentation.core.kinetics.growth import assimilable_nitrogen_pools
 from fermentation.core.media import get_medium, wine_schema
 from fermentation.core.process import ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
@@ -884,4 +894,240 @@ def test_the_ester_needed_its_own_tracer_slot_because_the_alcohol_fraction_is_no
         f"one-slot inheritance would have reported {inherited:.5f} against the tracer's "
         f"{actual:.5f} - if that error is now negligible the second slot is not paying for "
         "itself"
+    )
+
+
+# -- D-256: WHEN the higher alcohols are made, measured against Rollero's own columns ---
+
+
+#: Rollero's Table S1/S2, **total** isoamyl alcohol [uM] at the two columns this beat reads:
+#: ``NT`` (all medium nitrogen consumed) and ``EF`` (end of fermentation), per nitrogen level
+#: as ``{yan: (2 mg/l lipid, 8 mg/l lipid)}``.
+#:
+#: **These are used for a WITHIN-experiment ratio and for a RESPONSE, never for a level.** The
+#: absolute numbers carry the lipid axis this model has no coordinate for (25% between the two
+#: legs at SM70) and his own EF series is NON-MONOTONE in nitrogen - 1202 / 1340 / 914 uM at the
+#: leg mean, peaking at SM250. A guard that scored the model's absolute isoamyl against these
+#: would be pinning a 3x "miss" against a series with 25% internal spread; the ratios below
+#: survive all of that because both halves come from the same fermentation.
+_ROLLERO_NT_ISOAMYL_UM = {70.0: (545.0, 720.0), 250.0: (682.0, 607.0), 425.0: (407.0, 437.0)}
+_ROLLERO_EF_ISOAMYL_UM = {70.0: (1066.0, 1337.0), 250.0: (1314.0, 1365.0), 425.0: (793.0, 1034.0)}
+
+#: Rollero's Table **S2** - the 13C-leucine experiment - isoamyl-alcohol isotopic enrichment at
+#: EF, ``{yan: (2 mg/l, 8 mg/l)}``. The twin of :data:`_ROLLERO_EF_ENRICHMENT`, which is Table
+#: S1's 13C-valine arm.
+#:
+#: **This table is why the D-111 tracer comment about "a source that measured only one of the
+#: two routes" is now false** (see ``LABELLED_PRECURSOR`` in ``carbon_routing``). Rollero ran
+#: both labels on the same medium at the same three nitrogen levels, so the leucine -> isoamyl
+#: PRIMARY branch has a measured target exactly as the valine -> KIC secondary branch does. The
+#: shipped tracer slot still credits valine alone, which stays the right default - crediting
+#: both would double the label against Table S1 - and the leucine arm is reached by re-pointing
+#: the module global in a test.
+_ROLLERO_EF_LEUCINE_ENRICHMENT = {
+    70.0: (0.035, 0.034),
+    250.0: (0.042, 0.047),
+    425.0: (0.082, 0.068),
+}
+
+
+def _fusel_nitrogen_gate_closure(traj, compiled) -> int:
+    """Index of the first sample where the fusel rate law's OWN nitrogen gate is essentially shut.
+
+    **Which nitrogen matters, and it is not the obvious one.**
+    :func:`~fermentation.core.kinetics.byproducts.fusel_rate_shape` gates on
+    :func:`~fermentation.core.kinetics.growth.assimilable_nitrogen_pools` - extracellular ``N``
+    plus the D-250 intracellular store, and **no amino-acid pool at all**. The must's leucine and
+    valine are therefore invisible to the gate that throttles the alcohols they source. Reading
+    the landmark off "total assimilable nitrogen including the pools" gives a different, later
+    time, so this helper names the gate's own quantity rather than a plausible synonym.
+    """
+    schema, params = compiled.schema, compiled.param_values
+    for i in range(traj.y.shape[1]):
+        n = sum(assimilable_nitrogen_pools(traj.y[:, i], schema))
+        if n / (params["K_n"] + n) < 0.01:
+            return i
+    raise AssertionError("vacuous: the fusel nitrogen gate never closes over this run")
+
+
+@pytest.mark.parametrize("yan", (70.0, 250.0, 425.0))
+def test_higher_alcohol_production_is_switched_off_at_PEAK_fermentative_flux(yan):
+    """THE ATTRIBUTION (D-256): the shut-off is the nitrogen gate, not the loss of flux.
+
+    ``fusel_rate_shape`` is ``flux x N/(K_n+N) x arrhenius`` with a hard ``n <= 0 => 0``. This
+    test measures *which* of those factors ends higher-alcohol production, and the answer is
+    unambiguous: at the hour the nitrogen gate shuts, the fermentative flux term is at **100% of
+    its whole-run maximum** and roughly four fifths of the sugar is still unfermented. The model
+    stops making higher alcohols at the moment it is fermenting hardest.
+
+    **This is the guard to read first, because it is entirely within the model and within one
+    run.** No paper's calibration, no unit frame, no lipid axis - so nothing about it can be
+    argued away by a commensurability objection, unlike the level comparisons that follow.
+
+    A repair that gave the alcohols a production term surviving nitrogen exhaustion (the
+    rate-law question D-254 left open and D-256 declines to answer on its own authority) fails
+    here, which is the point: the shut-off is pinned so that removing it registers.
+    """
+    traj, compiled = _rollero_run(1.0, yan_paper_mgn=yan)
+    schema, params = compiled.schema, compiled.param_values
+    i = _fusel_nitrogen_gate_closure(traj, compiled)
+
+    flux = np.array(
+        [
+            fermentative_flux_shape(traj.y[:, j], schema, params["K_sugar_uptake"])
+            for j in range(traj.y.shape[1])
+        ]
+    )
+    assert flux.max() > 0.0, "vacuous: the ferment never developed any fermentative flux"
+    assert flux[i] >= 0.95 * flux.max(), (
+        f"SM{yan:.0f}: at nitrogen-gate closure ({traj.t[i]:.0f} h) the fermentative flux is "
+        f"{flux[i] / flux.max():.1%} of its run maximum. D-256's attribution was that the "
+        "higher alcohols are switched off at PEAK flux, so the cause is the nitrogen gate "
+        "alone - if the flux has already collapsed by here, that attribution is wrong"
+    )
+
+    sugar_left = float(np.sum(traj.y[schema.slice("S"), i]))
+    sugar_start = float(np.sum(traj.y[schema.slice("S"), 0]))
+    assert sugar_left > 0.5 * sugar_start, (
+        f"SM{yan:.0f}: only {1 - sugar_left / sugar_start:.0%} of the sugar is fermented at "
+        "gate closure in D-256's measurement - if most of the ferment is now over by this "
+        "point, 'production stops while the ferment runs on' no longer describes the model"
+    )
+
+    after = np.array(
+        [fusel_rate_shape(traj.y[:, j], schema, params) for j in range(i, traj.y.shape[1])]
+    )
+    assert after.max() < 0.02 * flux.max(), (
+        f"SM{yan:.0f}: the fusel rate shape is still live after gate closure - the gate is not "
+        "the switch this test claims it is"
+    )
+
+
+@pytest.mark.parametrize("yan", (70.0, 250.0, 425.0))
+def test_the_model_makes_ALL_its_isoamyl_before_the_gate_shuts_where_rollero_makes_half(yan):
+    """THE MISS, pinned (D-256): the model finishes the alcohol during growth; reality does not.
+
+    Rollero's ``NT`` column is the sample at which all the medium's nitrogen has been consumed
+    and his ``EF`` column is end of fermentation. Across **six independent fermentations** (three
+    nitrogen levels x two lipid levels) the isoamyl alcohol already present at NT is a strikingly
+    steady **42-54%** of the final amount - so about half of it is made *after* the nitrogen is
+    gone, which no Ehrlich route can supply and only de-novo synthesis from sugar can. The model
+    makes **100%** of it by then and none afterwards.
+
+    **A within-experiment ratio on both sides, which is what makes it survive the objections the
+    absolute levels do not.** Each fraction is one fermentation divided by itself, so the paper's
+    calibration, the strain, the lipid level and the model's own isoamyl level all cancel.
+
+    **The mapping between his NT and the model's landmark is an INFERENCE and is sized here.**
+    His NT is defined on the medium's nitrogen; the model's landmark is defined on the quantity
+    its own rate law gates on (see :func:`_fusel_nitrogen_gate_closure`), which excludes the
+    amino-acid pools. The two are close on these musts but they are not the same quantity, and
+    the model's fraction is so far outside the measured band (1.00 against 0.42-0.54) that no
+    plausible re-definition of the landmark closes it - which is why the miss is reported as a
+    miss rather than as a landmark artefact.
+
+    Pinned as a MISS, in the D-255 section-6 shape: the number is asserted where it actually is,
+    so that closing the gap registers as a change instead of passing unnoticed. It is **not**
+    licence to move any sourced band.
+    """
+    traj, compiled = _rollero_run(1.0, yan_paper_mgn=yan)
+    schema = compiled.schema
+    i = _fusel_nitrogen_gate_closure(traj, compiled)
+    iso = traj.y[schema.slice("isoamyl_alcohol")][0]
+    assert iso[-1] > 0.0, "vacuous: no isoamyl alcohol was made"
+    model_fraction = float(iso[i] / iso[-1])
+
+    measured = [
+        nt / ef
+        for nt, ef in zip(_ROLLERO_NT_ISOAMYL_UM[yan], _ROLLERO_EF_ISOAMYL_UM[yan], strict=True)
+    ]
+    assert model_fraction >= 0.99, (
+        f"SM{yan:.0f}: the model has {model_fraction:.1%} of its final isoamyl alcohol at "
+        "nitrogen-gate closure. D-256 measured 100% - if this has fallen, a production term "
+        "that survives nitrogen exhaustion has appeared and the D-256 miss is closing; "
+        f"Rollero's own two legs read {measured[0]:.1%} / {measured[1]:.1%}"
+    )
+    assert model_fraction > max(measured) + 0.4, (
+        f"SM{yan:.0f}: model {model_fraction:.1%} against Rollero's {max(measured):.1%} - the "
+        "gap this test exists to pin has narrowed by more than the lipid axis can explain, so "
+        "re-measure it rather than re-pinning this number"
+    )
+
+
+def test_the_isoamyl_response_to_must_nitrogen_is_far_steeper_than_rollero_measures():
+    """THE LEVEL FINDING, stated as a RESPONSE because the absolute level is not assertable.
+
+    Across Rollero's nitrogen range the model's final isoamyl alcohol **rises 2.3x** (1205 ->
+    2736 uM). His own measurement does not rise at all: the leg means go 1202 / 1340 / 914 uM,
+    peaking at SM250 and ending **below** where they started. So the model's higher alcohols are
+    far more strongly driven by must nitrogen than the paper's are - which is the same defect
+    :func:`test_higher_alcohol_production_is_switched_off_at_PEAK_fermentative_flux` attributes,
+    read on the level rather than on the clock: production is confined to the nitrogen-gated
+    growth window, so more nitrogen buys proportionally more alcohol.
+
+    **The absolute level is deliberately NOT asserted, and the reason is measurable.** The model
+    is 1.00x / 1.55x / 3.00x his leg means, but his own lipid axis spans 25% at SM70 and his
+    SM425 totals sit below his SM250 ones. Pinning a 3x miss against a non-monotone series with
+    that much internal spread would be scoring the model against noise. The *direction* of the
+    response is robust to all of it: no reading of his table makes isoamyl rise 2.3x with
+    nitrogen.
+    """
+    totals = {}
+    for yan in (70.0, 250.0, 425.0):
+        traj, compiled = _rollero_run(1.0, yan_paper_mgn=yan)
+        totals[yan] = float(traj.y[compiled.schema.slice("isoamyl_alcohol"), -1][0])
+    assert all(v > 0.0 for v in totals.values()), "vacuous: a must made no isoamyl alcohol"
+
+    model_response = totals[425.0] / totals[70.0]
+    measured_response = sum(_ROLLERO_EF_ISOAMYL_UM[425.0]) / sum(_ROLLERO_EF_ISOAMYL_UM[70.0])
+    assert measured_response < 1.0, (
+        "the transcription of Rollero's EF totals no longer says his isoamyl FALLS across his "
+        "nitrogen range - re-read Table S1 before trusting anything below"
+    )
+    assert model_response > 2.0, (
+        f"the model's isoamyl response to must nitrogen is {model_response:.2f}x across "
+        f"Rollero's range against his measured {measured_response:.2f}x. D-256 measured 2.27x; "
+        "if this has fallen below 2 the over-response is closing and the finding should be "
+        "re-measured, not re-pinned"
+    )
+
+
+@pytest.mark.parametrize("yan", (70.0, 250.0, 425.0))
+def test_the_leucine_route_under_attributes_on_rolleros_own_musts_too(yan, monkeypatch):
+    """The OTHER tracer, reachable since D-256 sourced Table S2 (the 13C-leucine arm).
+
+    The shipped tracer credits valine alone, because D-111 built it against Table S1 and
+    crediting the leucine primary branch as well would double the label. Table S2 measures that
+    branch on the *same* medium at the same three nitrogen levels, so the arm is now scoreable -
+    reached by re-pointing the module global the sourcing layer reads, with no production change
+    and no new state slot.
+
+    **The finding: the leucine branch under-attributes on all three musts** (0.99 / 2.05 / 2.65%
+    against his 3.4-3.5 / 4.2-4.7 / 6.8-8.2%), which is the same sign D-120 measured on the
+    characterization must and the reason a de-novo *ceiling* on isoamyl remains refused - a
+    one-directional cap cannot fix an under-attribution.
+
+    **Anti-vacuity is the load-bearing part of this test.** ``byproducts`` imports
+    ``LABELLED_PRECURSOR`` by value, so patching ``carbon_routing`` would leave the run
+    unchanged and every assertion below would still pass while measuring the valine arm twice.
+    The final assertion is what catches that: the two arms must read *differently*.
+    """
+    traj_v, compiled_v = _rollero_run(1.0, yan_paper_mgn=yan)
+    valine = _enrichment(traj_v, compiled_v.schema, "isoamyl_alcohol", "isoamyl_alcohol_valine")
+
+    monkeypatch.setattr(byproducts_module, "LABELLED_PRECURSOR", "leucine")
+    traj_l, compiled_l = _rollero_run(1.0, yan_paper_mgn=yan)
+    leucine = _enrichment(traj_l, compiled_l.schema, "isoamyl_alcohol", "isoamyl_alcohol_valine")
+
+    floor = min(_ROLLERO_EF_LEUCINE_ENRICHMENT[yan])
+    assert 0.0 < leucine < floor, (
+        f"SM{yan:.0f}: the model sources {leucine:.4f} of its isoamyl alcohol from must leucine "
+        f"against Rollero's Table S2 floor of {floor:.3f}. D-256 measured an under-attribution "
+        "on all three musts; if this has crossed the floor the de-novo ceiling D-120 refused "
+        "becomes reachable again for isoamyl and that refusal should be re-opened"
+    )
+    assert abs(leucine - valine) > 0.05 * valine, (
+        f"SM{yan:.0f}: the leucine arm reads {leucine:.6f} against the valine arm's "
+        f"{valine:.6f} - indistinguishable, so the patch did not reach the sourcing layer and "
+        "this test is measuring the valine route twice"
     )

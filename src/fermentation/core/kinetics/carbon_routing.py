@@ -350,12 +350,26 @@ class LabelTracer:
     tracer_pool: str
 
 
-#: The amino acid whose label the tracers follow — **valine**, because that is what Rollero 2017
-#: fed (U-¹³C valine) and therefore the only enrichment the model can be held to. Named here so
-#: the producer-side credit cannot silently widen to "any Ehrlich precursor": crediting the
-#: leucine → isoamyl primary branch as well would double the tracer against a source that
-#: measured only one of the two routes, and the ledger would not notice (a labelled sub-quantity
-#: carries no carbon weight — the D-89/D-90 family, where only an explicit guard is not blind).
+#: The amino acid whose label the tracers follow — **valine**, because that is the label
+#: :data:`VALINE_LABEL_TRACERS` was built against (Rollero 2017's U-¹³C valine arm, Table S1).
+#: Named here so the producer-side credit cannot silently widen to "any Ehrlich precursor":
+#: crediting the leucine → isoamyl primary branch as well would **double** the tracer against a
+#: single-label experiment, and the ledger would not notice (a labelled sub-quantity carries no
+#: carbon weight — the D-89/D-90 family, where only an explicit guard is not blind).
+#:
+#: **THE REASON GIVEN HERE UNTIL D-256 WAS THAT THE SOURCE "measured only one of the two
+#: routes". That is false, and it is the tenth stale-blocker instance in this archive** (the
+#: second living in a code comment, after D-254's pair). Rollero ran a *second* labelling
+#: experiment — U-¹³C **leucine**, supplemental Table S2 — on the same Bely 1990 medium at the
+#: same three nitrogen levels, so the leucine → isoamyl primary branch has a measured target
+#: exactly as the valine → KIC secondary branch does, and it is under-attributed on all three
+#: musts (``test_the_leucine_route_under_attributes_on_rolleros_own_musts_too``).
+#:
+#: **Valine nevertheless stays the shipped default, and for the surviving half of the reason
+#: above:** each of Rollero's experiments labels ONE compound, so a tracer slot crediting both
+#: branches is commensurate with neither table. Giving leucine its own slot is a state-vector
+#: change and is the owner's call (D-256); until then the arm is reached by re-pointing this
+#: global in a test, which is why the name is read through the module rather than inlined.
 LABELLED_PRECURSOR = "valine"
 
 #: The two tracers the valine → KIC → isoamyl route needs to reach Rollero's ester observable
