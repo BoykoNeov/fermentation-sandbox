@@ -433,7 +433,7 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   DOES work on its own axis: 48.1 % made by N-gate closure against Rollero's 44-52 %, level anchor held at
   172.3 mg/L, `f=1` bit-for-bit the old model. It was reverted because holding the level costs the five k
   x0.4033, and that rate drives the model's **only** consumer of the must's phenylalanine — 20.3 % -> 65.8 %
-  left, phenylacetaldehyde ~15x over 2 y, **31 tests red**. Mutation-verified: sink OFF, the same sweep moves
+  left under the k rescale ALONE (72.8 % under the full repair), phenylacetaldehyde x15.3 at 1 y and 2 y under the FULL repair only — without the attribution scaling the same aldehyde FALLS 9 %, so label the arm — **31 tests red**. Mutation-verified: sink OFF, the same sweep moves
   phenylalanine 1.3 points instead of 45.5, and 97.8 % survives, so `AminoAcidAssimilation` barely touches it.
   **The escape route is CLOSED and measured**: hold k and the level band 140-205 caps f at 0.98 = 90.7 % at NT.
   **The real blocker is D-104's sink** — precursor consumption (protein, the DOMINANT fate) rides higher-alcohol

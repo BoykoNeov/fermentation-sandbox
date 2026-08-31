@@ -36241,11 +36241,24 @@ the *same* defect as the residual over-response, not a second one.
 
 ### 2. What it cost, and why that is disqualifying rather than a band to re-derive
 
-**The must's phenylalanine stops being consumed: 20.3 % → 65.8 % left at the end of fermentation.**
-Real ferments consume essentially all of their assimilable amino acids. Downstream, across two
-years of aging, phenylacetaldehyde — the Strecker aldehyde gated on residual phenylalanine — rises
-**≈15×**, which is a sensory-visible consequence of an error rather than a finding. Total nitrogen
-consumption barely moves (0.9962 → 0.9919), so this is specifically the amino-acid pools.
+**The must's phenylalanine stops being consumed.** Real ferments consume essentially all of their
+assimilable amino acids. **The two figures below come from different arms and are labelled as
+such**, because mixing them is exactly the error this line has made twice on ratios:
+
+| arm | phenylalanine left at end of ferment | phenylacetaldehyde at 1 y / 2 y |
+|---|---|---|
+| shipped model | 20.3 % | 8.875e-08 / 1.885e-07 |
+| `k` ×0.4033 alone (what the shipped guard sweeps) | **65.8 %** | 8.095e-08 / 1.719e-07 (−9 %) |
+| full repair: blend + rescale + attribution scaling | **72.9 %** | 1.357e-06 / 2.884e-06 (**×15.3**) |
+
+Two things worth reading off that table. The stranding is driven by the **rate rescale**, not by
+the blend or the attribution scaling — 45 of the 53 points arrive with the constants alone. But
+the downstream aldehyde only explodes once the attribution scaling is in, and *reverses sign*
+without it: the Strecker route is gated on residual phenylalanine, and the §4 correction is what
+stops the Ehrlich route consuming it late. So the aging consequence is a property of the
+**complete** repair, and a version measured without §4 would have under-reported it ~170-fold.
+Total nitrogen consumption barely moves throughout (0.9962 → 0.9919), so this is specifically the
+amino-acid pools and not the ferment at large.
 
 **The mechanism, verified by mutation rather than argued.** `PrecursorNonEhrlichFates` consumes
 precursor at `f/(1−f)` times the Ehrlich re-route's own draw, and that draw is proportional to the
