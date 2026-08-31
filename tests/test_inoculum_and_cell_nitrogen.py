@@ -45,6 +45,12 @@ what D-251 §4 did.
 a transient nitrogen store against ``biomass_N_fraction``'s end-state band; and reading "her data
 cannot settle the inoculum" as "her data are silent" — they cap the end-state fraction below the
 whole band, in both frames.
+
+**And specifically: D-249 §3 and D-251 §4 still stand in the archive, unedited, saying what they
+said.** The archive is append-only, so both voided prices are still readable in their original
+form and a later beat re-deriving either one from those sections is the likeliest way this record
+gets undone. The ⚠ markers in the index are the only warning those sections carry; this file is
+the measurement behind them.
 """
 
 from __future__ import annotations
@@ -388,18 +394,25 @@ def test_the_shipped_capacity_is_the_CONTROL_and_undershoots_her_further(runs):
     :func:`test_at_HER_landmark_the_landing_capacity_UNDERSHOOTS_her_cell_nitrogen` is not
     measuring something inert.
     """
-    for pitch in (SHIPPED_PITCH_GPL, SOURCED_PITCH_GPL):
+    for pitch, at_half, at_peak in (
+        (SHIPPED_PITCH_GPL, 0.0159, 0.0559),
+        (SOURCED_PITCH_GPL, 0.0181, 0.0461),
+    ):
         shipped = runs[(pitch, 1.0)]
         landing = runs[(pitch, LANDING_R[pitch])]
-        assert shipped["cell_n_at_half"] < landing["cell_n_at_half"], (
-            f"at pitch {pitch} the shipped capacity now holds at least as much cell nitrogen at "
-            f"her landmark as the landing capacity ({shipped['cell_n_at_half']:.4f} vs "
-            f"{landing['cell_n_at_half']:.4f}); the capacity no longer moves this observable and "
-            "the undershoot reading needs re-deriving"
+
+        half_gap = landing["cell_n_at_half"] - shipped["cell_n_at_half"]
+        assert half_gap == pytest.approx(at_half, abs=0.004), (
+            f"at pitch {pitch} the capacity moves cell nitrogen at her landmark by {half_gap:.4f}, "
+            f"not the {at_half} D-252 measured ({shipped['cell_n_at_half']:.4f} shipped vs "
+            f"{landing['cell_n_at_half']:.4f} landing). The MAGNITUDE is the point: a bare "
+            "inequality here would pass on a difference of 1e-12 and stop discriminating exactly "
+            "when the effect decayed"
         )
-        assert shipped["cell_n_max"] < landing["cell_n_max"], (
-            f"at pitch {pitch} the shipped capacity's peak cell nitrogen no longer sits below the "
-            f"landing capacity's -- {shipped['cell_n_max']:.4f} vs {landing['cell_n_max']:.4f}"
+        peak_gap = landing["cell_n_max"] - shipped["cell_n_max"]
+        assert peak_gap == pytest.approx(at_peak, abs=0.008), (
+            f"at pitch {pitch} the capacity moves the peak by {peak_gap:.4f}, not the {at_peak} "
+            f"D-252 measured ({shipped['cell_n_max']:.4f} vs {landing['cell_n_max']:.4f})"
         )
 
     assert runs[(SHIPPED_PITCH_GPL, 1.0)]["cell_n_max"] == pytest.approx(0.0833, abs=0.002), (
