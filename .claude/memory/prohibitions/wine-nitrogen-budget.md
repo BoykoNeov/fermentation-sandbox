@@ -226,6 +226,49 @@ unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings
   - **The pitch is UNCHANGED at 0.25 and the calibration is UNTAKEN.** D-252 voids two prices; it
     makes no move and recommends none. Both remain the owner's call.
 
+- **BOTH owner's calls are TAKEN - D-253. The fixture pitches 0.04 and `r` is 2.6.** Do NOT
+  re-propose either as open, and do NOT re-derive them from D-249 §3 / D-251 §5, which the
+  append-only archive still carries in their original "not taken" form.
+  - **ORDER IS LOAD-BEARING: the pitch FIRST, then the capacity.** The landing `r` is NOT
+    pitch-invariant (3.9 at the house 0.25, **2.6** at the sourced 0.04). Landing `r` first fits a
+    shipped parameter to an inoculum nobody published. Two commits, suite green between.
+  - **The pitch is sourced from MINEBOIS, not resolved from Crepin** (1e6 cells/mL, same Bely 1990
+    medium, same lab lineage; D-219 crossing). Directly sourced for the Minebois fixture, inherited
+    by lineage for Crepin. D-252 §4's "her data cannot settle the inoculum" STANDS untouched.
+  - **MINEBOIS WAS THE HALF D-252 NEVER PRICED, and she does not regress**: 1.009x/0.977x ->
+    **1.014x/0.982x**, inside the pin either way, flat in `r` across 0.5-10. `commensurate_scenario`
+    pitches BOTH musts - always price both. [[feedback-a-shared-fixture-has-two-consumers]]
+  - **What the pitch bought**: 90 % of the N gone at **29.9 h** vs her 28 (from 17.6), and **28.6 h**
+    on the extracellular frame - a 2 % miss. Cost: peak biomass 3.418 -> **3.213** vs her 3.39.
+    Re-pins: Coleman `r=0` arm 0.616 -> **0.591** (that arm IS inoculum-set; the `r=1` arm drifts
+    0.0004 - the two moving differently is D-248's own separation), and the extracellular gap
+    1.71x -> **0.98x**.
+  - **The capacity is landed on the SHAPE, and the extent stays un-fitted.** Residual **0.623 %** at
+    every `r` from 0.25 to 50 at BOTH pitches - complete consumption and the Coleman identity were
+    never in play, so never re-litigate the level as having traded them. What `r=2.6` lands is
+    Crepin's half-nitrogen landmark (0.2449 vs her 0.2448) on the extracellular frame; **the 3/4
+    landmark (0.4150 vs 0.4100) and the landmark RATIO (1.694 vs 1.673) come along UNINVITED - that
+    is the anti-fitting defence, NOT the tier**, which stays `speculative`.
+    **PRECISION IS TWO SIG FIGS** (+/-0.2): never restate 2.6 as 2.60 or re-derive a third digit.
+  - **Never fit `r` to anything else**: the timing is REFUSED (D-249, unreachable through the knob;
+    the inoculum closed it) and the extent is saturated. `wine_generic.yaml`'s old "not repairable
+    without giving up the saturated regime" is CORRECTED - the regime never moved.
+  - **D-251's solver-noise brittleness is LIVE and it FIRED** - `assert_nonnegative`'s 1e-9 default
+    caught -2.36e-9 on the 2 g/L dosed must. It is noise: 2 orders of tolerance -> -1.4e-12, 4 ->
+    -3.4e-14, store peak unmoved to 5 dp. **The discriminator is the SCALING, never the size.** That
+    site now names atol=1e-8 PAIRED with a tightened run checked at the un-loosened default. On
+    Crepin's must it moved the OTHER way (-2.3e-9 -> -1.4e-10) and neither move suffices alone -
+    **scenario-dependence, not a repair.** [[feedback-solver-noise-size-is-not-portable]]
+  - **A `== 0.0` was reading the SIGN of solver noise.** The branched-chain Strecker guard: leucine
+    ends -6.5e-11 and CLAMPS to exact zero, isoleucine +3.0e-15 and leaks 3.6e-17. Floored at
+    1e-12 g/L (6 orders under the sensory threshold) + a non-vacuity arm on the precursors.
+  - **A sweep keyed on MULTIPLIERS silently re-scales when the shipped value moves** - every
+    "r = 10" in `test_assimilable_nitrogen_uptake`'s prose would have meant 26, nothing red. `_run`
+    now has `override=` (replaces) beside `scale=` (multiplies), and the grid keys off `SHIPPED_R`
+    read from the YAML. [[feedback-a-multiplier-is-not-a-value]]
+  - **D-249's refusal HOLDS but the margin narrowed**: nitrogen 1.59x -> 1.65x (house), 0.94x ->
+    0.96x (sourced), against runs at 1.93x / 1.55x. The ordering is what the guard asserts.
+
 Measurements: `M:\claud_projects\temp\ferment\d243-wine-nitrogen-audit\` and
 `d244-wine-n-evaluation-point\` — `FINDINGS-pre.md`, `probe_band.py`, `probe_ceiling.py`,
 `probe_partition_stall.py`, `probe_denovo2.py`, `probe_pins.py`, and the `patch*.py` migrations.
@@ -239,3 +282,7 @@ full run), and `snapshot/` (the restore arms).
 D-252: `d252-pitch/` - `probe_pitch.py` (the mass balance both ways + the anchor read
 with and without the literal), `probe_transient.py` (the increment basis, superseded),
 `probe_total_basis.py` (the TOTAL-cell basis and the peak's location), `suite.txt`.
+D-253: `d253-inoculum-and-capacity/` - `measure.py` (both musts x both pitches x the capacity
+grid), `fine.py` (the bracketing grid that landed 2.6), `repins.py`, `t90.py`, `interp.py`,
+`dip.py` + `dip3.py` (the noise-vs-over-draw scaling), `gaps.py`, `strecker2.py`,
+`suite-moveA.txt` / `suite-moveB2.txt`.
