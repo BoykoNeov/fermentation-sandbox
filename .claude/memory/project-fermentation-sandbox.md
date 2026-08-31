@@ -31,7 +31,7 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-31)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-256** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **2071 + 6 xfail** (D-256 adds 10; the xfail SET is unchanged) (3 D-188 Herzan; 2 D-215's own; **1 fusel** — D-244's five became one at **D-248**, which closed four by un-coupling nitrogen uptake and lowered NO sourced threshold) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats. Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-257** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **2072 + 6 xfail** (D-257 adds 1 and changes NO production code; the xfail SET is unchanged) (3 D-188 Herzan; 2 D-215's own; **1 fusel** — D-244's five became one at **D-248**, which closed four by un-coupling nitrogen uptake and lowered NO sourced threshold) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats. Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation; **D-254 an 8th, the first living in a CODE COMMENT** (two fixtures, one copy dead and one still live); **D-255 a 9th and the FIRST closed by BUILDING the missing thing**; **D-256 a 10th — Rollero's SECOND tracer table (13C leucine) sat unread in D-255's OWN folder**, the D-230 shape repeating one beat later.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Beer acid-base = **NINE** beats BUILT (D-178→D-183, D-207→D-209, D-211, **D-239**), `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING** — day-1 pH admits an acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms. **D-239 BUILT D-209 §8's buffer-removal half and its day-7 cost puts the high `z̄` edge OUTSIDE Tyrell's envelope ON PURPOSE — never xfail that edge.**
@@ -428,6 +428,21 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   **D-111's 2.1-7.5 % is a 24-CELL ROW SPAN** (4 times × 3 N × 2 lipid) so end-of-run was scored on mid-ferment
   columns — **never re-scope to EF, never widen**; SM70 below floor (0.0123) is PINNED as a miss. Tracer-as-
   substitution is an **INFERENCE** (addition halves it). → `ROLLERO_S3_PCT` + `_rollero_run`
+- **The isoamyl timing repair was BUILT and REVERTED (D-257, corrects D-256) — do NOT re-propose it as
+  unbuilt, and do NOT re-propose it as available.** A blended fusel gate `f*N/(K_n+N) + (1-f)` at f=0.79
+  DOES work on its own axis: 48.1 % made by N-gate closure against Rollero's 44-52 %, level anchor held at
+  172.3 mg/L, `f=1` bit-for-bit the old model. It was reverted because holding the level costs the five k
+  x0.4033, and that rate drives the model's **only** consumer of the must's phenylalanine — 20.3 % -> 65.8 %
+  left, phenylacetaldehyde ~15x over 2 y, **31 tests red**. Mutation-verified: sink OFF, the same sweep moves
+  phenylalanine 1.3 points instead of 45.5, and 97.8 % survives, so `AminoAcidAssimilation` barely touches it.
+  **The escape route is CLOSED and measured**: hold k and the level band 140-205 caps f at 0.98 = 90.7 % at NT.
+  **The real blocker is D-104's sink** — precursor consumption (protein, the DOMINANT fate) rides higher-alcohol
+  production instead of growth; fix that first and this repair reopens. Patch + probes kept at
+  `M:\claud_projects\temp\ferment\d257-fusel-de-novo\`. Also measured there: the attribution layer must scale
+  by the Ehrlich share or the D-117 carbon margin goes to 1.147x, and **propanol drops to 79.1 % de novo under a
+  sourced 80 % floor** with the obvious `f_de_novo_propanol` cap REFUSED under D-206 (it would be fitted to the
+  model's own abundances). **The leucine tracer NUMERATOR did not move at all** (11.9/42.6/72.4 uM, bit-stable) —
+  the enrichment % moved only because its denominator did, the third beat running.
 - **Isoamyl's timing defect is MEASURED, its repair PRICED and NOT taken (D-256, corrects D-255)** — read at
   Rollero's four columns, not just the last: the model makes **100 % of its isoamyl before the fusel N-gate
   shuts, at 100.0 % of PEAK fermentative flux** with four fifths of the sugar left; his NT column says **42-54 %

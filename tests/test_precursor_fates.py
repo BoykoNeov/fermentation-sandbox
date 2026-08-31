@@ -494,3 +494,116 @@ def test_the_sink_is_speculative_and_only_taints_tiers_when_enabled():
     assert off.tier_of("N") is Tier.VALIDATED
     assert on.tier_of("N") is Tier.SPECULATIVE
     assert PrecursorNonEhrlichFates.tier is Tier.SPECULATIVE
+
+
+# -- D-257: why the temporal fusel repair is BLOCKED HERE, measured rather than asserted -------
+
+#: The uniform factor a level-preserving timing repair must apply to all five higher-alcohol
+#: rate constants. Derived at D-257, not chosen: adding a nitrogen-independent de-novo term to
+#: ``fusel_rate_shape`` and fitting its weight to Rollero's NT/EF fraction (48.2 % on his SM250)
+#: lands finished isoamyl alcohol at 426 mg/L on the D-112 anchor must, so holding the Wang 2024
+#: 172 mg/L anchor costs exactly this factor. The five share one rate shape, so one factor holds
+#: every species' mean at once and no D-99 ratio moves.
+_D257_LEVEL_PRESERVING_K_FACTOR = 0.4033
+
+
+def _run_with_scaled_fusel_k(factor: float):
+    """The D-104 fixture again, with every higher-alcohol rate constant scaled by ``factor``."""
+    scenario = Scenario(
+        name="d257-fusel-k-sweep",
+        medium="wine",
+        initial={"brix": 24.0, "yan_mgl": 250.0, "pitch_gpl": 0.25, "amino_acids_gpl": 1.0},
+        temperature_schedule=[TemperaturePoint(day=0.0, celsius=20.0)],
+        duration_days=14.0,
+    )
+    compiled = compile_scenario(scenario, strict=True)
+    params = dict(compiled.param_values)
+    for spec in FUSEL_SPECS:
+        params[spec.k_param] = params[spec.k_param] * factor
+    dur = compiled.t_span_h[1]
+    traj = simulate(
+        compiled.process_set,
+        params,
+        compiled.y0,
+        compiled.t_span_h,
+        t_eval=np.linspace(0.0, dur, int(dur) + 1),
+    )
+    assert traj.success, traj.message
+    return traj, compiled
+
+
+def _surviving_fraction(traj, compiled, pool: str) -> float:
+    series = traj.y[compiled.process_set.schema.slice(pool)][0]
+    assert float(series[0]) > 0.0, f"vacuous: the must carries no {pool}"
+    return float(series[-1]) / float(series[0])
+
+
+def test_precursor_consumption_rides_the_ALCOHOL_rate_and_that_is_what_blocks_the_d257_repair():
+    r"""THE BLOCKER, pinned inside one model and one pair of runs (decision D-257).
+
+    :class:`PrecursorNonEhrlichFates` consumes precursor at ``f/(1-f)`` times the Ehrlich
+    re-route's own draw, and that draw is proportional to the higher-alcohol PRODUCTION RATE.
+    So the model has an amino acid's **dominant** fate - protein, 77-86 % of consumed leucine by
+    Crepin's measurement, and the whole reason this sink exists - riding how much fusel alcohol
+    is being made, rather than riding growth. Nothing in the must's biology works that way.
+
+    **Why this is the finding of D-257 rather than a note.** D-256 measured a large temporal
+    defect: the model makes 100.6 % of its isoamyl alcohol before its own nitrogen gate shuts,
+    at peak fermentative flux, where Rollero measures 42-54 % in by then across six
+    fermentations. Every repair for that defect must slow production in the growth window and
+    make up the rest afterwards, and holding the sourced level anchor then forces the five ``k``
+    down by :data:`_D257_LEVEL_PRESERVING_K_FACTOR`. This test measures what that costs: the
+    must's phenylalanine stops being consumed. **The repair was built, measured and reverted on
+    exactly this** - the patch is kept at
+    ``M:\claud_projects\temp\ferment\d257-fusel-de-novo\attempted-repair.patch``.
+
+    **Verified by mutation, and the mutation is sharper than the test.** Toggling the sink OFF
+    and repeating the same sweep, the must's phenylalanine stops caring about the higher-alcohol
+    rate entirely: 97.8 % -> 99.1 % survives (a 1.3-point swing) against 20.3 % -> 65.8 % with
+    the sink on (45.5 points). So this sink is not merely *a* consumer of phenylalanine, it is
+    effectively the ONLY one - :class:`AminoAcidAssimilation` leaves 97.8 % of it in the must -
+    and what it consumes is set by how much 2-phenylethanol is being made. Probe kept at
+    ``M:\claud_projects\temp\ferment\d257-fusel-de-novo\mutation.py``.
+
+    **The anti-vacuity arm is the load-bearing half**, and it is what makes this an attribution
+    rather than a restatement: the same scaling leaves biomass and the run's TOTAL nitrogen
+    consumption essentially where they were. If those moved too, "consumption rides the alcohol
+    rate" would just be "the whole ferment moved". They do not - so the coupling is specifically
+    between higher-alcohol production and the amino-acid pools, which is the inversion.
+    """
+    base_traj, base_compiled = _run_with_scaled_fusel_k(1.0)
+    slow_traj, slow_compiled = _run_with_scaled_fusel_k(_D257_LEVEL_PRESERVING_K_FACTOR)
+
+    base_phe = _surviving_fraction(base_traj, base_compiled, "phenylalanine")
+    slow_phe = _surviving_fraction(slow_traj, slow_compiled, "phenylalanine")
+
+    assert base_phe < 0.30, (
+        f"the shipped model leaves {base_phe:.1%} of the must's phenylalanine unconsumed; D-257 "
+        "measured 20.3 %. If this has risen the baseline for the comparison below has moved and "
+        "the coupling must be re-measured rather than re-pinned"
+    )
+    assert slow_phe > 0.55, (
+        f"scaling the five higher-alcohol rate constants by "
+        f"{_D257_LEVEL_PRESERVING_K_FACTOR} leaves {slow_phe:.1%} of the must's phenylalanine "
+        f"unconsumed against {base_phe:.1%} unscaled. D-257 measured 65.8 %. If this has fallen, "
+        "precursor consumption no longer rides the alcohol rate - which would UNBLOCK the "
+        "temporal fusel repair D-257 refused, so re-open that record rather than re-pinning here"
+    )
+
+    # -- the anti-vacuity arm: the rest of the ferment did NOT move with it ---------------------
+    schema = base_compiled.process_set.schema
+    base_x = float(base_traj.y[schema.slice("X"), -1][0])
+    slow_x = float(slow_traj.y[slow_compiled.process_set.schema.slice("X"), -1][0])
+    assert base_x > 0.0, "vacuous: no biomass was built"
+    assert abs(slow_x - base_x) < 0.05 * base_x, (
+        f"final biomass moved {base_x:.4f} -> {slow_x:.4f} g/L under the k scaling. This test "
+        "attributes the phenylalanine change to the ALCOHOL rate specifically; if the whole "
+        "ferment moved, that attribution is not established and the finding must be re-measured"
+    )
+
+    base_n = _surviving_fraction(base_traj, base_compiled, "N")
+    slow_n = _surviving_fraction(slow_traj, slow_compiled, "N")
+    assert abs(slow_n - base_n) < 0.02, (
+        f"the extracellular nitrogen slot moved {base_n:.4f} -> {slow_n:.4f} of its initial "
+        "value under the k scaling - the same objection as the biomass arm above"
+    )

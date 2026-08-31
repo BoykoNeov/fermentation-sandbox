@@ -9,7 +9,12 @@ metadata:
 **When a defect's repair is out of scope, still run the crudest version of it — not to propose
 it, but to find out whether the measurement is reachable at all.** The shipped form and the crude
 form are two points; if the source's number lies *between* them, some intermediate form can hit
-it, and that is a result the owner can act on without a design.
+it **on that axis** — which is worth knowing and is not the same as the repair being
+shippable. **CORRECTED AT D-257:** the intermediate form was built, hit 48.1 % against the
+measured 44-52 %, held the level anchor, and was still reverted because the rate it slowed
+was the model's only consumer of a precursor pool. The bracket is necessary, not
+sufficient; see [[feedback-a-bracket-on-one-axis-is-not-reachability]] for what to check
+before building.
 
 D-256. The model makes 100 % of its isoamyl alcohol before the nitrogen gate shuts; Rollero
 measures 42-54 % made by then. Deleting the gate (`nitrogen_gate = 1.0`) is not a candidate — it
