@@ -297,9 +297,19 @@ def test_the_model_needs_TWICE_the_biomass_share_to_have_eaten_the_same_nitrogen
     already gone, and 41.0 % with three-quarters gone. The model needs 54.3 % and 77.7 %. Because
     both sides are ratios of a biomass to a biomass at a *nitrogen* level, the comparison has no
     time axis: rescaling either run's clock leaves it identical, and the near-equal columns at
-    two pitches 6.25× apart show it is not an inoculum artefact either. What it says is that
-    ``ρ_N ∝ X`` over-requires cells early — a functional-form defect, and NOT the storage cap
-    D-248 §10 refused, which is the opposite sign and could only lower these numbers late.
+    two pitches 6.25× apart show it is not an inoculum artefact either.
+
+    **The frame these numbers are in, which D-249 did not label and D-251 does.** They are read
+    through :func:`~tests.test_defined_media._assimilable_n_mgl`, which counts the D-250
+    intracellular store as *unconsumed*. Crépin sampled the **medium**. In her frame the same
+    shipped run reads **41.2 %** and **62.6 %**, so the gap is 1.68×/1.53× rather than the
+    2.22×/1.90× below — see ``tests/test_nitrogen_uptake_shape_frame.py``. The numbers asserted
+    here are correct and stay; what D-251 corrects is D-249 §5's *reading* of them, which
+    concluded ``ρ_N ∝ X`` is the wrong functional form. In Crépin's own frame the shipped
+    capacity knob crosses her landmark inside its declared band, so the form is not shown to be
+    wrong — the level was never identifiable on an observable this repo could express before
+    D-250 split the frames. Neither record re-opens the storage cap D-248 §10 refused, which is
+    the opposite sign and could only lower these numbers late.
     """
     for pitch, expected in (
         (SHIPPED_PITCH_GPL, {0.50: 0.543, 0.75: 0.777}),

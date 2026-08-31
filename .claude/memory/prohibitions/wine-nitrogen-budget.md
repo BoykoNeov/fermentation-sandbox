@@ -156,9 +156,49 @@ unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings
   confined to that helper, moving five consumers. Urea = the **ethyl-carbamate precursor**, so a
   beat that builds it gets independent fidelity value.
 
+- **The nitrogen channel has TWO frames and a claim must name which — D-251.** `_assimilable_n_mgl`
+  counts the D-250 store as unconsumed (deliberate, D-250 §7); Crepin sampled the **MEDIUM**.
+  D-249 §5's front-loading table is in the model's frame, not hers, and **two fifths of the gap it
+  reports is the frame**: the same shipped run reads 0.412/0.626 of peak biomass at her two
+  landmarks, not 0.543/0.777, so the gap is 1.68x/1.53x and not 2.22x/1.90x.
+  **Never quote a nitrogen-timing or nitrogen-shape number against a paper without saying which
+  frame it is in.** [[feedback-validate-calibrations-in-the-frame-that-binds]]
+  - **`rho_N ∝ X` is NOT convicted — D-249 §5's functional-form verdict is CORRECTED, not
+    confirmed. Do not re-propose a replacement rate law as a settled need.** In her frame the
+    SHIPPED `amino_acid_uptake_capacity_ratio` walks the half-nitrogen share 0.412 -> 0.091 and
+    crosses her 0.245 at **r ~ 3.9** (pitch 0.25) / **2.65** (sourced 0.04), **inside the declared
+    [0.5, 10] band** — no new parameter, no widened band. D-249 §4's sweep missed it because in
+    the TOTAL frame the same 1000x moves the share in the third decimal (0.543 -> 0.542): a
+    **blind observable, not a dead knob**. The form is **un-convicted, not vindicated**.
+  - **The second landmark and the RATIO come along uninvited** — 0.404 against her 0.410, ratio
+    1.648 vs 1.673 — which is what separates this from fitting one number to one number.
+    **Her THIRD landmark (N_T, 0.991) discriminates NOTHING**: the model matches it at r = 1 and
+    r = 1000 alike, because near-complete consumption and near-peak biomass are the same event in
+    a nitrogen-limited run. Never count it as a third point of agreement.
+  - **The calibration is PRICED and NOT TAKEN — owner's trade.** Landing her landmarks loads the
+    cells to **0.137-0.139 g N/g DW** against `biomass_N_fraction`'s sourced N-replete elemental
+    reference of **0.114**, band top **0.14** (Roels/Heijnen; compiled structural is 0.0624 here),
+    with the store transiently holding 35-41 % of the must's nitrogen. It spends essentially the
+    whole band, at BOTH pitches, and the landing capacity is **not pitch-invariant** (3.9 vs 2.65
+    across 6.25x of inoculum), so it inherits the unsourced pitch D-249 flagged.
+    **Cost measured, not estimated**: full suite at r = 3.5 is **3 failed / 2033 passed** — no
+    fusel guard, no Coleman yield, no propanol floor, no Minebois share, no benchmark; all three
+    are r = 1 values pinned by D-249/D-250.
+  - **D-248 §10 stays REFUSED and D-250 did NOT unblock it.** A Droop-style quota needs the
+    store's contents to feed back into the uptake RATE; D-250 built a compartment uptake fills and
+    growth draws from, and the rate still reads nothing about it. Re-opening §10 is the owner's
+    call, never a beat's.
+  - **`assert_nonnegative`'s 1e-9 atol is already within 2x of firing on SHIPPED parameters**
+    (`stored_nitrogen` dips -2.34e-9 on Crepin's must at rtol 1e-6, -4.0e-20 at 1e-10 — solver
+    noise, and LARGER at r = 1 than at 3.5). `Flags: D-250`. Recorded, tolerance NOT changed.
+
 Measurements: `M:\claud_projects\temp\ferment\d243-wine-nitrogen-audit\` and
 `d244-wine-n-evaluation-point\` — `FINDINGS-pre.md`, `probe_band.py`, `probe_ceiling.py`,
 `probe_partition_stall.py`, `probe_denovo2.py`, `probe_pins.py`, and the `patch*.py` migrations.
 D-248: `d248-nitrogen-uncoupling\` — `measure.py` (the 200x sweep), `probe_residual.py`,
 `probe_control.py` (the all-ammonium control), `probe_pins.py`, `probe_phe.py`,
 `probe_frame.py` + `probe_cancel.py` (the refusal), and the `fix_*.py` / `rewrite_*.py` edits.
+D-251: `d251-nitrogen-uptake-shape/` - `probe_shape.py` (both frames x the sweep),
+`probe_quota.py`, `probe_ceiling.py`, `probe_landing.py` (the landing capacity per
+pitch), `probe_undershoot.py` (the tolerance scaling), `suite_r3.5.txt` (the mutated
+full run), and `snapshot/` (the restore arms).
