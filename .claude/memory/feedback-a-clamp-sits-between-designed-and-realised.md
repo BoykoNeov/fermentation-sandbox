@@ -26,7 +26,7 @@ measurement moved an over-attribution from one alcohol to the other instead of r
 precursor was supply-limited and each product's amount was set by its own rate law, so deleting
 the whole route moved every concentration by ≤3.4e-6 while moving provenance by 4.5 %. Every guard
 in the repo read concentrations. A quantity no test can see will not be found by adding more of
-the same tests, and its code comment said it "never binds in practice" for eleven years of records.
+the same tests, and its code comment said it "never binds in practice" for 143 records.
 
 **How to apply:** when writing or reading an attribution helper, grep the path from the parameter
 to the applied value for anything that can truncate, and if one exists either integrate the

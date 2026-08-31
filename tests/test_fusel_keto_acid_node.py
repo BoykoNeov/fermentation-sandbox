@@ -196,7 +196,14 @@ _D245_D120_LEGS_GONE_DIRECTION_BACK_AT_D248 = (
     "fixture read ~1.1x. That also retires D-245's own caveat that the isoamyl trip (1.5 % "
     "relative) sat inside this harness's cap-window systematic -- 73 % over is an order of "
     "magnitude outside it, so the over-attribution is a property of the model at her nitrogen "
-    "rather than an artefact of a richer must. Pinned in tests/test_defined_media.py."
+    "rather than an artefact of a richer must. Pinned in tests/test_defined_media.py. "
+    "[HISTORY, NOT CURRENT STATE -- everything above this marker is kept verbatim as what D-245 "
+    "and D-246 measured, and D-248 undid the direction leg: on this fixture the two alcohols read "
+    "0.873x and 0.927x, and on her own must 1.014x and 0.982x, so D-246's ~1.7x is superseded. "
+    "D-254 adds that the estimator behind all of these numbers credits DESIGNED branch shares "
+    "while ehrlich_draws truncates one of them, which on her own must moves the over-attribution "
+    "from isoamyl to isobutanol (0.989x / 1.049x); see tests/test_fusel_provenance_estimator.py. "
+    "This test stays xfail on its INSTRUMENT leg alone.]"
 )
 
 #: The routes that ALSO eat the speciated precursors. Disabled where the ``f : (1−f)`` split
