@@ -266,6 +266,14 @@ unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings
     "r = 10" in `test_assimilable_nitrogen_uptake`'s prose would have meant 26, nothing red. `_run`
     now has `override=` (replaces) beside `scale=` (multiplies), and the grid keys off `SHIPPED_R`
     read from the YAML. [[feedback-a-multiplier-is-not-a-value]]
+  - **The cell loading is MEASURED, never REQUIRED, and its bound is about 2.6 not about the model.**
+    An assertion that the landing capacity pushes cells PAST 0.114 would fail the suite for any
+    future REDUCTION in transient storage (a Droop quota, a smaller store) — a guard that fires on
+    an improvement. The claim is the ordering against the `r=1` control. And `loaded <= 0.14` holds
+    at the shipped point only: **at the capacity band's high edge the transient hits 0.322**, over
+    twice the elemental band's top, so an ensemble drawing `r` over [0.5, 10] WILL cross it. Not a
+    defect (end-state band vs transient, D-252) — but never quote the shipped point's compliance as
+    a property of the parameter. [[feedback-a-guard-must-not-fire-on-an-improvement]]
   - **D-249's refusal HOLDS but the margin narrowed**: nitrogen 1.59x -> 1.65x (house), 0.94x ->
     0.96x (sourced), against runs at 1.93x / 1.55x. The ordering is what the guard asserts.
 

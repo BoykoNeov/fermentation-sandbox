@@ -365,8 +365,17 @@ def test_the_front_loading_is_PAID_FOR_in_stored_nitrogen_at_the_cell_N_ceiling(
     an *end-state* elemental composition, that Crépin's own end state falls below the whole of it,
     and that the model's cell-nitrogen peak happens at ~11–21 % of the nitrogen gone, well before
     her first landmark at 50 %. So the comparison below is a bound the transient must respect, not
-    a measurement it is failing. What would make the calibration inadmissible is crossing the
-    band's own high edge, and the last assertion is that line.
+    a measurement it is failing. What would make the calibration inadmissible is the *shipped*
+    point crossing the band's own high edge, and one assertion is that line — **but it is a
+    statement about 2.6, not about the model.** At the capacity band's own high edge the transient
+    reaches 0.322 g N/g DW, more than twice the elemental band's top, and that is measured here so
+    the shipped point's compliance can never be quoted as a property of the parameter.
+
+    **The ordering is the claim, and the physical line is not.** This test used to assert that the
+    landing capacity loads cells *past* 0.114, which made a reduction in transient storage — a
+    Droop quota, a smaller store — fail the suite for being an improvement. What it asserts now is
+    that the landing capacity loads more than ``r = 1`` does, which is the calibration's own
+    footprint and nothing else's.
 
     The ``r = 1`` arm is kept as the **control**: without it, "the loaded cells are near the top
     of the band" could equally be a property of the model at any capacity, and the number would
@@ -385,8 +394,10 @@ def test_the_front_loading_is_PAID_FOR_in_stored_nitrogen_at_the_cell_N_ceiling(
         "measured against a different cell"
     )
 
+    controls = {}
     for pitch, expected in ((HOUSE_PITCH_GPL, 0.0833), (SOURCED_PITCH_GPL, 0.0910)):
         control = structural + sweep[(pitch, 1.0)]["quota_max"]
+        controls[pitch] = control
         assert control == pytest.approx(expected, abs=0.005), (
             f"pitch {pitch}: the r=1 control reads {control:.4f} g N/g DW, not {expected}"
         )
@@ -403,20 +414,44 @@ def test_the_front_loading_is_PAID_FOR_in_stored_nitrogen_at_the_cell_N_ceiling(
             f"pitch {pitch}: at the landing capacity the cells carry {loaded:.4f} g N/g DW, not "
             f"the {expected} D-251 priced"
         )
-        assert loaded > ceiling.value, (
-            f"pitch {pitch}: landing Crépin's landmarks no longer pushes the cells past the "
-            f"N-replete reference ({loaded:.4f} ≤ {ceiling.value}). That would make the "
-            "calibration cheap, and it is the reason D-251 left it to the owner — re-price it "
-            "rather than deleting this"
+        # The ORDERING, not a physical line. An earlier version asserted `loaded > 0.114`, which
+        # made the guard REQUIRE the shipped configuration to load cells past the N-replete
+        # reference — so any future change that reduced transient storage (a Droop quota, a
+        # smaller store) would have gone red for being an improvement, and its message told the
+        # reader to re-price rather than to think. What the section actually claims is that the
+        # loading is the CALIBRATION's, not the model's, and that is this comparison.
+        assert loaded > controls[pitch], (
+            f"pitch {pitch}: the landing capacity now loads the cells no more than r=1 does "
+            f"({loaded:.4f} vs {controls[pitch]:.4f}). More transport capacity storing no more "
+            "nitrogen would mean the store is capped somewhere it did not used to be — a "
+            "structural surprise worth reading, not a bound to relax"
         )
         assert loaded <= top, (
             f"pitch {pitch}: {loaded:.4f} g N/g DW is outside the sourced band's own high edge "
-            f"{top}, which would make the calibration inadmissible rather than expensive"
+            f"{top}. At the SHIPPED capacity that would make the calibration inadmissible"
         )
         assert reading["store_share"] > 0.30, (
             f"pitch {pitch}: the store holds {reading['store_share']:.1%} of the must's nitrogen "
             "at its peak — the transient the price above is charged for"
         )
+
+    # AND THE BOUND ABOVE IS A STATEMENT ABOUT THE SHIPPED VALUE, NEVER ABOUT THE MODEL. At the
+    # capacity band's own high edge the transient goes far past the elemental band: 0.322 g N/g DW
+    # at r = 10, more than twice its top. So `loaded <= top` holding at 2.6 is not evidence that
+    # the model cannot exceed it, and an ensemble drawing r over [0.5, 10] will produce members
+    # that do. That is recorded here rather than guarded, because the elemental band is an
+    # END-STATE composition and this is a transient (D-252) — the crossing is not a defect. What
+    # would be a defect is quoting the shipped point's compliance as a property of the parameter.
+    edge = structural + sweep[(SOURCED_PITCH_GPL, 10.0)]["quota_max"]
+    assert edge == pytest.approx(0.322, abs=0.01), (
+        f"at the capacity band's high edge the cells carry {edge:.4f} g N/g DW, not the 0.322 "
+        "D-253 measured"
+    )
+    assert edge > top, (
+        f"the band's high edge now keeps the transient inside the elemental band ({edge:.4f} <= "
+        f"{top}). If that is true the loading really IS bounded by the parameter's own band and "
+        "the caveat above can be dropped — a finding to record, not a line to delete"
+    )
 
 
 def test_the_stores_nonnegativity_dip_is_SOLVER_NOISE_and_on_THIS_must_moved_inside_the_guard():
