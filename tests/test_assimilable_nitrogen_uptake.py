@@ -394,13 +394,21 @@ def test_biomass_now_reaches_the_coleman_yield_the_compile_seam_installs(sweep):
     fitted to Coleman: ``f_N`` is the seam's own override and the target is arithmetic from it.
 
     **The inoculum is read off the run, not written in (decision D-252).** This line carried
-    ``0.25`` as a literal — correct at the pitch this fixture runs, and brittle at any other,
-    because at pitch 0.04 it subtracted an inoculum the run did not have and read 0.925 instead
-    of 0.985. D-249 §3 published that 0.925 as the cost of moving the fixture onto its only
-    sourced pitch; it was the literal, and ``tests/test_inoculum_and_cell_nitrogen.py`` pins both
-    readings. The verdict at the shipped pitch is unchanged — this is a brittleness fix.
+    ``0.25`` as a literal — correct at the pitch this fixture used to run, and brittle at any
+    other, because at pitch 0.04 it subtracted an inoculum the run did not have and read 0.925
+    instead of 0.985. D-249 §3 published that 0.925 as the cost of moving the fixture onto its
+    only sourced pitch; it was the literal, and ``tests/test_inoculum_and_cell_nitrogen.py`` pins
+    both readings.
+
+    **D-253 then made that move, and the anchor is what proves it was free.** The fixture now
+    pitches the sourced 0.04 g/L and the ``r = 1`` arm reads **0.9848** where it read 0.9844 —
+    a 0.0004 drift across a 6.25× inoculum change, which is what "structurally insensitive"
+    means. The ``r = 0`` arm is *not* insensitive and moves 0.616 → **0.591**: that arm is the
+    pre-D-248 frozen path, where growth stops with the nitrogen still standing, so its peak is
+    set by how much biomass was pitched rather than by how much nitrogen was consumed. The two
+    arms moving differently is the finding, not noise — it is the same separation D-248 rests on.
     """
-    for ratio, expected, tol in ((0.0, 0.616, 0.02), (1.0, 0.984, 0.02)):
+    for ratio, expected, tol in ((0.0, 0.591, 0.02), (1.0, 0.985, 0.02)):
         traj, schema, params, _ = sweep[ratio]
         initial = _assimilable_n_mgl(traj, schema, 0) / 1000.0
         x0 = float(traj.y[schema.slice("X"), :][0][0])
@@ -412,14 +420,28 @@ def test_biomass_now_reaches_the_coleman_yield_the_compile_seam_installs(sweep):
         )
 
 
-def test_the_exhaustion_TIME_still_misses_crepins_and_the_direction_is_recorded(sweep):
-    """The extent saturates; the timing does not, and it runs ~1.5x fast (decision D-248).
+def test_the_exhaustion_TIME_now_LANDS_on_crepins_and_it_was_the_INOCULUM(sweep):
+    """The extent saturates; the timing does not — and the timing has stopped missing (D-253).
 
     Crépin's Data Set S1 puts the must's assimilable nitrogen exhausted at N_T = 28 h, long
-    before its end of fermentation at 150 h. The model reaches 90 % consumed at ~18.6 h at the
-    shipped capacity. This test exists so that "insensitive across 200x" — which is true of the
-    *extent* and is the reason the parameter is not fitted — can never be read as "the time
-    course was checked and passed". It was checked, and it misses.
+    before its end of fermentation at 150 h. D-248 §5 measured this model at **~18.6 h**, ~1.5×
+    fast, and D-249 refused to repair it through ``amino_acid_uptake_capacity_ratio`` on the
+    ground that the miss is unreachable that way — a sweep to 1000× saturates at ~16.4 h and
+    never overtakes the run containing it. That refusal stands and is untouched.
+
+    **What closed it was the fixture's inoculum, which was never Crépin's.** At the sourced pitch
+    the same run reaches 90 % consumed at **~30.4 h** on this file's grid idiom, against her 28 h
+    — 8.5 % slow rather than 50 % fast, and now on the *other* side of her measurement. Read on
+    the extracellular quantity she actually sampled it is nearer still: 28.6 h, a 2 % miss
+    (``tests/test_nitrogen_stored_intracellularly.py``). The attribution is measured at both
+    pitches in ``tests/test_nitrogen_timing_attribution.py`` (nitrogen gap 1.59× at the house
+    pitch, 0.94× at the sourced one) and is not re-derived here.
+
+    **The purpose of this test is unchanged**, and it is why the band below is two-sided rather
+    than a pass mark: "insensitive across 200×" is true of the *extent* and is the reason the
+    parameter is not fitted, and it must never be read as "the time course was checked". The
+    time course is a live observable of that same knob — the second half of this test drives it
+    — while the residual it is measured beside is flat to the fifth decimal.
     """
     traj, schema, _, _ = sweep[1.0]
     series = np.array([_assimilable_n_mgl(traj, schema, i) for i in range(traj.y.shape[1])])
@@ -427,12 +449,40 @@ def test_the_exhaustion_TIME_still_misses_crepins_and_the_direction_is_recorded(
     assert below.size, "the must is never 90 % consumed at the shipped capacity"
     t90 = float(traj.t[below[0]])
 
-    assert t90 < CREPIN_EXHAUSTION_H, (
-        f"the model now exhausts the must at {t90:.1f} h against Crépin's {CREPIN_EXHAUSTION_H} h "
-        "— it no longer runs FAST, which reverses the direction D-248 recorded and is a "
-        "re-decision rather than a pin to relax"
+    assert 28.0 <= t90 <= 33.0, (
+        f"the 90 %-consumed time reads {t90:.2f} h against Crépin's {CREPIN_EXHAUSTION_H} h. "
+        "Below 28 h the model is FAST again, which is the pre-D-253 reading and means the "
+        "fixture's pitch went back to the house 0.25; above 33 h the agreement D-253 bought "
+        "has been spent somewhere else. Either way a re-decision, not a pin to widen"
     )
-    assert 15.0 <= t90 <= 22.0, f"the 90 %-consumed time left [15 h, 22 h]: {t90:.2f}"
+    assert t90 > CREPIN_EXHAUSTION_H, (
+        f"the model exhausts the must at {t90:.2f} h, EARLIER than Crépin's "
+        f"{CREPIN_EXHAUSTION_H} h. D-253 records the residual miss as slow-side; a flip to the "
+        "fast side is the direction D-248 recorded returning"
+    )
+
+    # Non-vacuity, and the whole reason this test sits next to the residual one: the knob the
+    # extent cannot see moves the timing by 10 h across the same sweep.
+    times = []
+    for ratio in sorted(sweep):
+        if ratio == 0.0:
+            continue  # the pre-D-248 path never reaches 90 % consumed at all
+        arm_traj, arm_schema, _, _ = sweep[ratio]
+        arm = np.array(
+            [_assimilable_n_mgl(arm_traj, arm_schema, i) for i in range(arm_traj.y.shape[1])]
+        )
+        hit = np.nonzero(arm <= 0.10 * arm[0])[0]
+        assert hit.size, f"r={ratio} never reaches 90 % consumed"
+        times.append(float(arm_traj.t[hit[0]]))
+
+    assert all(b <= a for a, b in zip(times, times[1:], strict=False)), (
+        f"the 90 %-consumed time is no longer non-increasing in capacity: {times}"
+    )
+    assert times[0] - times[-1] > 5.0, (
+        f"the timing moved only {times[0] - times[-1]:.1f} h across the sweep {times}. If it has "
+        "gone flat too, then the extent's insensitivity and the timing's are the same fact and "
+        "this test no longer distinguishes them"
+    )
 
 
 def test_uptake_touches_no_precursor_pool_in_a_driven_run(sweep):

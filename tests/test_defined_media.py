@@ -78,6 +78,7 @@ from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
 from fermentation.runtime import simulate_scheduled
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.units import brix_to_sugar_gpl
+from fermentation.units.convert import cells_per_ml_to_pitch_gpl
 from tests.test_fusel_catabolic_shape import _MINEBOIS_AMINO_ACID_SHARE, _amino_acid_share
 from tests.test_fusel_keto_acid_node import (
     _OTHER_PRECURSOR_CONSUMERS,
@@ -291,6 +292,19 @@ _MUSTS = {
 }
 _FERMENT_DAYS = 14.0
 
+#: The pitch both fixtures run at, and it is **sourced** (decision D-253). Minebois §Materials and
+#: Methods — the same Bely, Sablayrolles & Barre 1990 medium and the same lab lineage as Crépin —
+#: inoculates at 1 × 10⁶ cells mL⁻¹, converted through the engine's own D-219 crossing. So the
+#: value is *directly* sourced for the Minebois fixture and inherited by lineage for Crépin, who
+#: states no inoculum at all (``grep -c`` over her text = 0).
+SOURCED_PITCH_GPL = cells_per_ml_to_pitch_gpl(1.0e6)
+
+#: What these fixtures used to pitch: the wine benchmark's house default, 6.25× larger and
+#: **unsourced by either paper**. Retained as the contrast arm of D-249/D-251/D-252's measurements,
+#: never as a fixture default again — D-253 moved it. Do not "simplify" the two-pitch comparisons
+#: in ``test_nitrogen_timing_attribution.py`` down to one by deleting this.
+HOUSE_PITCH_GPL = 0.25
+
 
 def commensurate_scenario(which: str, *, days: float = _FERMENT_DAYS) -> Scenario:
     """The named paper's own must, as a scenario.
@@ -301,10 +315,18 @@ def commensurate_scenario(which: str, *, days: float = _FERMENT_DAYS) -> Scenari
     off the Processes every test in this file measures and the guards would then be answering a
     question nobody asked. :func:`test_the_commensurate_musts_carry_the_papers_own_pools` asserts
     both halves — the Processes are live AND no pool kept the dose's spectrum share.
+
+    **The pitch is :data:`SOURCED_PITCH_GPL`, not the house 0.25 it used to be (decision D-253).**
+    Both papers run the same medium out of the same lab lineage and Minebois states the inoculum;
+    the 0.25 was the wine benchmark's default, inherited by accident and unsourced by either
+    paper. Moving it buys Crépin's nitrogen-exhaustion clock (29.9 h against her measured 28 h,
+    from 17.6 h) and costs peak biomass (3.21 g/L against her 3.39, from 3.42). Every number in
+    this file is measured at the new pitch; :func:`~tests.test_nitrogen_timing_attribution.
+    test_the_fixtures_pitch_is_sourced_and_the_house_default_is_6_25x_larger` pins the move.
     """
     mm, sugar, celsius = _MUSTS[which]
     pools, yan = commensurate_pools(mm)
-    initial = {"brix": _brix_for(sugar), "yan_mgl": yan, "pitch_gpl": 0.25} | pools
+    initial = {"brix": _brix_for(sugar), "yan_mgl": yan, "pitch_gpl": SOURCED_PITCH_GPL} | pools
     initial["amino_acids_gpl"] = 1.0
     return Scenario(
         name=f"d246-{which}",

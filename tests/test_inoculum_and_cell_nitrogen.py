@@ -65,6 +65,8 @@ from fermentation.runtime import simulate_scheduled
 from fermentation.scenario import compile_scenario
 from tests.test_defined_media import (
     CREPIN_MUST_MM,
+    HOUSE_PITCH_GPL,
+    SOURCED_PITCH_GPL,
     _assimilable_n_mgl,
     commensurate_scenario,
     model_frame_mgn,
@@ -73,8 +75,6 @@ from tests.test_defined_media import (
 from tests.test_fusel_keto_acid_node import _OTHER_PRECURSOR_CONSUMERS
 from tests.test_nitrogen_timing_attribution import (
     CREPIN_FINAL_BIOMASS_GPL,
-    SHIPPED_PITCH_GPL,
-    SOURCED_PITCH_GPL,
 )
 
 STORED = "stored_nitrogen"
@@ -86,7 +86,7 @@ CREPIN_FIRST_DRY_WEIGHT_GPL = 0.83
 CREPIN_FIRST_LANDMARK_FRACTION = 0.50
 
 #: The capacity that lands her half-nitrogen landmark at each pitch (D-251). NOT shipped.
-LANDING_R = {SHIPPED_PITCH_GPL: 3.9, SOURCED_PITCH_GPL: 2.65}
+LANDING_R = {HOUSE_PITCH_GPL: 3.9, SOURCED_PITCH_GPL: 2.65}
 
 
 def _band() -> tuple[float, float]:
@@ -144,9 +144,9 @@ def _run(pitch: float, capacity_ratio: float) -> dict[str, Any]:
 def runs() -> dict[tuple[float, float], dict[str, Any]]:
     """The four runs this file reads — computed ONCE (the D-245 pattern)."""
     wanted = (
-        (SHIPPED_PITCH_GPL, 1.0),
+        (HOUSE_PITCH_GPL, 1.0),
         (SOURCED_PITCH_GPL, 1.0),
-        (SHIPPED_PITCH_GPL, LANDING_R[SHIPPED_PITCH_GPL]),
+        (HOUSE_PITCH_GPL, LANDING_R[HOUSE_PITCH_GPL]),
         (SOURCED_PITCH_GPL, LANDING_R[SOURCED_PITCH_GPL]),
     )
     return {key: _run(*key) for key in wanted}
@@ -176,7 +176,7 @@ def test_the_coleman_anchor_is_STRUCTURALLY_INSENSITIVE_and_d249s_price_was_a_LI
     ratio shift by the same X₀. It is *structurally insensitive*, not invariant: the ratio drifts
     toward 1 as X₀ grows, and this pins the drift so "insensitive" can never be read as "constant".
     """
-    shipped, sourced = runs[(SHIPPED_PITCH_GPL, 1.0)], runs[(SOURCED_PITCH_GPL, 1.0)]
+    shipped, sourced = runs[(HOUSE_PITCH_GPL, 1.0)], runs[(SOURCED_PITCH_GPL, 1.0)]
 
     same_f_n = pytest.approx(sourced["biomass_N_fraction"], rel=1e-12)
     assert shipped["biomass_N_fraction"] == same_f_n, (
@@ -186,14 +186,14 @@ def test_the_coleman_anchor_is_STRUCTURALLY_INSENSITIVE_and_d249s_price_was_a_LI
     )
 
     own, literal = {}, {}
-    for pitch, run in ((SHIPPED_PITCH_GPL, shipped), (SOURCED_PITCH_GPL, sourced)):
+    for pitch, run in ((HOUSE_PITCH_GPL, shipped), (SOURCED_PITCH_GPL, sourced)):
         predicted_own = pitch + run["initial_n_gpl"] / run["biomass_N_fraction"]
-        predicted_literal = SHIPPED_PITCH_GPL + run["initial_n_gpl"] / run["biomass_N_fraction"]
+        predicted_literal = HOUSE_PITCH_GPL + run["initial_n_gpl"] / run["biomass_N_fraction"]
         own[pitch] = run["peak_biomass"] / predicted_own
         literal[pitch] = run["peak_biomass"] / predicted_literal
 
-    assert own[SHIPPED_PITCH_GPL] == pytest.approx(0.9844, abs=0.002), (
-        f"the anchor reads {own[SHIPPED_PITCH_GPL]:.4f} at the fixture's own pitch, not the "
+    assert own[HOUSE_PITCH_GPL] == pytest.approx(0.9844, abs=0.002), (
+        f"the anchor reads {own[HOUSE_PITCH_GPL]:.4f} at the fixture's own pitch, not the "
         "0.9844 D-248 measured and this record re-derived"
     )
     assert own[SOURCED_PITCH_GPL] == pytest.approx(0.9848, abs=0.002), (
@@ -201,7 +201,7 @@ def test_the_coleman_anchor_is_STRUCTURALLY_INSENSITIVE_and_d249s_price_was_a_LI
         "uses that pitch; D-252 measured 0.9848"
     )
 
-    drift = abs(own[SOURCED_PITCH_GPL] - own[SHIPPED_PITCH_GPL])
+    drift = abs(own[SOURCED_PITCH_GPL] - own[HOUSE_PITCH_GPL])
     assert drift == pytest.approx(0.0004, abs=0.0006), (
         f"the anchor moves {drift:.5f} across a 6.25x inoculum change, not the 0.0004 D-252 "
         "measured -- 'structurally insensitive' is a measured smallness, not an identity, and "
@@ -298,7 +298,7 @@ def test_her_data_CANNOT_settle_the_inoculum_and_the_gain_required_says_why():
     }
     assert point["model"] == pytest.approx(0.168, abs=0.01), point
     assert point["paper"] == pytest.approx(0.507, abs=0.01), point
-    assert point["model"] < SHIPPED_PITCH_GPL < point["paper"], (
+    assert point["model"] < HOUSE_PITCH_GPL < point["paper"], (
         f"the two frames' point estimates {point} no longer straddle the fixture's own pitch; "
         "the reason neither end is usable is that the frame decides which side of 0.25 it lands"
     )
@@ -326,7 +326,7 @@ def test_at_HER_landmark_the_landing_capacity_UNDERSHOOTS_her_cell_nitrogen(runs
         ("model", model_frame_mgn(CREPIN_MUST_MM)),
         ("paper", paper_frame_mgn(CREPIN_MUST_MM)),
     ):
-        for x0 in (0.0, SOURCED_PITCH_GPL, SHIPPED_PITCH_GPL):
+        for x0 in (0.0, SOURCED_PITCH_GPL, HOUSE_PITCH_GPL):
             for f_inoc in (0.06241, 0.114):
                 her.append(
                     _crepin_cell_n(
@@ -346,7 +346,7 @@ def test_at_HER_landmark_the_landing_capacity_UNDERSHOOTS_her_cell_nitrogen(runs
         f"its ceiling is now {her_high:.4f}, not the 0.156 D-252 measured"
     )
 
-    for pitch, expected in ((SHIPPED_PITCH_GPL, 0.0920), (SOURCED_PITCH_GPL, 0.0971)):
+    for pitch, expected in ((HOUSE_PITCH_GPL, 0.0920), (SOURCED_PITCH_GPL, 0.0971)):
         run = runs[(pitch, LANDING_R[pitch])]
         at_half = run["cell_n_at_half"]
         assert at_half == pytest.approx(expected, abs=0.003), (
@@ -368,7 +368,7 @@ def test_the_models_cell_nitrogen_PEAK_is_at_a_moment_crepin_never_sampled(runs)
     is at 50 %. A price charged at a moment with no measurement in it is a price against nothing.
     """
     for pitch, top, consumed in (
-        (SHIPPED_PITCH_GPL, 0.1391, 0.205),
+        (HOUSE_PITCH_GPL, 0.1391, 0.205),
         (SOURCED_PITCH_GPL, 0.1372, 0.106),
     ):
         run = runs[(pitch, LANDING_R[pitch])]
@@ -395,7 +395,7 @@ def test_the_shipped_capacity_is_the_CONTROL_and_undershoots_her_further(runs):
     measuring something inert.
     """
     for pitch, at_half, at_peak in (
-        (SHIPPED_PITCH_GPL, 0.0159, 0.0559),
+        (HOUSE_PITCH_GPL, 0.0159, 0.0559),
         (SOURCED_PITCH_GPL, 0.0181, 0.0461),
     ):
         shipped = runs[(pitch, 1.0)]
@@ -415,6 +415,6 @@ def test_the_shipped_capacity_is_the_CONTROL_and_undershoots_her_further(runs):
             f"D-252 measured ({shipped['cell_n_max']:.4f} vs {landing['cell_n_max']:.4f})"
         )
 
-    assert runs[(SHIPPED_PITCH_GPL, 1.0)]["cell_n_max"] == pytest.approx(0.0833, abs=0.002), (
+    assert runs[(HOUSE_PITCH_GPL, 1.0)]["cell_n_max"] == pytest.approx(0.0833, abs=0.002), (
         "the shipped capacity's peak cell nitrogen is no longer the 0.0833 D-251 §4 measured"
     )

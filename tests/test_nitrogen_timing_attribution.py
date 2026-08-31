@@ -53,9 +53,13 @@ import pytest
 from fermentation.runtime import simulate_scheduled
 from fermentation.scenario import compile_scenario
 from fermentation.scenario.schema import TemperaturePoint
-from fermentation.units.convert import cells_per_ml_to_pitch_gpl
 from tests.test_assimilable_nitrogen_uptake import CREPIN_EXHAUSTION_H
-from tests.test_defined_media import _assimilable_n_mgl, commensurate_scenario
+from tests.test_defined_media import (
+    HOUSE_PITCH_GPL,
+    SOURCED_PITCH_GPL,
+    _assimilable_n_mgl,
+    commensurate_scenario,
+)
 from tests.test_fusel_keto_acid_node import _OTHER_PRECURSOR_CONSUMERS
 
 #: Total sugar at or below which the run counts as dry — the benchmarks' own threshold, so this
@@ -72,16 +76,12 @@ CREPIN_EF_H = 150.0
 CREPIN_DRY_WEIGHT_GPL = {0.50: 0.83, 0.75: 1.39, 1.00: 3.36}
 CREPIN_FINAL_BIOMASS_GPL = 3.39
 
-#: The fixture's pitch, inherited from the wine benchmark's default — **not** Crépin's, who never
-#: states an inoculum, and not the value her sibling paper states. See
-#: :func:`test_the_fixtures_pitch_is_unsourced_and_the_only_sourced_value_is_6_25x_smaller`.
-SHIPPED_PITCH_GPL = 0.25
-
-#: Minebois §Materials and Methods — the same Bely, Sablayrolles & Barre 1990 medium and the same
-#: lab lineage as Crépin — inoculates at 1 × 10⁶ cells mL⁻¹. Converted through the engine's own
-#: :func:`~fermentation.units.convert.cells_per_ml_to_pitch_gpl` (D-219), the same crossing
-#: ``test_validation_varela2004.py`` uses for its own research pitch.
-SOURCED_PITCH_GPL = cells_per_ml_to_pitch_gpl(1.0e6)
+#: Both pitches are defined in ``tests/test_defined_media.py``, the file that owns the fixture:
+#: :data:`~tests.test_defined_media.SOURCED_PITCH_GPL` is what it now runs at, and
+#: :data:`~tests.test_defined_media.HOUSE_PITCH_GPL` the 0.25 it ran at through D-252. Every
+#: two-pitch comparison below is unchanged by D-253's move — each one passes its pitch in
+#: explicitly — but which of the two is the *fixture's* has swapped, and the tests that read the
+#: fixture's own default say so.
 
 
 def _crepin_run(pitch_gpl: float, *, isothermal: bool = False, capacity_ratio: float | None = None):
@@ -150,7 +150,7 @@ def courses():
     """The four runs this file needs, integrated ONCE (the D-245 pattern)."""
     return {
         (pitch, iso): _Course(*_crepin_run(pitch, isothermal=iso))
-        for pitch in (SHIPPED_PITCH_GPL, SOURCED_PITCH_GPL)
+        for pitch in (HOUSE_PITCH_GPL, SOURCED_PITCH_GPL)
         for iso in (False, True)
     }
 
@@ -164,7 +164,7 @@ def test_the_nitrogen_channel_is_SLOWER_than_the_run_containing_it_at_both_pitch
     between them; only the observable does.
     """
     for pitch, (clock, nitro) in (
-        (SHIPPED_PITCH_GPL, (1.92, 1.59)),
+        (HOUSE_PITCH_GPL, (1.92, 1.59)),
         (SOURCED_PITCH_GPL, (1.54, 0.94)),
     ):
         course = courses[(pitch, False)]
@@ -209,7 +209,7 @@ def test_no_transport_CAPACITY_can_make_the_nitrogen_channel_outrun_its_own_run(
     without touching nitrogen *would* be caught, which is precisely the case in which this
     record's attribution reverses.
     """
-    course = _Course(*_crepin_run(SHIPPED_PITCH_GPL, capacity_ratio=1000.0))
+    course = _Course(*_crepin_run(HOUSE_PITCH_GPL, capacity_ratio=1000.0))
     clock_gap = CREPIN_EF_H / course.hours_to_dryness
     nitrogen_gap = CREPIN_EXHAUSTION_H / course.hours_to_n_consumed(0.90)
 
@@ -236,7 +236,7 @@ def test_time_free_the_model_exhausts_its_nitrogen_LATER_in_its_run_than_crepin_
     measured = CREPIN_EXHAUSTION_H / CREPIN_EF_H
     assert measured == pytest.approx(0.187, abs=0.002)
 
-    for pitch, expected in ((SHIPPED_PITCH_GPL, 0.225), (SOURCED_PITCH_GPL, 0.308)):
+    for pitch, expected in ((HOUSE_PITCH_GPL, 0.225), (SOURCED_PITCH_GPL, 0.308)):
         course = courses[(pitch, False)]
         share = course.hours_to_n_consumed(0.90) / course.hours_to_dryness
         assert share == pytest.approx(expected, abs=0.01), (
@@ -259,7 +259,7 @@ def test_the_temperature_confound_pushes_the_OTHER_way(courses):
     the explanation for the gap D-249 attributes — a finding that survives a confound pointing
     at it is worth more than one that needs the confound removed.
     """
-    for pitch in (SHIPPED_PITCH_GPL, SOURCED_PITCH_GPL):
+    for pitch in (HOUSE_PITCH_GPL, SOURCED_PITCH_GPL):
         ramped = courses[(pitch, False)].hours_to_dryness
         isothermal = courses[(pitch, True)].hours_to_dryness
         assert isothermal < ramped, (
@@ -312,7 +312,7 @@ def test_the_model_needs_TWICE_the_biomass_share_to_have_eaten_the_same_nitrogen
     the opposite sign and could only lower these numbers late.
     """
     for pitch, expected in (
-        (SHIPPED_PITCH_GPL, {0.50: 0.543, 0.75: 0.777}),
+        (HOUSE_PITCH_GPL, {0.50: 0.543, 0.75: 0.777}),
         (SOURCED_PITCH_GPL, {0.50: 0.513, 0.75: 0.762}),
     ):
         course = courses[(pitch, False)]
@@ -334,32 +334,44 @@ def test_the_model_needs_TWICE_the_biomass_share_to_have_eaten_the_same_nitrogen
             )
 
 
-def test_the_fixtures_pitch_is_unsourced_and_the_only_sourced_value_is_6_25x_smaller():
-    """A declared-fact guard, so changing the fixture's pitch has to be deliberate (D-249 §2).
+def test_the_fixtures_pitch_is_sourced_and_the_house_default_is_6_25x_larger():
+    """A declared-fact guard on the pitch, now that the move D-249 priced has been made (D-253).
 
-    Crépin never states an inoculum — ``grep -c inocul`` over the full PMC text is **0**. The
-    fixture carries the wine benchmark's default 0.25 g/L, and the only sourced number for this
-    medium is her sibling paper's 1 × 10⁶ cells mL⁻¹. Moving the fixture onto it is a **trade**
-    and is the owner's call, not a beat's: it takes the nitrogen exhaustion from 17.6 h to
-    29.9 h against her 28 h, and in the same move takes peak biomass from +0.8 % to −5.2 %
-    of her measured 3.39 g/L. **The Coleman-anchor half of this price is WITHDRAWN at D-252**:
-    the 0.984 → 0.925 was ``test_biomass_now_reaches_the_coleman_yield_the_compile_seam_installs``
+    Crépin never states an inoculum — ``grep -c inocul`` over the full PMC text is **0** — so for
+    her run the pitch is inherited by lineage: the same Bely, Sablayrolles & Barre 1990 medium out
+    of the same lab as Minebois, who states 1 × 10⁶ cells mL⁻¹. For the Minebois fixture the same
+    number is *directly* sourced, which is what makes the shared constant defensible rather than a
+    second house default wearing a citation.
+
+    **What the move bought and what it cost.** Nitrogen exhaustion goes 17.6 h → 29.9 h against
+    her measured 28 h; peak biomass goes +0.8 % → −5.2 % of her measured 3.39 g/L. **The
+    Coleman-anchor line of D-249's price list is deleted, not paid** (decision D-252): the
+    0.984 → 0.925 was ``test_biomass_now_reaches_the_coleman_yield_the_compile_seam_installs``
     predicting against a hardcoded 0.25 g/L inoculum the run did not have. Against the run's own
-    pitch the anchor reads 0.9848, inside the band, and it is *structurally insensitive* to the
-    inoculum — it drifts 0.0004 across the 6.25×. The move sells the anchor nothing; what it
-    still costs is the biomass level. See ``tests/test_inoculum_and_cell_nitrogen.py``.
+    pitch the anchor reads 0.9848, inside the band, and is *structurally insensitive* to the
+    inoculum — it drifts 0.0004 across the 6.25×. See ``tests/test_inoculum_and_cell_nitrogen.py``.
+
+    **Minebois was the unpriced half and it does not regress**: her two in-study fusel shares read
+    1.009×/0.977× at the house pitch and 1.014×/0.982× at the sourced one, inside the pin either
+    way (``test_both_minebois_legs_land_on_her_own_measurement_once_uptake_is_uncoupled``).
     """
     assert abs(SOURCED_PITCH_GPL - 0.04) < 1e-6, (
         f"1e6 cells/mL now converts to {SOURCED_PITCH_GPL} g/L, not the 0.04 D-249 measured "
         "through the D-219 crossing"
     )
-    ratio = SHIPPED_PITCH_GPL / SOURCED_PITCH_GPL
+    ratio = HOUSE_PITCH_GPL / SOURCED_PITCH_GPL
     assert ratio == pytest.approx(6.25, abs=0.01), (
-        "the fixture's pitch is no longer 6.25x the only sourced value for this medium; if it "
-        "was moved onto Minebois' stated inoculum, D-248's Coleman-yield guard moves with it"
+        "the house default is no longer 6.25x the sourced pitch; the two-pitch comparisons in "
+        "this file are all quoted against that separation"
     )
     scenario = commensurate_scenario("crepin")
-    assert scenario.initial["pitch_gpl"] == pytest.approx(SHIPPED_PITCH_GPL), (
-        "the shared Crépin fixture's pitch has changed; every number in this file and in "
-        "tests/test_assimilable_nitrogen_uptake.py is scored at 0.25 g/L"
+    assert scenario.initial["pitch_gpl"] == pytest.approx(SOURCED_PITCH_GPL), (
+        "the shared Crépin fixture is no longer pitched at the sourced 1e6 cells/mL. If it went "
+        "back to the house 0.25 that is a re-decision reversing D-253, not a default to restore "
+        "quietly — every number in this file and in tests/test_assimilable_nitrogen_uptake.py is "
+        "scored at the sourced pitch"
+    )
+    assert scenario.initial["pitch_gpl"] != pytest.approx(HOUSE_PITCH_GPL), (
+        "the sourced and house pitches have collided, which makes every two-pitch comparison in "
+        "this file vacuous rather than merely wrong"
     )

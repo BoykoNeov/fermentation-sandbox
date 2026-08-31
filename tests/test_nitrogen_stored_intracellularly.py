@@ -417,6 +417,13 @@ def test_the_extracellular_reading_is_now_separable_and_d249s_verdict_survives_i
     is what her Data Set S1 measures — is newly readable, and it exhausts sooner. D-249's
     conclusion is that the nitrogen channel is slower than the fermentation containing it; that
     survives the narrower reading, which is the point of pinning it here.
+
+    **At the sourced pitch this is the reading that moved most (decision D-253).** The gap was
+    1.71× when the fixture carried the house 0.25 g/L inoculum; on the sourced 0.04 it is
+    **0.98×** — the medium's nitrogen exhausts at 28.6 h against Crépin's measured N_T of 28 h.
+    So on the one frame she sampled, at the one inoculum her lab published, the exhaustion clock
+    agrees to 2 %. D-249's verdict is unaffected: 0.98× is still comfortably under the run's own
+    1.54×, and the comparison below is what carries that claim, not the number above it.
     """
     compiled = compile_scenario(commensurate_scenario("crepin"))
     for name in _OTHER_PRECURSOR_CONSUMERS:
@@ -441,10 +448,14 @@ def test_the_extracellular_reading_is_now_separable_and_d249s_verdict_survives_i
         """First crossing, INTERPOLATED between the bracketing samples.
 
         The same idiom ``test_nitrogen_timing_attribution._cross`` uses, and not a detail: taking
-        the sample index outright reads this crossing 0.5 h late on an output grid this coarse,
-        which moves the ratio below from 1.71 to 1.66 and makes it incomparable with the 1.59 the
-        record it is scored against derived. Error scales with the local slope, and the nitrogen
-        curve is steep exactly here.
+        the sample index outright reads this crossing late by however coarse the output grid is
+        there, which is what makes the number incomparable with the one the record it is scored
+        against derived. Error scales with the local slope, and the nitrogen curve is steep
+        exactly here. At the sourced pitch (D-253) the two idioms differ by 0.10 h — 28.61 h
+        interpolated against 28.70 h off the index, a ratio of 0.979 against 0.975 — where at the
+        house pitch the same choice was worth 0.5 h and moved the ratio 1.71 → 1.66. The
+        sensitivity shrank because the run is slower there, not because the idiom stopped
+        mattering; keep the interpolation.
         """
         consumed = 1.0 - series / series[0]
         hit = np.nonzero(consumed >= fraction)[0]
@@ -487,10 +498,15 @@ def test_the_extracellular_reading_is_now_separable_and_d249s_verdict_survives_i
     # than the run containing it (Crépin's N_T = 28 h against her EF = 150 h).
     nitrogen_gap = 28.0 / outside_h
     clock_gap = 150.0 / run_h
-    # The number D-250's record and its prohibitions file both state, pinned rather than merely
-    # asserted — D-249's own idiom for this quantity. Its 1.59x is the wider reading.
-    assert nitrogen_gap == pytest.approx(1.71, abs=0.05), (
-        f"the extracellular nitrogen gap reads {nitrogen_gap:.2f}x, not the 1.71 D-250 measured"
+    # D-250 measured 1.71x here at the house pitch of 0.25 g/L. D-253 moved the fixture onto the
+    # sourced inoculum and this is the reading that moved most: **0.98x**, i.e. the medium's
+    # nitrogen now exhausts within 2 % of Crepin's own N_T, on the frame she actually sampled.
+    # The pin is the number, not the verdict; the verdict is the comparison below, and it holds
+    # at both pitches (tests/test_nitrogen_timing_attribution.py measures both).
+    assert nitrogen_gap == pytest.approx(0.98, abs=0.05), (
+        f"the extracellular nitrogen gap reads {nitrogen_gap:.2f}x, not the 0.98 D-253 measured "
+        "at the sourced pitch. A jump back toward 1.7x means the fixture is pitched at the "
+        "house 0.25 again, which reverses D-253 rather than loosening a tolerance"
     )
     assert nitrogen_gap < clock_gap, (
         f"read outside the cells the nitrogen gap is {nitrogen_gap:.2f}x against the run's own "

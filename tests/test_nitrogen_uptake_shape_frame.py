@@ -47,13 +47,16 @@ from fermentation.core.state import FloatArray
 from fermentation.parameters.store import default_data_dir, load_parameters
 from fermentation.runtime import simulate_scheduled
 from fermentation.scenario import compile_scenario
-from tests.test_defined_media import _assimilable_n_mgl, commensurate_scenario
+from tests.test_defined_media import (
+    HOUSE_PITCH_GPL,
+    SOURCED_PITCH_GPL,
+    _assimilable_n_mgl,
+    commensurate_scenario,
+)
 from tests.test_fusel_keto_acid_node import _OTHER_PRECURSOR_CONSUMERS
 from tests.test_nitrogen_timing_attribution import (
     CREPIN_DRY_WEIGHT_GPL,
     CREPIN_FINAL_BIOMASS_GPL,
-    SHIPPED_PITCH_GPL,
-    SOURCED_PITCH_GPL,
     _crepin_run,
 )
 
@@ -67,11 +70,11 @@ CREPIN_SHARE = {f: CREPIN_DRY_WEIGHT_GPL[f] / CREPIN_FINAL_BIOMASS_GPL for f in 
 
 #: The capacity that lands Crépin's half-nitrogen landmark, per pitch. NOT shipped — the shipped
 #: value is 1.0 and this file does not move it. Measured on the grid in :func:`sweep`.
-LANDING_R = {SHIPPED_PITCH_GPL: 3.9, SOURCED_PITCH_GPL: 2.65}
+LANDING_R = {HOUSE_PITCH_GPL: 3.9, SOURCED_PITCH_GPL: 2.65}
 
 #: The grid each pitch is read on. 1000 is D-249 §4's own saturation point, kept so the
 #: total-frame flatness claim is made against the same extreme that record used.
-GRID = {SHIPPED_PITCH_GPL: (1.0, 2.0, 3.9, 5.0, 1000.0), SOURCED_PITCH_GPL: (1.0, 2.65)}
+GRID = {HOUSE_PITCH_GPL: (1.0, 2.0, 3.9, 5.0, 1000.0), SOURCED_PITCH_GPL: (1.0, 2.65)}
 
 
 def _cross(t: FloatArray, series: FloatArray, level: float) -> float:
@@ -148,7 +151,7 @@ def test_read_in_the_frame_crepin_SAMPLED_two_fifths_of_the_front_loading_gap_is
     The total-frame numbers this asserts are D-249's own pinned 0.543/0.777, re-derived rather
     than quoted, so the two files cannot drift apart on the baseline.
     """
-    shares = sweep[(SHIPPED_PITCH_GPL, 1.0)]["shares"]
+    shares = sweep[(HOUSE_PITCH_GPL, 1.0)]["shares"]
 
     assert shares["total"][0.50] == pytest.approx(0.543, abs=0.01)
     assert shares["total"][0.75] == pytest.approx(0.777, abs=0.01)
@@ -169,7 +172,7 @@ def test_read_in_the_frame_crepin_SAMPLED_two_fifths_of_the_front_loading_gap_is
             "store is empty or is being counted on the wrong side and this whole file is void"
         )
 
-    assert sweep[(SHIPPED_PITCH_GPL, 1.0)]["store_share"] > 0.10, (
+    assert sweep[(HOUSE_PITCH_GPL, 1.0)]["store_share"] > 0.10, (
         "the two frames can only differ while the store holds something — at 16.3 % of the "
         "must's nitrogen it does, and this is the non-vacuity arm for every comparison above"
     )
@@ -184,8 +187,8 @@ def test_in_the_TOTAL_frame_the_capacity_knob_is_INVISIBLE_which_is_why_d249_saw
     the third decimal. The knob moves nitrogen between the medium and the store, and the total
     frame is blind to that transfer by construction — it counts both sides.
     """
-    lo = sweep[(SHIPPED_PITCH_GPL, 1.0)]["shares"]["total"]
-    hi = sweep[(SHIPPED_PITCH_GPL, 1000.0)]["shares"]["total"]
+    lo = sweep[(HOUSE_PITCH_GPL, 1.0)]["shares"]["total"]
+    hi = sweep[(HOUSE_PITCH_GPL, 1000.0)]["shares"]["total"]
 
     for landmark in (0.50, 0.75):
         assert abs(hi[landmark] - lo[landmark]) < 0.005, (
@@ -194,8 +197,8 @@ def test_in_the_TOTAL_frame_the_capacity_knob_is_INVISIBLE_which_is_why_d249_saw
             "reason D-249's sweep could not see the knob"
         )
 
-    medium_lo = sweep[(SHIPPED_PITCH_GPL, 1.0)]["shares"]["medium"][0.50]
-    medium_hi = sweep[(SHIPPED_PITCH_GPL, 1000.0)]["shares"]["medium"][0.50]
+    medium_lo = sweep[(HOUSE_PITCH_GPL, 1.0)]["shares"]["medium"][0.50]
+    medium_hi = sweep[(HOUSE_PITCH_GPL, 1000.0)]["shares"]["medium"][0.50]
     assert medium_lo - medium_hi > 0.30, (
         "the same 1000× in the MEDIUM frame must move the half-nitrogen share by a lot "
         f"(0.412 → 0.091 when measured); it moved {medium_lo - medium_hi:.3f}. Without this arm "
@@ -217,7 +220,7 @@ def test_the_shipped_knob_REACHES_crepins_landmark_inside_its_own_declared_band(
         "band's edges are load-bearing literals here"
     )
 
-    for pitch in (SHIPPED_PITCH_GPL, SOURCED_PITCH_GPL):
+    for pitch in (HOUSE_PITCH_GPL, SOURCED_PITCH_GPL):
         grid = sorted(GRID[pitch])
         shares = [sweep[(pitch, r)]["shares"]["medium"][0.50] for r in grid]
         assert all(b < a for a, b in zip(shares, shares[1:], strict=False)), (
@@ -253,7 +256,7 @@ def test_one_capacity_lands_BOTH_discriminating_landmarks_and_their_RATIO(sweep)
     This is the anti-D-98 arm: the record is entitled to say the form reproduces her landmarks
     only while the *second* landmark and the ratio come along uninvited.
     """
-    for pitch, expected in ((SHIPPED_PITCH_GPL, 1.648), (SOURCED_PITCH_GPL, 1.701)):
+    for pitch, expected in ((HOUSE_PITCH_GPL, 1.648), (SOURCED_PITCH_GPL, 1.701)):
         shares = sweep[(pitch, LANDING_R[pitch])]["shares"]["medium"]
 
         assert shares[0.75] == pytest.approx(CREPIN_SHARE[0.75], abs=0.015), (
@@ -322,14 +325,14 @@ def test_the_front_loading_is_PAID_FOR_in_stored_nitrogen_at_the_cell_N_ceiling(
         "measured against a different cell"
     )
 
-    shipped = structural + sweep[(SHIPPED_PITCH_GPL, 1.0)]["quota_max"]
+    shipped = structural + sweep[(HOUSE_PITCH_GPL, 1.0)]["quota_max"]
     assert shipped == pytest.approx(0.083, abs=0.005)
     assert shipped < ceiling.value, (
         "at the SHIPPED capacity the cells must stay below the N-replete reference — this is the "
         "control that makes the ceiling pressure below a property of the calibration"
     )
 
-    for pitch, expected in ((SHIPPED_PITCH_GPL, 0.1391), (SOURCED_PITCH_GPL, 0.1371)):
+    for pitch, expected in ((HOUSE_PITCH_GPL, 0.1391), (SOURCED_PITCH_GPL, 0.1371)):
         reading = sweep[(pitch, LANDING_R[pitch])]
         loaded = structural + reading["quota_max"]
         assert loaded == pytest.approx(expected, abs=0.005), (
