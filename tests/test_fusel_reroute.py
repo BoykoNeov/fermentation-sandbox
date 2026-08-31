@@ -513,8 +513,15 @@ def test_the_kic_branch_cannot_source_more_isoamyl_than_is_being_made(full_param
 #: Rollero *et al.* 2017's own SM250 condition - 250 mg N/L, 24 C. The enrichments below are
 #: quoted against that paper, so the probe must run on a COMMENSURATE must (D-104's lesson,
 #: where a ~470 mg N/L probe flattered the model against a 180 mg N/L source). **Since D-255 it
-#: does**: the number below is the paper's own headline, in the paper's own frame, and
-#: :func:`_rollero_run` builds his medium at it rather than approximating it with a dose.
+#: does**: :func:`_rollero_run` builds his medium at this nitrogen rather than approximating it
+#: with a dose.
+#:
+#: **THIS IS THE PAPER'S FRAME AND IT IS NOT WHAT THE SCENARIO DECLARES.** 250 is Rollero's own
+#: headline, counted his way (Arg 3 N, Trp 1, His 1, proline excluded), which is the frame a %YAN
+#: table is written in. It is passed as ``yan_paper_mgn``, and
+#: :func:`~tests.test_defined_media.commensurate_pools` converts to the model's every-atom frame,
+#: so the compiled scenario declares ``yan_mgl`` **279.3**, not 250. The two frames are the
+#: D-243/D-248 conflation and the gap is real, not rounding - do not "fix" one to the other.
 _ROLLERO_YAN = 250.0
 
 #: What Rollero measures, and the ONLY thing this beat may be scored against.
