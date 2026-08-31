@@ -181,9 +181,12 @@ unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings
     with the store transiently holding 35-41 % of the must's nitrogen. It spends essentially the
     whole band, at BOTH pitches, and the landing capacity is **not pitch-invariant** (3.9 vs 2.65
     across 6.25x of inoculum), so it inherits the unsourced pitch D-249 flagged.
-    **Cost measured, not estimated**: full suite at r = 3.5 is **3 failed / 2033 passed** — no
-    fusel guard, no Coleman yield, no propanol floor, no Minebois share, no benchmark; all three
-    are r = 1 values pinned by D-249/D-250.
+    **Cost measured AT THE RECOMMENDED CAPACITY**: full suite at r = 3.9 is **2 failed / 2041
+    passed** — no fusel guard, no Coleman yield, no propanol floor, no Minebois share, no
+    benchmark; BOTH are r = 1 values pinned by D-249/D-250. **The first pricing was taken at
+    r = 3.5, a value nobody recommends, and mis-classed its third failure as a re-pin** — it
+    was `assert_nonnegative`'s 1e-9 tolerance dip, which does not fire at 3.9 at all. Price a
+    calibration at the value you would ship, and class every failure before calling it a cost.
   - **D-248 §10 stays REFUSED and D-250 did NOT unblock it.** A Droop-style quota needs the
     store's contents to feed back into the uptake RATE; D-250 built a compartment uptake fills and
     growth draws from, and the rate still reads nothing about it. Re-opening §10 is the owner's
@@ -200,5 +203,5 @@ D-248: `d248-nitrogen-uncoupling\` — `measure.py` (the 200x sweep), `probe_res
 `probe_frame.py` + `probe_cancel.py` (the refusal), and the `fix_*.py` / `rewrite_*.py` edits.
 D-251: `d251-nitrogen-uptake-shape/` - `probe_shape.py` (both frames x the sweep),
 `probe_quota.py`, `probe_ceiling.py`, `probe_landing.py` (the landing capacity per
-pitch), `probe_undershoot.py` (the tolerance scaling), `suite_r3.5.txt` (the mutated
+pitch), `probe_undershoot.py` (the tolerance scaling), `suite_r3.5.txt` + `suite_r3.9.txt` (the mutated
 full run), and `snapshot/` (the restore arms).

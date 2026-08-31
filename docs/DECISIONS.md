@@ -35772,20 +35772,22 @@ Nitrogen taken up ahead of anabolic need has to sit somewhere. `biomass_N_fracti
 
 Landing Crépin's landmarks makes the cells carry **0.137–0.139 g N/g DW** — past the reference value by 20 % and within 0.001–0.003 of the band's own top edge, at **both** pitches. It is admissible on the letter of the band and it spends essentially all of it. **And the landing capacity is not pitch-invariant** (3.9 against 2.65 across a 6.25× inoculum change), so a calibration taken today inherits the unsourced pitch D-249 flagged. Two reasons the trade is the owner's, not a beat's.
 
-### 5. The cost of taking it is measured, not estimated
+### 5. The cost is measured at the capacity actually recommended, and the first pricing got the failure CLASS wrong
 
-Full suite with the shipped value mutated to 3.5, snapshot-restored and byte-checked: **3 failed, 2033 passed**. No fusel guard, no Coleman-yield guard, no propanol floor, no Minebois share and no benchmark moves — consistent with D-248's insensitivity finding, which was about *extent*. All three are `r = 1` values pinned by the last two records: D-249's nitrogen gap 1.59 → 1.67, D-250's extracellular gap 1.71 → 1.83, and the nonnegativity dip of §6. So the calibration costs three re-pins and a tolerance, not a repair.
+Full suite with the shipped value mutated to **3.9** — the capacity §3 lands on — then snapshot-restored and byte-checked (`9ac5289f8cac61e21d60daba04eee0b4`): **2 failed, 2041 passed, 6 xfailed**. No fusel guard, no Coleman-yield guard, no propanol floor, no Minebois share and no benchmark moves — consistent with D-248's insensitivity finding, which was about *extent*. **Both** failures are `r = 1` values pinned by the last two records: D-249's nitrogen gap 1.59 → 1.67 (`test_the_nitrogen_channel_is_SLOWER_than_the_run_containing_it_at_both_pitches`) and D-250's extracellular gap 1.71 → 1.84 (`test_the_extracellular_reading_is_now_separable_and_d249s_verdict_survives_it`). The calibration costs **two re-pins**, not a repair.
+
+**The first draft of this section priced a capacity nobody recommends, and mis-classed what failed.** It ran the suite at `r = 3.5` — mutated before the landing capacity had been measured — read **3 failed / 2033 passed** (2036 collected: that run predates this record's own seven tests), and called all three re-pins. The third was not a re-pin: it was `assert_nonnegative` tripping on the `stored_nitrogen` dip of §6, a solver-noise excursion sitting a factor of two from a 1e-9 boundary, and it does **not** fire at 3.9. A tolerance crossing is not a price. Both runs are kept here because the difference between them is the point: **a cost table is only a cost table at the value being recommended, and a failure count is not a price until every entry in it has been classed.**
 
 ### 6. The store's nonnegativity dip is solver noise, and it is already there at the shipped capacity
 
-The mutated run tripped `stored_nitrogen went negative: -1.910e-09`. Growth's draw is split between `N` and the store in proportion to what each holds, so the store's share of the draw vanishes as the store empties and no over-draw is possible by construction. The falsifiable consequence is that the dip must scale with **solver tolerance** and not with capacity. Measured on Crépin's must:
+The `r = 3.5` run of §5 tripped `stored_nitrogen went negative: -1.910e-09` at t = 53.1 h; the `r = 3.9` run does not trip it at all. Growth's draw is split between `N` and the store in proportion to what each holds, so the store's share of the draw vanishes as the store empties and no over-draw is possible by construction. The falsifiable consequence is that the dip must scale with **solver tolerance** and not with capacity. Measured on Crépin's must:
 
 | | `rtol` 1e-6 | 1e-8 | 1e-10 |
 |---|---|---|---|
 | `r = 1` (**shipped**) | **−2.34e-9** | −5.3e-13 | −4.0e-20 |
 | `r = 3.5` | −1.59e-9 | −2.4e-12 | −1.8e-15 |
 
-Eleven orders for four of tolerance, and **the shipped capacity's dip is the larger of the two**. So this is not a property of the calibration at all: `assert_nonnegative`'s 1e-9 default is already within a factor of two of firing on shipped parameters, and no shipped test happens to integrate a trajectory where it does. A tolerance calibration, recorded rather than changed — the guard's atol is not this beat's to move.
+Eleven orders for four of tolerance, and **the shipped capacity's dip is the larger of the two** — while at the recommended 3.9 the guard does not fire at all, which is the clearest statement available that the excursion tracks the integrator rather than the knob. So this is not a property of the calibration at all: `assert_nonnegative`'s 1e-9 default is already within a factor of two of firing on shipped parameters, and no shipped test happens to integrate a trajectory where it does. A tolerance calibration, recorded rather than changed — the guard's atol is not this beat's to move.
 
 ### 7. What is NOT settled, so a later beat does not read this as more than it is
 
@@ -35793,7 +35795,7 @@ Eleven orders for four of tolerance, and **the shipped capacity's dip is the lar
 
 **D-248 §10 stays refused and is NOT re-opened.** A Droop-style quota needs the store's contents to feed back into the uptake *rate*, and that feedback is precisely the brake §10 refused and D-249 §5 called inert on this observable. D-250 built a compartment uptake fills and growth draws from; it did **not** make the rate read it. Re-opening §10 is the owner's call, and this record does not make it.
 
-**The calibration itself is the owner's trade**, priced above: `r` 1.0 → ~3.9 (or ~2.65 at the sourced pitch), three re-pinned numbers, cells at the top of the elemental band, and a value that inherits an inoculum nobody published.
+**The calibration itself is the owner's trade**, priced above: `r` 1.0 → ~3.9 (or ~2.65 at the sourced pitch), two re-pinned numbers, cells at the top of the elemental band, and a value that inherits an inoculum nobody published.
 
 ### 8. What is pinned
 

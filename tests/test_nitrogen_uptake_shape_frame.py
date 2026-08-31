@@ -75,7 +75,12 @@ GRID = {SHIPPED_PITCH_GPL: (1.0, 2.0, 3.9, 5.0, 1000.0), SOURCED_PITCH_GPL: (1.0
 
 
 def _cross(t: FloatArray, series: FloatArray, level: float) -> float:
-    """Interpolated first crossing — D-249's own idiom, so the two files' hours are comparable."""
+    """Interpolated first crossing of a RISING series — D-249's idiom, restricted.
+
+    That file's ``_Course._cross`` also handles a falling series (it reads sugar); this one
+    only ever sees a consumed-fraction, so the falling branch is dropped rather than carried
+    untested. The two agree on the rising case, which is the one both files compare hours on.
+    """
     hit = np.nonzero(series >= level)[0]
     assert hit.size, f"the run never reaches {level}"
     i = int(hit[0])
@@ -95,7 +100,10 @@ def _read(pitch: float, r: float) -> dict[str, Any]:
 
     frames = {
         "total": 1.0 - total / total[0],
-        # What a sample of Crépin's medium would have contained: the store is inside the cells.
+        # What a sample of Crépin's medium would have contained: the store is inside the
+        # cells. ``store[0]`` is zero on every scenario this repo compiles — nothing seeds a
+        # pre-loaded store — but it is subtracted explicitly so the denominator stays the
+        # medium's own initial nitrogen if one ever is, rather than changing meaning silently.
         "medium": 1.0 - (total - store) / (total[0] - store[0]),
     }
     shares = {
