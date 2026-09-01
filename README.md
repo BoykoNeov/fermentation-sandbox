@@ -58,16 +58,43 @@ benchmarks are encoded as skipped tests waiting for the kinetics.
 fermentation; pass the wine (~24 °Brix → dry in 10–14 days) and beer (~1.048 OG
 → ~1.010 in 5–7 days) benchmarks. See [`docs/plans/`](docs/plans/).
 
-## Getting started
+## Running it
 
-Requires Python ≥ 3.13 and [uv](https://docs.astral.sh/uv/).
+The console is the way in: a local page where you describe a batch, run it, and follow any
+line on the chart back to the papers the numbers came from. It runs entirely on your own
+machine and uploads nothing.
+
+**Windows** — double-click `start-console.cmd`.
+**macOS / Linux** — run `./start-console.sh`.
+
+Either one checks what is needed, installs the interface dependencies on first use, picks a
+port that is free, and opens the page in your browser. The first start takes a minute or two
+while the pieces are downloaded; after that it is a few seconds. Leave the terminal window
+open while you use it — closing it shuts the console down.
+
+The only thing to install first is [uv](https://docs.astral.sh/uv/getting-started/installation/),
+which fetches the right Python (≥ 3.13) and everything else by itself. The launcher says so
+if it is missing; it will not install anything for you.
+
+The equivalent typed by hand, if you would rather:
 
 ```bash
-uv sync                  # create the venv and install deps (incl. dev tools)
-uv run pytest            # run the test suite
-uv run ruff check .      # lint
-uv run ruff format .     # format
-uv run mypy              # type-check
+uv sync --group ui
+uv run streamlit run app/main.py
+```
+
+The console is optional and separate: a plain `uv sync` still installs a four-dependency
+research library with no interface code in it. See [`app/README.md`](app/README.md) for what
+the page shows and why it is arranged that way.
+
+## Working on the code
+
+```bash
+uv sync                 # create the venv and install deps (incl. dev tools)
+uv run pytest -n auto   # the full test suite, in parallel
+uv run ruff check .     # lint
+uv run ruff format .    # format
+uv run mypy             # type-check
 ```
 
 Benchmarks (skipped until kinetics land) are marked; run only them with:
@@ -75,19 +102,6 @@ Benchmarks (skipped until kinetics land) are marked; run only them with:
 ```bash
 uv run pytest -m benchmark
 ```
-
-### The console
-
-There is a local app for building a batch, running it, and following any line on the
-chart back to the papers the numbers came from. It is optional and installs nothing by
-default — the packaged library remains four runtime dependencies with no interface code.
-
-```bash
-uv sync --group ui
-uv run streamlit run app/main.py
-```
-
-See [`app/README.md`](app/README.md).
 
 ## License
 

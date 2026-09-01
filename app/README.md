@@ -3,13 +3,23 @@
 A local app for describing a batch, running it, and seeing how far the answer can be
 trusted. It sits above the engine and the engine never knows it exists.
 
+Double-click `start-console.cmd` (Windows) or run `./start-console.sh` (macOS, Linux). Either
+one installs what the interface needs, finds a port nothing else is using, and opens the page.
+The equivalent typed by hand is:
+
 ```bash
 uv sync --group ui
 uv run streamlit run app/main.py
 ```
 
 It opens in a browser at `http://localhost:8501`. Nothing is uploaded anywhere; the whole
-thing runs on this machine.
+thing runs on this machine. That includes the framework's own usage telemetry, which
+`.streamlit/config.toml` turns off, so the sentence holds however the console was started.
+
+A written report lands in `Fermentation Console` under your `Documents` folder — or under your
+home directory where there is no `Documents` — and `FERMENTATION_CONSOLE_REPORTS` moves it. The
+location used to be a constant naming a drive that exists on one machine in the world, which
+made *Write it* raise on every other one.
 
 ## Why it exists
 
@@ -45,6 +55,7 @@ Hence the two things it is built around, and one it is built to avoid:
 | `report.py` | One run written to a single self-contained HTML file. |
 | `fidelity.py` | The three separate things people call "fidelity". |
 | `library.py` | Starter batches, and the form metadata read from the engine's own tables. |
+| `start_console.py` | What the double-clickable wrappers call: dependency check, free port, browser. |
 
 ## Three things that will bite an editor
 

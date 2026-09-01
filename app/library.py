@@ -95,8 +95,62 @@ INPUT_LABELS: dict[str, str] = {
 }
 
 
+#: One plain sentence per input, shown on the form's own help icon. These describe what the
+#: quantity *is* and what a normal batch looks like; they are presentation, not constraint.
+#: Nothing here narrows what the engine accepts — a range invented in the interface would be
+#: a number with no source behind it, which is precisely what the parameter store forbids.
+#: A key missing here simply gets no help icon, which is a visible gap rather than a wrong one.
+INPUT_HELP: dict[str, str] = {
+    "brix": "How sweet the juice is before fermenting, on the scale a refractometer reads. "
+    "Most wine is picked between 20 and 26; higher means more alcohol at the end, and a "
+    "harder job for the yeast.",
+    "yan_mgl": "The part of the nitrogen in the juice that yeast can actually eat. It is the "
+    "usual reason a ferment stalls: comfortable is 200-300, and under about 150 the yeast "
+    "runs short before the sugar does.",
+    "pitch_gpl": "How much dried yeast goes in per litre. Winemaking is usually 0.25-0.5, "
+    "brewing rather more. More yeast starts faster but does not change where it finishes.",
+    "initial_ph": "How acidic it starts out. Wine sits near 3.0-3.8, wort near 5.0-5.5. It "
+    "affects how the yeast works and how much of the sulfur dioxide is doing anything.",
+    "tartaric_gpl": "The main acid of grapes, and the one that decides most of the pH. "
+    "Typically 4-8 g/L in juice.",
+    "malic_gpl": "The sharp apple acid. Cool years leave more of it; a malolactic culture "
+    "later converts it to the softer lactic acid.",
+    "so2_total_mgl": "Sulfur dioxide added at the crusher, the standard antioxidant and "
+    "antimicrobial. Commonly 30-60 mg/L. Only the small free fraction does the work.",
+    "glucose_gpl": "The simple sugar in wort. Yeast eats this first, before the maltose.",
+    "maltose_gpl": "The main sugar in wort, and most of the eventual alcohol. Usually the "
+    "largest of the three by far.",
+    "maltotriose_gpl": "The slowest of the three wort sugars, taken up last and often left "
+    "partly behind — which is where a lot of the sweetness in a finished beer comes from.",
+    "o2_mgl": "Oxygen dissolved into the wort when the yeast goes in. Brewers aerate on "
+    "purpose, to around 8-10 mg/L; the yeast needs it to build cell membranes.",
+    "mlf_pitch_gpl": "Malolactic bacteria, which convert the sharp malic acid to softer "
+    "lactic acid. A very small dose does it.",
+    "citrate_gpl": "Citric acid — a minor acid in grapes, sometimes added.",
+    "copper_gpl": "Copper already in the juice. It is the fining for the rotten-egg smell, "
+    "and also the metal that drives browning, so it cuts both ways.",
+    "peptide_buffer_gpl": "Short protein fragments in wort that resist pH change. They are "
+    "why a beer's pH falls less than the acid made would suggest.",
+    "amino_acids_gpl": "The nitrogen the yeast eats, counted as the amino acids themselves "
+    "rather than as one lump. Also the raw material for much of the aroma.",
+    "anthocyanin_gpl": "Red grape pigment. A white must has none, which is why the colour "
+    "chart is empty for one.",
+    "tannin_gpl": "The compounds from skins, seeds and oak that taste astringent and that "
+    "bind pigment as the wine ages.",
+    "carrying_capacity_gpl": "A ceiling on how much yeast the batch can hold, whatever else "
+    "is available. Left at zero, the model works it out instead.",
+    "ethanol_gpl": "Alcohol already present at the start — for a batch being restarted, or "
+    "one that has been fortified.",
+}
+
+
 def input_label(key: str) -> str:
     return INPUT_LABELS.get(key, key.replace("_gpl", "").replace("_mgl", "").replace("_", " "))
+
+
+def input_help(key: str) -> str | None:
+    """The help sentence for an input, or ``None`` where there is nothing to say yet."""
+    return INPUT_HELP.get(key)
 
 
 def input_unit(key: str) -> str:

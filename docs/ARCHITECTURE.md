@@ -45,6 +45,11 @@ repository and is held to the same lint, type and test gates. Its dependencies (
 Plotly) sit in the `ui` dependency group, so `uv sync` alone does not install them; run
 `uv sync --group ui` for the app. See `app/README.md`.
 
+The two launchers at the repo root — `start-console.cmd` and `start-console.sh` — are the only
+files outside `app/` that belong to this layer. They are wrappers: check for `uv`, let it
+install the `ui` group, then hand over to `app/start_console.py`, which chooses a port nothing
+is answering on and opens the browser. Nothing in them installs anything system-wide.
+
 ### Package map
 
 | Layer | Package | Contents |
@@ -57,7 +62,7 @@ Plotly) sit in the `ui` dependency group, so `uv sync` alone does not install th
 | validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `total_carbon`, `total_nitrogen`, `total_mass`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
 | analysis | `fermentation.analysis` | `ph_series`, `titratable_acidity_series`, `molecular_so2_series`, `free_so2_series`, `bound_so2_series`, `ibu_series`, `astringency_series`, `polymeric_pigment_series`, `color_series`, `observed_color_series`, `attribute_spread` |
 | sensory | `fermentation.sensory` | `oav_series`, `sensory_profile`, `oav_tier`, `load_thresholds`, `AROMA_COMPOUNDS`; `MaxRuleProjector`/`DescriptorProjector`; `StevensProjector`, `dominant_flip_sensitivity` |
-| app | `app` (top level, not packaged) | `main` (the Streamlit page, the only Streamlit importer); `render` (framework-free figures/panels); `readouts`, `runner`, `provenance`, `report`, `fidelity`, `library` |
+| app | `app` (top level, not packaged) | `main` (the Streamlit page, the only Streamlit importer); `render` (framework-free figures/panels); `readouts`, `runner`, `provenance`, `report`, `fidelity`, `library`; `start_console` (what the root launchers call) |
 
 ## The core
 

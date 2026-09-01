@@ -19,3 +19,9 @@ primaryColor = "#d4718f"
 backgroundColor = "#141310"
 secondaryBackgroundColor = "#211e19"
 textColor = "#ece7df"
+
+# Nothing about a run leaves this machine. The framework's own usage telemetry is off here
+# rather than only on the launcher's command line, so the promise holds however the console
+# is started -- including the documented `uv run streamlit run app/main.py`.
+[browser]
+gatherUsageStats = false

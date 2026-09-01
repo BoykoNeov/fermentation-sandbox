@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 import html
+import os
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -22,6 +23,28 @@ from app import provenance, readouts, render
 from app.render import Theme
 from app.runner import ConvergenceCheck, RunResult
 from fermentation.core.tiers import Tier
+
+#: Environment variable that moves the written reports somewhere else.
+REPORT_DIR_ENV = "FERMENTATION_CONSOLE_REPORTS"
+
+
+def default_report_dir() -> Path:
+    """Where a written report lands when nobody has said otherwise.
+
+    This is a constant inside software other people run, so it may not name a drive that
+    exists only on the machine it was written on. It used to name one, and on every other
+    machine the *Write it* button raised before it wrote a byte — the failure landing on the
+    one user least able to read it. The home directory is the single location every platform
+    agrees exists and every user can find; ``Documents`` is preferred where it is present
+    because that is where a person goes looking for a file they made.
+    """
+    override = os.environ.get(REPORT_DIR_ENV, "").strip()
+    if override:
+        return Path(override).expanduser()
+    home = Path.home()
+    documents = home / "Documents"
+    return (documents if documents.is_dir() else home) / "Fermentation Console"
+
 
 #: Page tokens per ground, matched to ``render.LIGHT`` / ``render.DARK``.
 #:

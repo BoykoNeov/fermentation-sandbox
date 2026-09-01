@@ -56,6 +56,7 @@ from app.library import (  # noqa: E402
     VERBS,
     allowed_initial_keys,
     gate_problems,
+    input_help,
     input_label,
     input_unit,
 )
@@ -70,7 +71,10 @@ from app.runner import (  # noqa: E402
 from fermentation.analysis import attribute_spread  # noqa: E402
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint  # noqa: E402
 
-REPORT_DIR = Path(r"M:\claud_projects\temp\ferm-ui")
+#: Where *Write it* puts the file. A home-relative folder, chosen in :mod:`app.report` so it
+#: is testable without a browser, and overridable with an environment variable for anyone who
+#: keeps their working files elsewhere.
+REPORT_DIR = report.default_report_dir()
 
 #: Sampling strategies, named for what they do rather than for their acronyms.
 SAMPLERS: dict[str, str] = {
@@ -164,6 +168,8 @@ if "loaded_starter" not in st.session_state:
     st.session_state.loaded_starter = None
 if "editor_epoch" not in st.session_state:
     st.session_state.editor_epoch = 0
+if "seen_intro" not in st.session_state:
+    st.session_state.seen_intro = False
 
 
 def seed_state(key: str, value: object) -> None:
@@ -269,6 +275,7 @@ with st.sidebar:
                 step=0.1,
                 format="%.4g",
                 key=f"{prefix}_{key}",
+                help=input_help(key),
             )
 
         seed_state("duration", 14.0)
@@ -336,13 +343,14 @@ with st.sidebar:
         spec = VERB_SPECS.get(verb)
         if spec and spec.note:
             st.caption(spec.note)
-        day = st.number_input("On day", min_value=0.0, value=1.0, step=0.5, key="new_day")
+        seed_state("new_day", 1.0)
+        day = st.number_input("On day", min_value=0.0, step=0.5, key="new_day")
         params: dict[str, float | str] = {}
         if spec:
             for pname, plabel, punit, pdefault in spec.numbers:
+                seed_state(f"np_{verb}_{pname}", float(pdefault))
                 params[pname] = st.number_input(
                     f"{plabel}" + (f" [{punit}]" if punit else ""),
-                    value=float(pdefault),
                     step=0.01,
                     format="%.4g",
                     key=f"np_{verb}_{pname}",
@@ -356,66 +364,78 @@ with st.sidebar:
             st.rerun()
 
     # -- settings: three separate things, never one slider ---------------------------------
+    #
+    # Collapsed, because none of it is needed to run a batch and the sight of solver
+    # tolerances is what makes a first-time reader close the page. Collapsed is not hidden: a
+    # widget inside a closed expander is still created on every run and still holds its value,
+    # so all three settings are live whether or not anyone opens the section.
+    #
+    # What must NOT happen here is the obvious "make it friendlier" move — folding these into
+    # one Quality slider. They are three genuinely different things and only the third can
+    # move the answer towards or away from reality; one slider would quietly claim otherwise.
+    # The chemistry choice had an expander of its own, and expanders cannot nest, so it is a
+    # marked-off subsection instead — same emphasis, carried in words.
     st.markdown("---")
-    st.markdown("### How hard to work at it")
-    st.caption(
-        "Three different things get called accuracy. They are kept apart here because only "
-        "the last one changes what is actually being modelled."
-    )
+    with st.expander("Settings — how hard to work at it, and which chemistry to include"):
+        st.caption(
+            "Nothing here needs touching to run a batch. Three different things get called "
+            "accuracy, and they are kept apart because only the last one changes what is "
+            "actually being modelled."
+        )
 
-    precision = st.select_slider(
-        "How carefully to do the maths",
-        options=[*PRECISION_ORDER, "custom"],
-        value=st.session_state.get("precision", "standard"),
-        key="precision",
-        help="This makes the calculation more exact, not more realistic. It answers one "
-        "question: has the answer stopped moving?",
-    )
-    st.caption(PRECISION_BLURB[precision])
+        seed_state("precision", "standard")
+        precision = st.select_slider(
+            "How carefully to do the maths",
+            options=[*PRECISION_ORDER, "custom"],
+            key="precision",
+            help="This makes the calculation more exact, not more realistic. It answers one "
+            "question: has the answer stopped moving?",
+        )
+        st.caption(PRECISION_BLURB[precision])
 
-    if precision == "custom":
-        method = st.selectbox("Method", METHODS, index=0)
-        if method == "RK45":
-            st.warning(
-                "RK45 is not built for a problem where very fast and very slow chemistry run "
-                "side by side, and fermentation always is. Expect it to crawl or give up. It "
-                "is here to diagnose, not to use."
+        if precision == "custom":
+            method = st.selectbox("Method", METHODS, index=0)
+            if method == "RK45":
+                st.warning(
+                    "RK45 is not built for a problem where very fast and very slow chemistry run "
+                    "side by side, and fermentation always is. Expect it to crawl or give up. It "
+                    "is here to diagnose, not to use."
+                )
+            rtol = st.number_input("Relative tolerance", value=1e-6, format="%.1e")
+            atol = st.number_input("Absolute tolerance", value=1e-9, format="%.1e")
+            cap_step = st.checkbox(
+                "Limit how big a step it may take",
+                value=False,
+                help="The method already chooses its own step sizes, so a limit almost never "
+                "changes the answer and always costs time. Here for the rare case where it does.",
             )
-        rtol = st.number_input("Relative tolerance", value=1e-6, format="%.1e")
-        atol = st.number_input("Absolute tolerance", value=1e-9, format="%.1e")
-        cap_step = st.checkbox(
-            "Limit how big a step it may take",
-            value=False,
-            help="The method already chooses its own step sizes, so a limit almost never "
-            "changes the answer and always costs time. Here for the rare case where it does.",
-        )
-        max_step = (
-            st.number_input("Largest step (hours)", value=1.0, min_value=1e-3)
-            if cap_step
-            else float("inf")
-        )
-        fidelity_kwargs = {
-            "precision": "custom",
-            "method": method,
-            "rtol": rtol,
-            "atol": atol,
-            "max_step": max_step,
-        }
-    else:
-        rtol, atol = PRECISION_PRESETS[precision]
-        fidelity_kwargs = {"precision": precision, "method": "BDF", "rtol": rtol, "atol": atol}
+            max_step = (
+                st.number_input("Largest step (hours)", value=1.0, min_value=1e-3)
+                if cap_step
+                else float("inf")
+            )
+            fidelity_kwargs = {
+                "precision": "custom",
+                "method": method,
+                "rtol": rtol,
+                "atol": atol,
+                "max_step": max_step,
+            }
+        else:
+            rtol, atol = PRECISION_PRESETS[precision]
+            fidelity_kwargs = {"precision": precision, "method": "BDF", "rtol": rtol, "atol": atol}
 
-    points = st.select_slider(
-        "How many points to keep",
-        options=list(POINT_CHOICES),
-        value=st.session_state.get("points", 200),
-        key="points",
-        help="How much of the run gets stored for the charts. It does not change the answer "
-        "at all, only how smooth the lines look. It is shared with the uncertainty band, "
-        "which can only combine its re-runs if they all land on the same points.",
-    )
+        seed_state("points", 200)
+        points = st.select_slider(
+            "How many points to keep",
+            options=list(POINT_CHOICES),
+            key="points",
+            help="How much of the run gets stored for the charts. It does not change the answer "
+            "at all, only how smooth the lines look. It is shared with the uncertainty band, "
+            "which can only combine its re-runs if they all land on the same points.",
+        )
 
-    with st.expander("Which chemistry to include — the setting that changes the answer"):
+        st.markdown("**Which chemistry to include — the setting that changes the answer**")
         st.caption(
             "The two above change how hard the machine works. This one changes what is being "
             "modelled, so it is the only one that can move the result towards or away from "
@@ -493,6 +513,48 @@ except Exception as exc:  # surfaced rather than crashed
     scenario_error = str(exc)
 
 st.title("Fermentation Console")
+st.markdown(
+    "**A batch of wine or beer, fermented on this machine instead of in a tank.** "
+    "Describe what goes in, and the model works out what happens to it day by day — and "
+    "says how far each answer can be trusted."
+)
+
+# The page arrives with a batch already run, so someone who reads nothing still sees the
+# thing working. This is for the reader who does not yet know that the left-hand column is
+# the batch. It is open until it is dismissed, and dismissing it lasts for the session — the
+# next visit is a fresh session, and a first-time reader is exactly who this is for.
+with st.expander("New here? Start with this", expanded=not st.session_state.seen_intro):
+    left, right = st.columns(2)
+    left.markdown(
+        "**Running one**\n\n"
+        "1. The column on the left is the batch. It already holds a complete one, and the "
+        "charts below are that batch fermented.\n"
+        "2. **Start from** swaps in a different batch — a white wine, a red with a "
+        "malolactic step, a ferment that gets stuck, a pale ale, a lager.\n"
+        "3. Change any number you like — how sweet the juice is, how warm it is kept, how "
+        "long to follow it — and press **Apply and run**. Nothing is recalculated until you "
+        "do, so you can change ten things at once.\n"
+        "4. **Things you do to it** adds an event on a given day: a nutrient addition, a "
+        "racking, bottling."
+    )
+    right.markdown(
+        "**Reading it**\n\n"
+        # No count here on purpose: which headline numbers a batch gets is worked out from the
+        # run, so a sentence that says "the six numbers" is a claim the copy cannot keep.
+        "- The numbers across the top are where the batch ended up. The chart pairs below "
+        "show how it got there.\n"
+        "- Every quantity carries a mark saying how well founded it is. A **dashed** line is "
+        "drawn from published research; a **dotted** one uses at least one number the author "
+        "estimated; a **thin pale** line is something this run never touched at all.\n"
+        "- Nothing here has been checked against a real fermentation someone measured, and "
+        "the page says so wherever it matters. It is a model, and it is honest about being "
+        "one.\n"
+        "- The other tabs ask harder questions: how much the answer moves when the numbers "
+        "are uncertain, how two batches differ, and where every figure came from."
+    )
+    if not st.session_state.seen_intro and st.button("Got it — hide this"):
+        st.session_state.seen_intro = True
+        st.rerun()
 
 if scenario_error or scenario is None:
     st.error(f"This batch does not add up yet.\n\n{scenario_error}")
@@ -891,6 +953,7 @@ with tab_data:
         "vertical scale, which are written into the file as they are set right now rather "
         "than left to flip with whatever machine opens it."
     )
+    st.caption(f"It will be written into `{REPORT_DIR}`, which is created if it is not there.")
     explain_vars = st.multiselect(
         "Include the source tables for",
         sorted(result.touched_variables()),
@@ -908,7 +971,11 @@ with tab_data:
             theme=theme,
             log_y=log_y,
         )
-        st.success(f"Saved to {path}")
+        st.success(f"Saved on this machine as:\n\n`{path}`")
+        st.caption(
+            "Double-click that file to open it in a browser. The button below saves a second "
+            "copy wherever your browser puts downloads, if that is easier to find."
+        )
         st.download_button(
             "Download it", data=path.read_bytes(), file_name=path.name, mime="text/html"
         )

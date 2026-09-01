@@ -667,3 +667,175 @@ def test_the_keep_this_run_box_gets_a_fresh_key_per_batch() -> None:
     assert len(keys) == 1, "expected exactly one 'Keep this run as' widget"
     assert not isinstance(keys[0], ast.Constant), "a constant key freezes the box"
     assert "scenario.name" in ast.unparse(keys[0])
+
+
+# -- starting it, and where it puts what it writes ------------------------------------------
+#
+# The console was easy to start on exactly one machine. These pin the two ways that was true:
+# a written report went to a folder named after a drive letter that exists here and nowhere
+# else, and a taken port produced a one-line framework error and no console.
+
+
+def test_no_shipped_interface_code_names_an_absolute_path() -> None:
+    """No file under ``app/`` may contain an absolute filesystem path.
+
+    ``REPORT_DIR`` named a folder on drive ``M:``, and ``report.write`` creates the
+    folder it is given, so *Write it* raised on every machine without that drive -- in front
+    of the user least equipped to read the traceback. The class of bug is "a location that is
+    true on the machine it was written on", so the guard is on the class, not on that one
+    constant: a path a user's machine must already have cannot be written down in code that
+    ships to other machines. It has to be derived at runtime, as ``default_report_dir`` does.
+
+    Scanned as text rather than as an AST because a drive letter is just as wrong inside a
+    comment: it would be documenting the same false location.
+    """
+    import pathlib
+    import re
+
+    app_dir = pathlib.Path(__file__).resolve().parents[1] / "app"
+    # The lookbehind is what keeps ``http://localhost`` out of it: a URL's scheme ends in a
+    # letter, a drive letter never follows one.
+    absolute = re.compile(r"(?<![A-Za-z])[A-Za-z]:[\\/]|(?:^|[\s\"'(=])/(?:home|Users|mnt|opt)/")
+    offenders = [
+        f"{path.name}:{n}: {line.strip()}"
+        for path in sorted(app_dir.glob("*.py"))
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+        if absolute.search(line) and "test_" not in line
+    ]
+    assert not offenders, "absolute paths in shipped interface code:\n" + "\n".join(offenders)
+
+
+def test_the_default_report_folder_is_under_the_user_s_own_home(monkeypatch) -> None:
+    pytest.importorskip("plotly")
+    from pathlib import Path
+
+    from app.report import REPORT_DIR_ENV, default_report_dir
+
+    monkeypatch.delenv(REPORT_DIR_ENV, raising=False)
+    folder = default_report_dir()
+    assert Path.home() in folder.parents, f"{folder} is not somewhere this user can reach"
+    assert folder.is_absolute()
+
+
+def test_the_report_folder_moves_with_its_environment_variable(monkeypatch, tmp_path) -> None:
+    pytest.importorskip("plotly")
+    from app.report import REPORT_DIR_ENV, default_report_dir, write
+
+    monkeypatch.setenv(REPORT_DIR_ENV, str(tmp_path / "elsewhere"))
+    assert default_report_dir() == tmp_path / "elsewhere"
+
+    # And the folder does not have to exist first -- writing creates it.
+    monkeypatch.setenv(REPORT_DIR_ENV, str(tmp_path / "not" / "there" / "yet"))
+    assert default_report_dir().parent.name == "there"
+    assert not write.__doc__ or "path" in write.__doc__.lower()
+
+
+def test_a_port_something_is_already_serving_is_never_offered() -> None:
+    """A busy port must be detected, including one held by a socket set to be re-usable.
+
+    Two probes were tried against a console that was genuinely serving on 8613 and both
+    reported the port free: binding it, and binding it with ``SO_REUSEADDR``. Windows lets a
+    second socket take a port whose *listener* set that option, and Uvicorn sets it -- so on
+    the platform this is most likely to be double-clicked on, a bind proves nothing. The
+    listener below therefore sets the same option the real server does.
+
+    On Linux a bind probe would pass this test, so treat a green here as necessary and not
+    sufficient; the failure this pins is a Windows one.
+
+    The stand-in server *accepts* in a thread rather than only listening. A socket that
+    listens and never accepts fills its backlog after the first probe and then refuses the
+    next one, so the second question gets the answer "free" from a port that is plainly
+    busy -- which is the test lying, not the probe. A real server accepts.
+    """
+    import socket
+    import threading
+
+    from app.start_console import choose_port, port_is_free
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("127.0.0.1", 0))
+    server.listen(8)
+    busy = server.getsockname()[1]
+
+    def accept_until_closed() -> None:
+        while True:
+            try:
+                connection, _ = server.accept()
+            except OSError:
+                return
+            connection.close()
+
+    accepting = threading.Thread(target=accept_until_closed, daemon=True)
+    accepting.start()
+    try:
+        assert not port_is_free(busy)
+        assert choose_port((busy,)) is None, "a busy port must not be handed to the server"
+    finally:
+        server.close()
+        accepting.join(timeout=2)
+
+    # Closed again: the same port is free, so the probe is not simply always saying "busy".
+    assert port_is_free(busy)
+
+
+def test_the_launcher_never_lets_the_framework_stop_and_ask_for_an_email() -> None:
+    """Headless, and telemetry off, on the command line the launcher actually builds.
+
+    Left to open the browser itself, Streamlit asks for an email address on the terminal
+    first. Nobody double-clicking an icon is watching a terminal, so that reads as a hang
+    with no page. Headless skips the question; the launcher opens the browser instead.
+    """
+    from app.start_console import command
+
+    line = command(8501)
+    assert line[1:4] == ["-m", "streamlit", "run"]
+    assert line[line.index("--server.headless") + 1] == "true"
+    assert line[line.index("--browser.gatherUsageStats") + 1] == "false"
+    assert line[line.index("--server.port") + 1] == "8501"
+
+
+def test_every_input_the_form_shows_first_says_what_it_is() -> None:
+    """The fields a first-time user meets must each carry a sentence explaining them.
+
+    "Assimilable nitrogen (YAN)" with no help text is a number nobody outside a lab can set.
+    The primary inputs are the ones on screen before anything is expanded, so a new one
+    arriving without an explanation is a regression in exactly the place it is least
+    affordable. The wider vocabulary behind "Everything else you can put in" is allowed to
+    have gaps -- a visible gap there beats a wrong sentence.
+    """
+    from app.library import PRIMARY_INPUTS, input_help
+
+    missing = {
+        (medium, key)
+        for medium, keys in PRIMARY_INPUTS.items()
+        for key in keys
+        if not (input_help(key) or "").strip()
+    }
+    assert not missing, f"primary inputs with no explanation: {sorted(missing)}"
+
+
+def test_the_launcher_says_nothing_it_cannot_print() -> None:
+    """Every sentence the launcher prints must be ASCII.
+
+    A Windows console draws an em dash without complaint, so this passes unnoticed until the
+    same command is redirected to a file: Python then encodes stdout with the machine's
+    legacy codepage and one dash raises ``UnicodeEncodeError``. The failure lands on the
+    launcher's own greeting -- the program crashing while explaining itself -- and it is
+    invisible in the place it is normally tested. Held on the source, since running it
+    would only reproduce the fault on one platform under one redirection.
+    """
+    import ast
+    import pathlib
+
+    source = pathlib.Path(__file__).resolve().parents[1] / "app" / "start_console.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    spoken = [
+        ast.unparse(argument)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "say"
+        for argument in node.args
+    ]
+    assert spoken, "expected the launcher to say something"
+    offenders = [line for line in spoken if not line.isascii()]
+    assert not offenders, "non-ASCII in launcher output:\n" + "\n".join(offenders)

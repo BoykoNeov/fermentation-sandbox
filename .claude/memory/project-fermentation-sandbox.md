@@ -55,7 +55,7 @@ still named the withdrawn "under-bound SO₂ pool" (D-143) as open.
 unconditional and lives here; the linked file only tells you *why*. **Read the file before proposing
 work that touches its subject.** Split out at D-185 from 320 inline lines
 [[feedback-a-doc-rots-where-it-duplicates]].
-- **The console / `app/` (D-261 → D-263)** — a Streamlit app + written HTML report **IS BUILT** and is a
+- **The console / `app/` (D-261 → D-264)** — a Streamlit app + written HTML report **IS BUILT** and is a
   FIFTH layer outside `src/`, so it is not in the wheel; deps live in the `ui` group
   (`uv sync --group ui`; `uv run streamlit run app/main.py`). **Do not re-propose "the engine has
   no UI".** Fidelity is THREE separate controls, never one slider — maths care / points kept /
@@ -71,6 +71,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   detect it — measured, not assumed); and a keyed Streamlit widget handed `value=` as well has
   two writers, which bit twice here — check every keyed widget, not the one that was reported.
   Owner rules: papers **reachable, not central**; **no in-house jargon in anything a user sees**.
+- **Starting the console + the naive-user pass (D-264)** — **BUILT, do not re-propose**: root launchers
+  `start-console.cmd` / `start-console.sh` → `app/start_console.py` (checks `uv`, **installs nothing**
+  system-wide, picks a free port, headless so Streamlit never prompts for an email, opens the browser;
+  its output is **ASCII** or it crashes when redirected). Reports land under `Documents/Fermentation
+  Console` (`FERMENTATION_CONSOLE_REPORTS` overrides) — **never write an absolute path into `app/`**,
+  a test scans for it. Onboarding block + per-input help exist; help text may state typical ranges but
+  **must not constrain a field** (an invented bound = an unsourced number). The three fidelity controls
+  are COLLAPSED, never merged into one slider. → [[feedback-a-shipped-constant-cannot-name-your-machine]]
 - **Growth-anchored precursor sink (D-259 → D-260)** — "exactly reversed" CORRECTED (ile > val
   matches Crépin); growth-anchoring **LANDS the sourced fate where a de-novo route exists** (Phe 98 %
   vs 0.975, mutation-verified), so D-104 does NOT refuse the FORM. **D-260: the numerator side is
