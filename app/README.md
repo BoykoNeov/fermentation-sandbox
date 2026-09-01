@@ -92,6 +92,14 @@ against near-black, not a ground nobody may change. `render.LIGHT` and `render.D
 same eight subject hues chosen twice, and `TIER_STYLE` is deliberately *not* per-theme — a
 ground may change a hue, never the meaning of a dash.
 
+**Switching the page does not redraw the charts on its own.** Streamlit 1.62 applies the new
+page CSS without re-running the script, so `st.context.theme.type` is never re-read and the
+figures keep the ink they were drawn with — measured in both directions: the page goes light
+while the traces stay `#e8798f`, and a manual re-run flips them to `#7c1d3f` immediately. The
+server cannot detect this, because the script is not running when it happens. So the charts
+catch up at the next interaction, the *Ink* control's help text says so, and pinning Light or
+Dark there is itself an interaction and therefore takes effect at once.
+
 ## Vertical scale
 
 The sidebar's *Log scale up the side* applies to every chart on the page and to the written

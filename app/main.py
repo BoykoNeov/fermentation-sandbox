@@ -447,10 +447,11 @@ with st.sidebar:
         horizontal=True,
         key="appearance",
         format_func=lambda k: {"page": "Match the page", "light": "Light", "dark": "Dark"}[k],
-        help="The page itself is switched under the ⋮ menu at the top right, in "
-        "Settings ▸ Appearance, and 'match the page' follows that. The browser reports a "
-        "theme change one step late, so if the charts lag behind the page for a moment, they "
-        "catch up on the next thing you touch — or pin them here.",
+        help="The page itself is switched under the ⋮ menu at the top right, and 'match the "
+        "page' follows that. Switching the page does not on its own redraw the charts — "
+        "nothing re-runs until you interact — so they keep the old ink until the next thing "
+        "you click, or until you press R. Picking Light or Dark here is itself a click, so "
+        "it takes effect at once.",
     )
     page_theme = getattr(st.context.theme, "type", None) or "light"
     theme = render.THEMES[page_theme if appearance == "page" else appearance]
