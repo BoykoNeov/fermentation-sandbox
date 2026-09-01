@@ -23,8 +23,13 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
+      # --group ui installs the console's own dependencies (streamlit, plotly).
+      # Without them mypy still checks app/ (files = src, tests, app) but with the
+      # library absent -- st.stop() loses its NoReturn, every post-guard narrowing
+      # collapses, and 44 phantom errors land on green code. The app's ~48 guards
+      # also self-skip via importorskip, so CI would test none of the console.
       - name: Install dependencies
-        run: uv sync --python ${{ matrix.python-version }}
+        run: uv sync --group ui --python ${{ matrix.python-version }}
 
       - name: Lint (ruff)
         run: uv run ruff check .
