@@ -155,6 +155,13 @@ The owner authorised **measuring which branch the evidence favours**, explicitly
 1. **The extent gap itself** — attributed and bounded, NOT closed, and now **THREE-way**. Both
    published ways of deciding it are refused above.
 2. **No settling / flocculation Process**, in either medium (rate-blocked).
-3. **D-209 §8's buffer-removal half** — unbuilt, and now also the gate on the pH clock.
+3. **D-209 §8's buffer-removal half is BUILT (D-239) — and the pH clock is STILL gated.**
+   This line said "unbuilt" for 19 records after the build shipped. The term is late-weighted
+   by construction, so it bought **0.008 pH** of the day-1 miss (0.172 → 0.164); the tripwire
+   `test_the_ph_clock_measures_the_known_day_one_ph_miss_and_not_settling` pins that miss at
+   0.162 ± 0.03 and is **still green**. **"Built" is not the gate — the gate is the miss
+   closing**, so do not read D-239 as unblocking the clock [[feedback-check-the-blocker-is-still-blocking]].
 4. `mu_max`'s timing residue, `E_a_fusels`, wine's two calibration frames, `k_ester_volatil`'s
-   sourcing — all where D-227/D-228 left them. Wine's nitrogen budget was never audited this way.
+   sourcing — all where D-227/D-228 left them. **"Wine's nitrogen budget was never audited this
+   way" is STALE too**: D-246→D-253 audited it and closed it — see
+   `prohibitions/wine-nitrogen-budget.md`, not this line.
