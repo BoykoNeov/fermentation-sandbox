@@ -30,7 +30,7 @@ from fermentation.core.process import Process, RateModifier
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import ParameterSet
-from fermentation.runtime.ensemble import Ensemble
+from fermentation.runtime.ensemble import Ensemble, _resolve_sample_names
 from fermentation.runtime.schedule import ScheduledTrajectory
 from fermentation.scenario import Scenario, compile_scenario
 
@@ -193,29 +193,46 @@ def run_once(scenario: Scenario, fidelity: Fidelity) -> RunResult:
     )
 
 
-def varying_constants(result: RunResult, only: Sequence[str] | None = None) -> tuple[str, ...]:
-    """Constants that would actually vary in an ensemble of this run.
+def varying_constants(
+    scenario: Scenario, fidelity: Fidelity, only: Sequence[str] | None = None
+) -> tuple[str, ...]:
+    """The numbers that would actually move if this batch were re-run many times.
 
-    A parameter with a zero-width uncertainty range is drawn at its own value every time and
-    explains no spread, so it does not count. The reason this is worth projecting *before*
-    the ensemble runs: the spread ranking is a regression of the members on the drawn
-    parameters, and it is underdetermined unless there are more members than varying
-    parameters. On a wine that means ~90 constants and therefore ~90 runs — a minute of
-    compute the person deserves to be told about before they press the button, not after.
+    Two corrections sit inside this one function, and both were wrong in the obvious
+    implementation:
+
+    **The scope is asked of the engine, not re-derived.** Walking a finished run's mechanisms
+    and unioning their declared reads looks right and comes up short: the engine also samples
+    what the schedule reads and what the set-up step read to build the starting state
+    (decision D-241). Measured, that shortcut missed 12 of 97 names on a wine and 8 of 89 on
+    a beer — always low, never high.
+
+    **A number pinned to a single value is in that scope but cannot vary.** The engine draws
+    it anyway (harmlessly, at its own value), but it has zero variance, so the spread ranking
+    drops it and does not count it against the re-run budget. Reporting the raw scope would
+    therefore overstate the runs needed, having just corrected an understatement.
+
+    Why the precision matters: the page prints this count as a promise. The ranking of which
+    number drives the uncertainty is a regression of the re-runs on the drawn values, so it
+    needs more re-runs than varying numbers. Printed low, someone waits a minute and gets the
+    underdetermined error anyway; printed high, they wait longer than they needed to.
+
+    Costs one set-up (a fraction of a second) and no integration.
     """
-    names: set[str] = set()
-    for m in result.mechanisms:
-        names.update(m.reads)
-    keep: list[str] = []
-    for name in sorted(names):
-        if only is not None and name not in only:
-            continue
-        if name not in result.parameters:
-            continue
-        u = result.parameters[name].uncertainty
-        if u.high > u.low:
-            keep.append(name)
-    return tuple(keep)
+    compiled = compile_scenario(scenario, strict=fidelity.strict, oxidative=fidelity.oxidative)
+    scope = _resolve_sample_names(
+        compiled.process_set,
+        compiled.parameters,
+        list(only) if only is not None else None,
+        None,
+        events=compiled.events,
+        seed_reads=compiled.seed_reads,
+    )
+    return tuple(
+        name
+        for name in scope
+        if compiled.parameters[name].uncertainty.high > compiled.parameters[name].uncertainty.low
+    )
 
 
 def run_uncertainty(

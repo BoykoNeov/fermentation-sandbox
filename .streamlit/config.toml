@@ -12,9 +12,3 @@ primaryColor = "#7c1d3f"
 backgroundColor = "#fbfaf7"
 secondaryBackgroundColor = "#f0ece4"
 textColor = "#1c1a17"
-
-[server]
-headless = true
-
-[browser]
-gatherUsageStats = false

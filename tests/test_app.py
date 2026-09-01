@@ -27,7 +27,8 @@ import pytest
 from app.fidelity import METHODS, PRECISION_ORDER, PRECISION_PRESETS, Fidelity, tightened
 from app.library import STARTERS, gate_problems
 from app.readouts import BY_KEY, groups_for, headline_variables, summary
-from app.runner import run_once, varying_constants
+from app.runner import run_once, run_uncertainty, varying_constants
+from fermentation.analysis import attribute_spread
 from fermentation.core.tiers import Tier
 from fermentation.runtime.integrate import simulate
 from fermentation.scenario import Intervention, Scenario, TemperaturePoint
@@ -223,13 +224,88 @@ def test_ph_refuses_a_band_and_ethanol_accepts_one(white_wine):
     assert bandable(BY_KEY["sugar"], pale_ale) is False
 
 
-def test_varying_constants_all_have_a_real_range(white_wine):
+def test_the_projected_scope_is_the_engine_scope_minus_what_cannot_move():
+    """The count the page prints has to be the engine's own answer, twice corrected.
+
+    Re-deriving the scope by walking a finished run's mechanisms undercounts — it misses
+    what the schedule reads and what the set-up step read to build the starting state
+    (D-241). Measured before this was fixed: 12 short of 97 on a wine, 8 short of 89 on a
+    beer, always low. And the engine's raw scope over-counts in the other direction, because
+    it happily draws a number pinned to a single value, which has no variance and is dropped
+    from the ranking.
+
+    This runs a tiny ensemble purely to read back what it really sampled.
+    """
+    fidelity = Fidelity.preset("draft", points=40)
+    for name in ("White wine, cool and clean", "Pale ale"):
+        projected = set(varying_constants(STARTERS[name], fidelity))
+        ens = run_uncertainty(STARTERS[name], fidelity, n_members=4, seed=0, sampler="mc")
+        drawn = set(ens.ensemble.sampled_names)
+        can_move = {
+            n
+            for n in drawn
+            if ens.parameters[n].uncertainty.high > ens.parameters[n].uncertainty.low
+        }
+        assert projected <= drawn, f"{name}: projecting names the engine will not draw"
+        assert projected == can_move, (
+            f"{name}: the projection is out by {sorted(can_move ^ projected)} — the page "
+            "would print a re-run count the ensemble does not agree with"
+        )
+
+
+def test_the_printed_re_run_count_is_the_one_the_ranking_actually_needs():
+    """The promise, end to end, at a size the suite can afford.
+
+    The page says the ranking needs more re-runs than there are varying numbers. That is only
+    worth printing if it is exactly true at the boundary, so this pins both sides of it: one
+    re-run per varying number is refused, one more than that succeeds. Run against a narrowed
+    scope so the whole test is a handful of seconds rather than a minute.
+    """
+    fidelity = Fidelity.preset("draft", points=40)
+    scenario = STARTERS["Pale ale"]
+
+    # A deliberately small slice of the numbers, so the boundary is cheap to reach.
+    candidates = varying_constants(scenario, fidelity)[:3]
+    scope = varying_constants(scenario, fidelity, only=list(candidates))
+    assert len(scope) == 3, "the narrowing did not survive into the engine's own resolution"
+
+    def rank(n_members: int):
+        ens = run_uncertainty(
+            scenario, fidelity, n_members=n_members, seed=0, sampler="mc", only=list(scope)
+        )
+        return attribute_spread(ens.ensemble, "E", ens.param_tiers)
+
+    with pytest.raises(ValueError, match="underdetermined"):
+        rank(len(scope))
+    attribution = rank(len(scope) + 1)
+    assert set(attribution.per_param) <= set(scope)
+
+
+def test_narrowing_the_scope_gives_a_smaller_set():
+    """Focusing on one quantity must actually reduce what gets drawn."""
+    fidelity = Fidelity.preset("draft", points=40)
+    scenario = STARTERS["Pale ale"]
+    everything = varying_constants(scenario, fidelity)
+    result = run_once(scenario, fidelity)
+    reads = sorted({n for m in result.touching("E") for n in m.reads})
+    narrowed = varying_constants(scenario, fidelity, only=reads)
+    assert 0 < len(narrowed) < len(everything)
+    assert set(narrowed) <= set(reads)
+
+
+def test_nothing_projected_is_pinned_to_a_single_value():
     """A number drawn at its own value every time explains nothing and must not be counted."""
-    names = varying_constants(white_wine)
+    fidelity = Fidelity.preset("draft", points=40)
+    scenario = STARTERS["White wine, cool and clean"]
+    result = run_once(scenario, fidelity)
+    names = varying_constants(scenario, fidelity)
     assert names
-    for name in names:
-        u = white_wine.parameters[name].uncertainty
-        assert u.high > u.low, f"{name} has no range and should not be listed as varying"
+    pinned = [
+        n
+        for n in names
+        if result.parameters[n].uncertainty.high <= result.parameters[n].uncertainty.low
+    ]
+    assert not pinned, f"drawn at a fixed value and so explaining nothing: {pinned}"
 
 
 # -- the form's cross-cutting gates -----------------------------------------------------------

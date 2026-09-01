@@ -489,8 +489,12 @@ with tab_run:
             if cc is None:
                 st.info("Already at the strictest setting, so there is nothing to compare to.")
             else:
-                st.session_state.convergence = cc
-        cc = st.session_state.get("convergence")
+                st.session_state.convergence = (scenario, fidelity, cc)
+        stored = st.session_state.get("convergence")
+        # Dropped rather than relabelled when it goes stale. This value is passed into the
+        # written report, so a check kept past the batch it was run on would be published as
+        # a verdict on a batch it never saw.
+        cc = stored[2] if stored is not None and stored[:2] == (scenario, fidelity) else None
         if cc is not None:
             st.metric(
                 f"Biggest change, in {cc.worst_variable}",
@@ -617,7 +621,7 @@ with tab_spread:
         "whether the model is right."
     )
 
-    scope_all = varying_constants(result)
+    scope_all = varying_constants(scenario, fidelity)
     scope_var = st.selectbox(
         "Vary the numbers behind",
         ["everything in this run", *sorted(result.touched_variables())],
@@ -631,7 +635,7 @@ with tab_spread:
     else:
         picked_mechs = provenance.mechanisms_for(result, scope_var)
         names = {n for m in picked_mechs for n in m.reads}
-        only = tuple(varying_constants(result, only=sorted(names)))
+        only = varying_constants(scenario, fidelity, only=sorted(names))
         n_varying = len(only)
 
     c1, c2, c3 = st.columns(3)
@@ -666,7 +670,7 @@ with tab_spread:
                 st.error(str(exc))
 
     ens = st.session_state.get("ens")
-    if ens is not None and ens.scenario == scenario:
+    if ens is not None and (ens.scenario, ens.fidelity) == (scenario, fidelity):
         for w in ens.warnings:
             st.warning(w)
         st.caption(
@@ -727,7 +731,10 @@ with tab_spread:
             )
             st.caption("Grouped by how well sourced the number is — " + by_tier)
     elif ens is not None:
-        st.info("The batch has changed since that band was worked out. Run it again.")
+        st.info(
+            "The batch or the settings have changed since that band was worked out. The old "
+            "one is not shown, because it would not line up with the run above. Run it again."
+        )
 
 
 # -- tab: compare --------------------------------------------------------------------------
@@ -810,12 +817,9 @@ with tab_data:
     )
     if st.button("Write it"):
         out = REPORT_DIR / f"{scenario.name.replace(' ', '-').lower()}.html"
-        path = report.write(
-            result,
-            out,
-            convergence=st.session_state.get("convergence"),
-            explain=tuple(explain_vars),
-        )
+        stored = st.session_state.get("convergence")
+        fresh = stored[2] if stored is not None and stored[:2] == (scenario, fidelity) else None
+        path = report.write(result, out, convergence=fresh, explain=tuple(explain_vars))
         st.success(f"Saved to {path}")
         st.download_button(
             "Download it", data=path.read_bytes(), file_name=path.name, mime="text/html"
