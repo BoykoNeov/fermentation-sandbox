@@ -23,25 +23,35 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
+      # Two flags, both load-bearing, on EVERY uv invocation below.
+      #
       # --group ui installs the console's own dependencies (streamlit, plotly).
       # Without them mypy still checks app/ (files = src, tests, app) but with the
       # library absent -- st.stop() loses its NoReturn, every post-guard narrowing
-      # collapses, and 44 phantom errors land on green code. The app's ~48 guards
+      # collapses, and 44 phantom errors land on green code. The app's 48 guards
       # also self-skip via importorskip, so CI would test none of the console.
+      #
+      # --python pins the interpreter. A bare `uv run` does NOT inherit the one the
+      # sync used: it takes the newest it can find, and if that differs it DELETES
+      # the environment and rebuilds it. Measured on run 33530346364 -- the 3.13 job
+      # synced 3.13.15, then `uv run ruff` announced 3.14.7, "Removed virtual
+      # environment", and reinstalled 27 packages without the ui group. Every step
+      # after the sync had been silently running 3.14, so the matrix has only ever
+      # tested one version. Any single unpinned step poisons the ones after it.
       - name: Install dependencies
         run: uv sync --group ui --python ${{ matrix.python-version }}
 
       - name: Lint (ruff)
-        run: uv run ruff check .
+        run: uv run --group ui --python ${{ matrix.python-version }} ruff check .
 
       - name: Format check (ruff)
-        run: uv run ruff format --check .
+        run: uv run --group ui --python ${{ matrix.python-version }} ruff format --check .
 
       - name: Type check (mypy)
-        run: uv run mypy
+        run: uv run --group ui --python ${{ matrix.python-version }} mypy
 
       - name: Decisions index is current
-        run: uv run python tools/gen_decisions_toc.py --check
+        run: uv run --group ui --python ${{ matrix.python-version }} python tools/gen_decisions_toc.py --check
 
       - name: Test (pytest)
-        run: uv run pytest -n auto -q
+        run: uv run --group ui --python ${{ matrix.python-version }} pytest -n auto -q
