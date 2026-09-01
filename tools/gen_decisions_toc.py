@@ -342,6 +342,11 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"plain language",
             r"\bcaveat",
             r"\binert\b",
+            # D-262/D-263 vocabulary: a palette is chosen against a ground, and a widget that
+            # both carries a key and is handed a value has two writers. Both are squarely
+            # interface concerns and neither was reachable from the words above.
+            r"\btheme",
+            r"\bwidget",
         ),
     ),
 ]
