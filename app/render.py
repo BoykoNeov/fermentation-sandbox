@@ -222,15 +222,18 @@ def _axis_spec(values: Sequence[FloatArray], *, log_y: bool) -> dict[str, Any]:
     * For a set of lines all flat at zero it picks -1 to 1, which for a concentration draws
       a range of negative values that cannot exist. Those axes get 0 to 1 instead, and
       :func:`flat_group_panel` says why the chart is empty.
+
+    The order matters. An axis with nothing positive on it cannot be a log axis, and it is
+    *also* the flat-at-zero case — so refusing the log scale has to fall through to the
+    straight guards rather than return, or turning the log scale on would hand back exactly
+    the negative half-axis the second fix exists to remove.
     """
     finite = _stack(values)
     if finite.size == 0:
         return {}
     lo, hi = float(finite.min()), float(finite.max())
-    if log_y:
-        floor = log_floor(values)
-        if floor is None:
-            return {}
+    floor = log_floor(values) if log_y else None
+    if floor is not None:
         bottom, top = float(np.log10(max(lo, floor))), float(np.log10(hi))
         if top - bottom < 0.5:  # a nearly flat line would otherwise get a hairline axis
             bottom, top = top - 0.5, top + 0.25

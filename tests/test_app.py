@@ -447,8 +447,17 @@ def test_a_log_axis_is_floored_off_the_data_not_off_the_solver_dust(white_wine):
         assert truth.min() <= drawn.min() + 1e-12
 
 
-def test_a_log_axis_is_refused_where_nothing_is_positive(white_wine):
-    """An all-zero chart gets no decade ruler drawn over it, log scale asked for or not."""
+def test_a_log_axis_is_refused_where_nothing_is_positive_without_losing_the_zero_floor(
+    white_wine,
+):
+    """An all-zero chart gets no decade ruler over it — and keeps the 0 to 1 range anyway.
+
+    These two guards live in the same function and the refusal used to return early, so
+    switching the log scale on handed the empty colour chart straight back to Plotly's
+    -1 to 1: the very negative half-axis the other guard exists to remove, reappearing the
+    moment someone used the other new control. Asserting only ``type != "log"`` passes with
+    that bug present, which is why the range is asserted here too.
+    """
     pytest.importorskip("plotly")
     from app import render
     from app.readouts import groups_for
@@ -456,8 +465,34 @@ def test_a_log_axis_is_refused_where_nothing_is_positive(white_wine):
     colour = [g for g in groups_for(white_wine) if g[0].title.startswith("Colour")]
     assert colour, "the white wine fixture is supposed to have an empty colour chart"
     group, live = colour[0]
-    fig = render.series_figure(white_wine, group, live, log_y=True)
-    assert fig.layout.yaxis.type != "log"
+    for log_y in (False, True):
+        fig = render.series_figure(white_wine, group, live, log_y=log_y)
+        assert fig.layout.yaxis.type != "log"
+        assert fig.layout.yaxis.range[0] == 0.0, f"negative concentrations at log_y={log_y}"
+        assert fig.layout.yaxis2.range[0] == 0.0
+
+
+def test_a_compared_run_keeps_its_colour_when_a_neighbour_cannot_be_drawn(white_wine):
+    """Colours are handed out over the runs actually drawn, not over the ones asked for.
+
+    A readout that one saved run's schema does not carry is skipped, and indexing the palette
+    by position in the *requested* list would then leave a gap — two charts of the same three
+    runs would colour them differently depending on which quantity was being compared.
+    """
+    pytest.importorskip("plotly")
+    from app import render
+    from app.readouts import BY_KEY
+    from app.runner import run_once
+
+    beer = run_once(STARTERS["Pale ale"], DRAFT)
+    tartaric = BY_KEY["tartaric"]  # wine only: the beer run has no such slot
+    assert not tartaric.available(beer)
+
+    pairs = [("beer", beer), ("wine", white_wine)]
+    fig = render.compare_figure(pairs, tartaric)
+    assert len(fig.data) == 1, "the run that cannot be drawn is skipped, not drawn empty"
+    assert fig.data[0].name == "wine"
+    assert fig.data[0].line.color == render.LIGHT.palette[0], "colours must not leave a gap"
 
 
 def test_a_flat_axis_is_never_given_a_negative_range(white_wine):
