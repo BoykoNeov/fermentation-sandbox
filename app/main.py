@@ -816,7 +816,11 @@ with tab_spread:
 with tab_compare:
     st.subheader("The same question asked of several batches")
     c1, c2 = st.columns([3, 1])
-    save_as = c1.text_input("Keep this run as", value=scenario.name, key="save_as")
+    # The key carries the run's name on purpose. `value=` only seeds a keyed widget the
+    # first time it is created, so a single fixed key would freeze this box on whatever
+    # the FIRST batch was called -- and "Keep it" would then file a later batch under an
+    # earlier one's name, silently overwriting the run it was meant to be compared with.
+    save_as = c1.text_input("Keep this run as", value=scenario.name, key=f"save_as_{scenario.name}")
     if c2.button("Keep it", width="stretch"):
         st.session_state.saved[save_as] = result
         st.rerun()

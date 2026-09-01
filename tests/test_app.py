@@ -637,3 +637,33 @@ def test_the_written_report_pins_its_own_ground(tmp_path, white_wine):
     )
     assert render.DARK.palette[0] in dark and render.DARK.palette[0] not in light
     assert render.LIGHT.palette[0] in light
+
+
+def test_the_keep_this_run_box_gets_a_fresh_key_per_batch() -> None:
+    """The "Keep this run as" name box must not freeze on the first batch's name.
+
+    Streamlit's ``value=`` only seeds a *keyed* widget the first time that key is created;
+    from then on the key owns the value and the recomputed ``value=`` is dead. So a fixed
+    key on this box leaves it displaying the first batch's name for the rest of the session
+    while the sidebar's own name field moves on. Pressing "Keep it" would then file the
+    current run under an earlier run's name -- overwriting the very run it was going to be
+    compared against, with nothing on screen to say so.
+
+    This is checked on the source rather than at runtime because nothing in this file
+    imports Streamlit. The invariant is the one that matters: the key is an expression that
+    varies with the run's name, not a constant.
+    """
+    import ast
+    import pathlib
+
+    source = pathlib.Path(__file__).resolve().parents[1] / "app" / "main.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    keys = [
+        next(k.value for k in node.keywords if k.arg == "key")
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and any(isinstance(a, ast.Constant) and a.value == "Keep this run as" for a in node.args)
+    ]
+    assert len(keys) == 1, "expected exactly one 'Keep this run as' widget"
+    assert not isinstance(keys[0], ast.Constant), "a constant key freezes the box"
+    assert "scenario.name" in ast.unparse(keys[0])
