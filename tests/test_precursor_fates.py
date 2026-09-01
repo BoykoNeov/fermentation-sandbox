@@ -33,9 +33,9 @@ from fermentation.core.kinetics import (
 from fermentation.core.kinetics.amino_acid_pools import SPEC_BY_SPECIES, depletion_gate
 from fermentation.core.kinetics.byproducts import ehrlich_draws
 from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS, refund_carbon_to_sugar
-from fermentation.core.kinetics.growth import biomass_growth_rate
+from fermentation.core.kinetics.growth import GrowthNitrogenLimited, biomass_growth_rate
 from fermentation.core.media import wine_schema
-from fermentation.core.process import Process, ProcessSet
+from fermentation.core.process import Process, ProcessSet, RateModifier
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
@@ -676,7 +676,9 @@ class _GrowthAnchoredFates(Process):
     def __init__(self, weights: Mapping[str, float]) -> None:
         self.weights = dict(weights)
 
-    def derivatives(self, t, y, schema, params):
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
         d = schema.zeros()
         base_dx = biomass_growth_rate(y, schema, params)
         if base_dx <= 0.0:
@@ -998,4 +1000,440 @@ def test_un_inverting_by_CUTTING_the_ehrlich_draw_is_refused_by_rolleros_leucine
         f"{floor_pct}-{ceiling_pct} %. This assert is the fence; if it ever passes marginally, "
         "the two observables have come within reach of each other and the refusal is no longer "
         "safe to quote"
+    )
+
+
+# D-260 — the NUMERATOR side of D-259 §5, measured: it is DEGENERATE with the split, not fenced.
+# ---------------------------------------------------------------------------------------------
+#: The over-draw multiplier on growth's own gated demand that reaches Crépin's band. Not a
+#: parameter and not a mechanism — a *dial* on the counterfactual, here to price how far the
+#: numerator lever has to be pushed and what that costs on the other axis.
+_D260_LAMBDA = 5.0
+#: ``f_non_ehrlich_leucine`` chosen to MATCH the growth-anchored split, so the control below
+#: compares two mechanisms at one split rather than at two.
+_D260_MATCHED_F = 0.174
+#: Rollero's own printed isoamyl totals across his six ferments (µM), from the same Table S2 the
+#: tracer band comes from. The model's isoamyl on this fixture is ~2123 µM — the incommensurate
+#: denominator D-112 recorded — and that gap is what makes the two targets collide here.
+_D260_ROLLERO_ISOAMYL_UM = (793.0, 1365.0)
+
+
+class _D260GrowthAnchoredFates(_GrowthAnchoredFates):
+    """D-259's counterfactual with the two dials this beat needs.
+
+    ``kappa`` scales ``K_amino_acids`` **for this draw only**, giving growth's uptake a higher
+    affinity than the Ehrlich re-route — the only asymmetry that can move a split whose shared
+    gate otherwise cancels (D-260 P1). ``lam`` multiplies the whole contribution, pricing an
+    over-draw against growth's own protein demand, which exceeds the must's supply 3.4-6.3×.
+    """
+
+    def __init__(self, weights: Mapping[str, float], kappa: float = 1.0, lam: float = 1.0) -> None:
+        super().__init__(weights)
+        self.kappa, self.lam = kappa, lam
+
+    def derivatives(
+        self, t: float, y: FloatArray, schema: StateSchema, params: Mapping[str, float]
+    ) -> FloatArray:
+        if self.kappa != 1.0:
+            params = {**params, "K_amino_acids": params["K_amino_acids"] * self.kappa}
+        d: FloatArray = super().derivatives(t, y, schema, params)
+        return d * self.lam if self.lam != 1.0 else d
+
+
+def _d260_arm(
+    *,
+    sink: _D260GrowthAnchoredFates | None = None,
+    f_leucine: float | None = None,
+    attach_growth_modifiers: bool = False,
+    points: int = 4001,
+) -> dict[str, float]:
+    """One arm on Crépin's must: the leucine split, the leucine tracer, and their closure.
+
+    ``sink=None`` runs the SHIPPED model. ``attach_growth_modifiers`` extends every modifier
+    that already scales ``growth_nitrogen_limited`` to also scale the sink — the D-32 discipline
+    a growth-anchored draw needs and which D-259's counterfactual did not carry (D-260 §4). The
+    modifier objects come from per-compile factories, so this mutation cannot leak between tests.
+
+    **The split is integrated from the two draws' own formulae, never from the pool**, and the
+    closure control ties it back to the depletion the solver realised. Reading the split off the
+    pool instead would make the tracer identity below a tautology.
+    """
+    compiled = compile_scenario(commensurate_scenario("crepin", days=14.0))
+    for name in _OTHER_PRECURSOR_CONSUMERS:
+        compiled.process_set.disable(name)
+    params = compiled.param_values
+    if f_leucine is not None:
+        params[non_ehrlich_fraction_param("leucine")] = f_leucine
+    if sink is not None:
+        compiled.process_set._processes[_GrowthAnchoredFates.name] = sink
+    attached: list[RateModifier] = []
+    if attach_growth_modifiers:
+        # ACTIVE modifiers only. A disabled one still sits in the set and can still be edited,
+        # but the solver never applies it -- folding its factor into the reconstruction below
+        # under-counted the draw by 1.8 %, which the closure control caught (0.982 against 1.0).
+        for modifier in compiled.process_set.active_modifiers:
+            if GrowthNitrogenLimited.name in modifier.modifies:
+                modifier.modifies = (*modifier.modifies, _GrowthAnchoredFates.name)
+                attached.append(modifier)
+        assert attached, "no modifier scales growth: the D-32 attachment below measures nothing"
+    traj = simulate_scheduled(
+        compiled.process_set,
+        params,
+        compiled.y0,
+        compiled.t_span_h,
+        events=compiled.events,
+        param_tiers=compiled.parameters.tier_map(),
+        t_eval=np.linspace(0.0, compiled.t_span_h[1], points),
+    )
+    assert traj.success, traj.message
+    y = np.asarray(traj.y, dtype=float)
+    t = np.asarray(traj.t, dtype=float)
+    schema = compiled.schema
+
+    lump = np.zeros_like(t)
+    ehrlich = np.zeros_like(t)
+    for i in range(t.size):
+        column = y[:, i]
+        drawn = 0.0
+        for draw in ehrlich_draws(column, schema, params):
+            if draw.precursor.species == "leucine":
+                drawn += draw.precursor_carbon / carbon_mass_fraction("leucine")
+        ehrlich[i] = drawn
+        if sink is None:  # shipped: the lump is f/(1−f) times the draw, by construction
+            f = params[non_ehrlich_fraction_param("leucine")]
+            lump[i] = drawn * f / (1.0 - f)
+        else:
+            gate_params = params
+            if sink.kappa != 1.0:
+                gate_params = {**params, "K_amino_acids": params["K_amino_acids"] * sink.kappa}
+            gate = depletion_gate(column, schema, gate_params, (SPEC_BY_SPECIES["leucine"],))
+            base_dx = max(biomass_growth_rate(column, schema, params), 0.0)
+            # The attached modifiers scale the Process's whole contribution inside the run, so a
+            # reconstruction that omits them is not the draw the solver applied. The closure
+            # control CAUGHT that omission (0.671 against 1.0) rather than it shipping as a
+            # measurement — which is the entire reason it is asserted in the fixture.
+            factor = 1.0
+            for modifier in attached:
+                factor *= modifier.factor(float(t[i]), column, schema, params)
+            lump[i] = sink.weights["leucine"] * base_dx * gate * sink.lam * factor
+
+    leucine_mw = MOLAR_MASS["leucine"]
+    lump_um = float(np.trapezoid(lump, t)) / leucine_mw * 1e6
+    ehrlich_um = float(np.trapezoid(ehrlich, t)) / leucine_mw * 1e6
+    pool = y[schema.slice("leucine"), :][0]
+    supply_um = float(pool[0]) / leucine_mw * 1e6
+    consumed_um = (float(pool[0]) - float(pool[-1])) / leucine_mw * 1e6
+    isoamyl_um = float(y[schema.slice("isoamyl_alcohol"), -1][0]) / M_ISOAMYL_OH * 1e6
+    assert supply_um > 0.0 and isoamyl_um > 0.0 and consumed_um > 0.0, (
+        "vacuous arm: no leucine in the must, none consumed, or no isoamyl produced"
+    )
+    return {
+        "lump_um": lump_um,
+        "ehrlich_um": ehrlich_um,
+        "supply_um": supply_um,
+        "consumed_um": consumed_um,
+        "isoamyl_um": isoamyl_um,
+        "split_pct": 100.0 * lump_um / (lump_um + ehrlich_um),
+        "tracer_pct": 100.0 * ehrlich_um / isoamyl_um,
+        "closure": (lump_um + ehrlich_um) / consumed_um,
+    }
+
+
+@pytest.fixture(scope="module")
+def d260_arms():
+    """Six arms, computed once (the D-245 shared-fixture pattern), with the closure asserted HERE.
+
+    The control lives in the fixture for D-259 §7's measured reason: both draws are recomputed
+    from their own formulae, so a number can be produced even when the Process that ran was not
+    the one the arm names, and it would mean nothing. Every consumer of this fixture inherits the
+    check that ties its split to the run that produced it.
+    """
+    arms = {
+        "shipped": _d260_arm(),
+        "f_matched": _d260_arm(f_leucine=_D260_MATCHED_F),
+        "lambda": _d260_arm(
+            sink=_D260GrowthAnchoredFates(_d259_weights("mid"), kappa=0.01, lam=_D260_LAMBDA),
+            attach_growth_modifiers=True,
+            # A 5x over-draw empties the pool in a sharp early transient the 4001-point grid
+            # integrates 2.5 % short -- caught by the closure control, not assumed away.
+            points=20001,
+        ),
+    }
+    for edge in _D259_EDGES:
+        arms[f"growth_mods_{edge}"] = _d260_arm(
+            sink=_D260GrowthAnchoredFates(_d259_weights(edge)), attach_growth_modifiers=True
+        )
+    # The arm the `f`-only control is MATCHED to. `_D260_MATCHED_F` was chosen against the
+    # UNCORRECTED (pre-modifier) growth-anchored split, so the control must be scored against
+    # that arm and not against `growth_mods_mid`, whose split is 10 points away -- comparing the
+    # two mechanisms at two different splits is exactly what the control exists to avoid.
+    arms["growth_nomods_mid"] = _d260_arm(
+        sink=_D260GrowthAnchoredFates(_d259_weights("mid")), attach_growth_modifiers=False
+    )
+    for name, arm in arms.items():
+        assert arm["closure"] == pytest.approx(1.0, abs=0.02), (
+            f"quadrature control failed for arm {name!r}: the lump and Ehrlich draws together "
+            f"account for {arm['closure']:.4f} of the leucine the solver actually removed from "
+            "the pool. Either the Process that ran is not the one this arm names, or the t_eval "
+            "grid is too coarse (D-103's trapezoid trap). Every number below is a ratio of these "
+            "two integrals and means nothing until this closes"
+        )
+    return arms
+
+
+def test_the_split_and_the_leucine_tracer_TRADE_one_for_one_on_this_must(d260_arms):
+    """**The D-260 headline, and it is why the numerator side is refused.**
+
+    D-259 §5 fenced un-inversion *by cutting the Ehrlich draw* and left the other side open:
+    "a repair that instead RAISES growth's own leucine draw moves the split while leaving the
+    Ehrlich draw, and therefore the tracer, untouched. That side is untested here." **It is not
+    untouched — it is the same number read from the other end.**
+
+    The arithmetic ``tracer = (1 − split) · consumed / isoamyl`` is trivial. What is NOT trivial,
+    and is what this test pins, are the two invariances that turn it into a constraint:
+
+    * ``consumed`` is **pinned at the must's supply** — the pool ends empty in every arm, whatever
+      draws it, so no mechanism can buy itself more leucine; and
+    * ``isoamyl`` is **invariant across the numerator arms** (production is anchored to sugar, not
+      to the precursor), so the denominator does not move under the repair either.
+
+    Given those two, the split and the tracer slide along one line in opposite directions, and the
+    measured arms sit at its two ends: the shipped model satisfies Crépin and misses Rollero; the
+    growth-anchored counterfactual satisfies Rollero and misses Crépin.
+    """
+    numerator_arms = [d260_arms["shipped"]] + [
+        d260_arms[f"growth_mods_{edge}"] for edge in _D259_EDGES
+    ]
+    supply = d260_arms["shipped"]["supply_um"]
+    isoamyl = d260_arms["shipped"]["isoamyl_um"]
+
+    for arm in numerator_arms:
+        assert arm["consumed_um"] == pytest.approx(supply, rel=0.01), (
+            f"an arm consumed {arm['consumed_um']:.1f} µM of a {supply:.1f} µM supply. The whole "
+            "trade below rests on the pool being emptied whatever draws it; if a mechanism now "
+            "leaves leucine standing, it has bought headroom and this test must be re-derived"
+        )
+        assert arm["isoamyl_um"] == pytest.approx(isoamyl, rel=0.01), (
+            f"isoamyl moved to {arm['isoamyl_um']:.1f} µM against the shipped {isoamyl:.1f}. The "
+            "denominator is supposed to be inert under a numerator-side repair; if it moves, the "
+            "split and the tracer are no longer on one line and the refusal is re-openable"
+        )
+        # The split is built from the two draws' integrals and `consumed_um` from the POOL, so
+        # this is not the tautology it would be if both came from the same place: it holds only
+        # as well as the closure does. Pinned 200x tighter than the fixture's 2 % closure bound,
+        # which is what gives it teeth of its own.
+        predicted = (1.0 - arm["split_pct"] / 100.0) * arm["consumed_um"] / arm["isoamyl_um"] * 100
+        assert predicted == pytest.approx(arm["tracer_pct"], rel=1e-4), (
+            f"the tracer predicted from the split is {predicted:.4f} % against a measured "
+            f"{arm['tracer_pct']:.4f} %. These are two readings of one integral; a divergence "
+            "means the split and the tracer were measured off different runs"
+        )
+
+    shipped, growth = d260_arms["shipped"], d260_arms["growth_mods_mid"]
+    crepin_lo, _ = _CREPIN_PROTEIN_PCT["leucine"]
+    rollero_lo, rollero_hi = _ROLLERO_LEUCINE_SHARE_OF_ISOAMYL_PCT
+    assert shipped["split_pct"] > crepin_lo and shipped["tracer_pct"] < rollero_lo, (
+        f"the shipped model reads split {shipped['split_pct']:.1f} % / tracer "
+        f"{shipped['tracer_pct']:.3f} %. It is supposed to sit at the CRÉPIN end of the line — "
+        "satisfying the split and missing the tracer floor. If it now satisfies both, the "
+        "collision this test describes has gone and the record is out of date"
+    )
+    assert growth["split_pct"] < crepin_lo and rollero_lo < growth["tracer_pct"] < rollero_hi, (
+        f"the growth-anchored arm reads split {growth['split_pct']:.1f} % / tracer "
+        f"{growth['tracer_pct']:.3f} %. It is supposed to sit at the ROLLERO end — inside the "
+        f"measured {rollero_lo}-{rollero_hi} % tracer band and below Crépin's {crepin_lo:.0f} %. "
+        "That it lands the tracer the shipped model misses is D-260's finding, not a bug"
+    )
+
+
+def test_crepins_split_and_rolleros_tracer_CANNOT_BOTH_hold_at_this_isoamyl_total(d260_arms):
+    """The collision, priced — and the escape route named, because it is a denominator (D-260 §5).
+
+    Because the pool is emptied and isoamyl is inert, Crépin's 77-86 % protein share caps the
+    Ehrlich draw, which caps the tracer *below Rollero's floor*; and Rollero's floor caps the
+    tracer from below, which caps the split *below Crépin's floor*. Both directions are asserted
+    so a future change that relieves either one fails here rather than passing silently.
+
+    **The escape is the isoamyl denominator, not the split.** Joint satisfaction needs the run's
+    isoamyl at or under ~1170 µM (at 77 %); this fixture makes ~2123 µM, while Rollero's own six
+    ferments print 793-1365 µM. So the conflict is this fixture's ~2× inflated isoamyl — the
+    incommensurate denominator D-112 already recorded — and **not** a disagreement between the
+    two papers. This does NOT license an isoamyl recalibration: D-112 measured that
+    ``k_isoamyl_alcohol`` is right, with the undosed anchor test as its control.
+    """
+    shipped = d260_arms["shipped"]
+    supply, isoamyl = shipped["supply_um"], shipped["isoamyl_um"]
+    crepin_lo, crepin_hi = _CREPIN_PROTEIN_PCT["leucine"]
+    rollero_lo, _ = _ROLLERO_LEUCINE_SHARE_OF_ISOAMYL_PCT
+
+    tracer_ceiling = 100.0 * supply * (1.0 - crepin_lo / 100.0) / isoamyl
+    assert tracer_ceiling < rollero_lo, (
+        f"at Crépin's {crepin_lo:.0f} % the tracer can reach at most {tracer_ceiling:.2f} %, "
+        f"against Rollero's {rollero_lo} % floor — that gap IS this test. If it has closed, the "
+        "two targets are now jointly reachable and the D-260 refusal must be re-measured"
+    )
+    split_ceiling = 100.0 * (1.0 - rollero_lo / 100.0 * isoamyl / supply)
+    assert split_ceiling < crepin_lo, (
+        f"holding Rollero's {rollero_lo} % floor caps the split at {split_ceiling:.1f} %, which "
+        f"must stay below Crépin's {crepin_lo:.0f} %. Asserted from the other side so a change "
+        "that relieves only one direction cannot pass"
+    )
+
+    isoamyl_needed = supply * (1.0 - crepin_lo / 100.0) / (rollero_lo / 100.0)
+    rollero_lo_um, rollero_hi_um = _D260_ROLLERO_ISOAMYL_UM
+    assert isoamyl < isoamyl_needed * 3.0, "sanity: the fixture's isoamyl is not off-scale"
+    assert isoamyl > isoamyl_needed, (
+        f"the fixture makes {isoamyl:.0f} µM of isoamyl where joint satisfaction needs "
+        f"≤ {isoamyl_needed:.0f} µM. This assert is the statement that the collision is a "
+        "DENOMINATOR artefact; if it fails the collision has a different cause"
+    )
+    assert rollero_lo_um < isoamyl_needed < rollero_hi_um, (
+        f"the joint-satisfaction ceiling {isoamyl_needed:.0f} µM must fall inside Rollero's own "
+        f"printed {rollero_lo_um:.0f}-{rollero_hi_um:.0f} µM. That it does is what makes this a "
+        "commensurability problem rather than a contradiction between the two papers"
+    )
+
+
+def test_the_tracer_GAIN_belongs_to_the_split_not_to_growth_anchoring(d260_arms):
+    """The control that stops D-260 §1 being read as an argument FOR the growth-anchored form.
+
+    A growth-anchored sink lands Rollero's tracer band. The rival explanation is trivial: any
+    *smaller* non-Ehrlich sink leaves a fuller pool, opens the Ehrlich gate and raises the draw.
+    So this arm keeps the SHIPPED mechanism untouched and moves only ``f_non_ehrlich_leucine``,
+    to the value that matches the growth-anchored split. If the two agree at a matched split, the
+    tracer is a function of the split alone and growth anchoring earns no credit for it.
+    """
+    matched = d260_arms["f_matched"]
+    growth = d260_arms["growth_nomods_mid"]
+    rollero_lo, rollero_hi = _ROLLERO_LEUCINE_SHARE_OF_ISOAMYL_PCT
+
+    assert rollero_lo < matched["tracer_pct"] < rollero_hi, (
+        f"the shipped form at f={_D260_MATCHED_F} reads a tracer of {matched['tracer_pct']:.3f} %, "
+        f"outside Rollero's {rollero_lo}-{rollero_hi} %. The control's whole point is that the "
+        "shipped mechanism reaches the same band once its split is matched"
+    )
+    predicted_from_split = (
+        (1.0 - matched["split_pct"] / 100.0) * matched["consumed_um"] / matched["isoamyl_um"] * 100
+    )
+    assert predicted_from_split == pytest.approx(matched["tracer_pct"], rel=1e-4), (
+        "the control arm's own split and tracer must be two readings of one integral"
+    )
+    # The comparison is only worth making at a MATCHED split -- otherwise the band has to be
+    # wide enough to absorb the split difference, and a mechanism that really did buy tracer
+    # share of its own would pass inside it.
+    assert abs(matched["split_pct"] - growth["split_pct"]) < 0.5, (
+        f"the control is scored at split {matched['split_pct']:.2f} % against the counterfactual's "
+        f"{growth['split_pct']:.2f} %. Re-derive _D260_MATCHED_F: comparing two mechanisms at two "
+        "different splits measures the split, which is the one thing this test must not do"
+    )
+    ratio = matched["tracer_pct"] / growth["tracer_pct"]
+    assert ratio == pytest.approx(1.0, rel=0.01), (
+        f"at a matched split ({matched['split_pct']:.2f} % vs {growth['split_pct']:.2f} %) the "
+        f"tracers read {matched['tracer_pct']:.3f} % (shipped form) and "
+        f"{growth['tracer_pct']:.3f} % (growth-anchored). They must agree to well within 1 %, "
+        "because the tracer "
+        "tracks the split rather than the mechanism. A divergence means growth anchoring buys "
+        "tracer share of its OWN and D-260 §4's control -- and with it §2 -- must be withdrawn"
+    )
+
+
+def test_raising_growths_OWN_draw_reaches_crepins_band_and_pays_for_it_on_the_tracer(d260_arms):
+    """The beat's own question, answered with a number: the lever works, and the price is fixed.
+
+    D-259 §8 named "raising growth's own precursor draw toward its protein demand" as the obvious
+    next question. It is reachable — growth's realised protein demand is 3.4-6.3× the must's
+    supply, so there IS demand to spare — and an over-draw of ~5× on the gated demand lands the
+    split in Crépin's band. **It buys nothing**, because it pays the whole gain straight back on
+    the tracer axis (D-260 §1). This is the refusal's receipt: not "the numerator cannot move"
+    but "moving it is the same move, in the other direction".
+    """
+    lam = d260_arms["lambda"]
+    baseline = d260_arms["growth_mods_mid"]
+    crepin_lo, crepin_hi = _CREPIN_PROTEIN_PCT["leucine"]
+    rollero_lo, _ = _ROLLERO_LEUCINE_SHARE_OF_ISOAMYL_PCT
+
+    assert lam["split_pct"] > baseline["split_pct"] + 30.0, (
+        f"λ={_D260_LAMBDA} moved the split only {baseline['split_pct']:.1f} → "
+        f"{lam['split_pct']:.1f} %. The lever is supposed to work; if it no longer does, the "
+        "refusal below is being carried by the wrong reason"
+    )
+    assert 70.0 < lam["split_pct"] < crepin_hi, (
+        f"λ={_D260_LAMBDA} lands the split at {lam['split_pct']:.1f} %, outside the [70, "
+        f"{crepin_hi:.0f}] window this test pins. Pinned two-sided: an arm that overshoots "
+        "Crépin's band is not evidence about reaching it"
+    )
+    assert lam["tracer_pct"] < rollero_lo, (
+        f"at a split of {lam['split_pct']:.1f} % the tracer reads {lam['tracer_pct']:.3f} %, "
+        f"which must be below Rollero's {rollero_lo} % floor — that is the price. If it is not, "
+        "the numerator lever has escaped the line and D-260's refusal is void"
+    )
+    assert lam["tracer_pct"] < baseline["tracer_pct"], (
+        "the over-draw must LOWER the tracer relative to its own baseline; a repair that raised "
+        "both would be outside the one-degree-of-freedom claim this record rests on"
+    )
+
+
+def test_a_growth_anchored_draw_must_carry_growths_OWN_rate_modifiers(
+    d260_arms, growth_anchored_split
+):
+    """**Corrects D-259's bracket** — its counterfactual carried none of growth's own (D-260 §4).
+
+    ``ArrheniusTemperature.for_growth(*also_scales)`` scales ``growth_nitrogen_limited`` plus
+    whatever wine passes it — the D-32 amino-acid swap — and ``BiomassCarryingCapacity.modifies``
+    is the same pair. **None of them names the precursor sink**, so a growth-anchored draw written
+    as ``w_i · base_dx · gate`` is anchored to the *pre-modifier* rate while the biomass it claims
+    to feed grows at the realised one. D-32 exists to forbid exactly this, one Process over.
+
+    The frame mismatch is visible inside D-259 itself: its protein-demand figure (580-1088 µM) is
+    in the realised frame, its counterfactual draw in the pre-modifier one. Attaching the
+    modifiers moves leucine's bracket 13.1-22.0 % → 21.3-33.7 %, so **D-104's 20.9 % no longer
+    sits at the top edge — it sits just below the bottom.**
+
+    What survives the correction: the refusal (still 2.3-3.6× under Crépin at every edge) and
+    D-259's order correction (isoleucine still above valine). What does not: every number, and
+    "monotonically inverted" — corrected valine now brackets Crépin's 41 and corrected threonine
+    sits above her 38.
+    """
+    structural = compile_scenario(commensurate_scenario("crepin", days=1.0))
+    scaling_growth = [
+        m.name
+        for m in structural.process_set._modifiers.values()
+        if GrowthNitrogenLimited.name in m.modifies
+    ]
+    assert scaling_growth, "no modifier scales growth on this medium; the finding is unmeasurable"
+    assert not any(
+        PrecursorNonEhrlichFates.name in m.modifies
+        for m in structural.process_set._modifiers.values()
+    ), (
+        f"a modifier now names {PrecursorNonEhrlichFates.name}. The shipped sink rides the "
+        "ALCOHOL rate, which already carries its own factors, so scaling it as well would "
+        "double-count; this test's premise is that the growth-anchored COUNTERFACTUAL is the "
+        "thing that needs them"
+    )
+
+    corrected = [d260_arms[f"growth_mods_{edge}"]["split_pct"] for edge in _D259_EDGES]
+    uncorrected = [growth_anchored_split[edge]["leucine"]["pct"] for edge in _D259_EDGES]
+    crepin_lo, crepin_hi = _CREPIN_PROTEIN_PCT["leucine"]
+
+    for corrected_pct, plain_pct in zip(corrected, uncorrected, strict=True):
+        assert corrected_pct > plain_pct + 5.0, (
+            f"attaching growth's modifiers moved the split only {plain_pct:.1f} → "
+            f"{corrected_pct:.1f} %. If the two frames now agree, D-260 §4's correction has "
+            "become vacuous and the bracket pinned below is measuring nothing"
+        )
+    assert min(corrected) == pytest.approx(21.3, abs=1.5), (
+        f"corrected bracket low edge {min(corrected):.1f} % (recorded 21.3)"
+    )
+    assert max(corrected) == pytest.approx(33.7, abs=1.5), (
+        f"corrected bracket high edge {max(corrected):.1f} % (recorded 33.7)"
+    )
+    assert max(corrected) < crepin_lo, (
+        f"the corrected bracket tops out at {max(corrected):.1f} %, which must stay below "
+        f"Crépin's {crepin_lo:.0f}-{crepin_hi:.0f} %. **D-259's refusal survives the correction** "
+        "— this assert is what says so, and if it fails the refusal does not survive it"
+    )
+    assert min(corrected) > _D104_GROWTH_ANCHORED_PCT["leucine"], (
+        f"D-104's 20.9 % must now sit BELOW the corrected bracket's low edge "
+        f"({min(corrected):.1f} %), where D-259 measured it at the TOP of the uncorrected one. "
+        "That reversal is the correction; if it is gone, say so rather than re-pinning"
     )

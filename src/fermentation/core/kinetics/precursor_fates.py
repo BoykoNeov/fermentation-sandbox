@@ -42,11 +42,19 @@ glucose** — so it could never put a gram into ``S``. Building a gluconeogenesi
 therefore not license the overrun; the overrun is arithmetic, not physiology.
 
 **Why it rides the re-route's draw rather than growth.** Anchoring to growth (``w_i·dX/dt`` at
-biomass composition) is the obvious form and it is **measurably wrong**: it makes each precursor's
-split fall out of *demand*, and the model's Ehrlich demand pulls the **amino acid**, so the
-largest alcohol drains its own precursor hardest. Measured against Crépin, that split is
-**monotonically inverted** — model leucine 20.9% to protein against a measured 77–86%, model
-order leu<ile<val<thr against Crépin's thr<val<ile<leu, exactly reversed. No biomass composition
+biomass composition) is the obvious form and it is **measurably wrong for the four precursors
+that have no de-novo route — not wrong as a form.** [The unqualified claim this sentence used to
+make was corrected at D-259: growth-anchoring lands **phenylalanine** on its sourced fate to
+within 0.5 points (97.2–98.5% against 0.975), and a mutation arm zeroing
+``f_de_novo_2_phenylethanol`` drops it to 37.1%, so it is the **route** that does that, not
+supply limitation. See the bottom of this docstring.] For the other four it makes each
+precursor's split fall out of *demand*, and the model's Ehrlich demand pulls the **amino acid**,
+so the largest alcohol drains its own precursor hardest. Measured against Crépin, that split is
+**inverted at the ends** — model leucine 20.9% to protein against a measured 77–86%, model
+order leu<ile<val<thr against Crépin's thr<val<ile<leu. [D-259 corrected "exactly reversed": the
+isoleucine/valine pair now reads the way Crépin measures it, because D-111 gave valine a second
+Ehrlich branch. And 20.9% is **one edge of a biomass composition recorded nowhere** — see below.]
+No biomass composition
 repairs it: for leucine to reach 77–86% by demand its protein demand would need ~4× the isoamyl
 demand — roughly half the biomass being leucine. Reality escapes the inversion by building
 isoamyl from **KIC**, a keto acid that is mostly *de novo*, so the leucine pool never faces that
@@ -171,6 +179,35 @@ share since D-19 — it does **not** create a new one, and ``total_carbon`` stil
 ~3e-5. Charging it properly would touch all five alcohols in **both** media — beer sources every
 fusel de novo — and would move the §2.2 beer benchmarks, so it is deliberately out of this beat's
 scope. See DECISIONS D-118.]**
+
+**[D-259/D-260 — WHAT THE GROWTH-ANCHORED ALTERNATIVE ACTUALLY MEASURES, since the paragraph
+above refuses it.** Three things about that refusal are worth carrying next to it.
+
+*(i) Its headline number rests on an input this project has never recorded.* "Leucine 20.9%"
+needs a yeast protein amino-acid composition, and none exists — not here, not in D-104, not in
+any receipts folder (``must_aa_fraction_*`` is the MUST spectrum, a different quantity). Across a
+stated bracket the growth-anchored leucine share spans **13.1–22.0%** and D-104's point sits at
+the top edge. **Do not quote 20.9% as "the model's" growth-anchored split.**
+
+*(ii) That bracket is itself in the wrong frame, and D-32 is the record that says so.* A
+growth-anchored draw written ``w_i·base_dx·gate`` carries **none of growth's rate modifiers** —
+``ArrheniusTemperature.for_growth(*also_scales)`` and ``BiomassCarryingCapacity.modifies`` name
+:class:`~fermentation.core.kinetics.growth.GrowthNitrogenLimited` and the D-32 amino-acid swap,
+never this Process — so it is anchored to the *pre-modifier* rate while the biomass it claims to
+feed grows at the realised one. Attaching them moves the bracket to **21.3–33.7%** (D-260). The
+refusal survives at every edge; every number in it moves, and D-104's 20.9% ends up just *below*
+the corrected low edge rather than at the top of the uncorrected one.
+
+*(iii) The split it produces is NOT a free knob — it is Rollero's leucine tracer, read from the
+other end.* On Crépin's must the pool is emptied whatever draws it and the isoamyl total is inert
+under any numerator-side change, so ``tracer = (1 − split)·consumed/isoamyl`` ties the two
+one-for-one. The shipped sink sits at the Crépin end (split 81.5%, tracer 1.51% against a
+measured 3.4–8.2%); the growth-anchored form sits at the Rollero end (split 27.6%, tracer 5.90%).
+**Neither is the other's repair, and no re-anchoring of this sink can be at both ends of one
+line.** What would relieve it is the isoamyl **denominator** — joint satisfaction needs ≤1170 µM
+where this fixture makes 2123 µM and Rollero's own ferments print 793–1365 µM — i.e. the
+incommensurate denominator D-112 already recorded. That is **not** a licence to recalibrate
+``k_isoamyl_alcohol``, which D-112 measured to be right. See DECISIONS D-259 and D-260.]**
 """
 
 from __future__ import annotations

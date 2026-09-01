@@ -74,6 +74,24 @@ past it from this file.** **Never evict an old prohibition to buy a line.**
 - **D-257 §7's blocker DOES clear** (phenylalanine 45.45 → 0.09 % under the `k` rescale) — but that
   is **within-fixture**; never quote it against D-257's own 20.3/65.8 %. **The build stays owner-gated.**
 
+**D-260 — the NUMERATOR side. Read before proposing ANY growth-driven precursor work.**
+- **D-259 §5's "that side is untested" is ANSWERED and the answer is a REFUSAL — do not re-open
+  it as open.** The split and Rollero's leucine tracer are **ONE knob**: the pool ends 0.00 %
+  in every arm and isoamyl moves < 0.01 %, so `tracer = (1−split)·consumed/isoamyl` binds them.
+  Shipped = Crépin end (81.50 % / 1.507 %); growth-anchored = Rollero end (27.58 % / 5.900 %).
+  **Neither is the other's repair.** The lever WORKS (λ=5 → 73.29 %) and pays 2.176 % on the
+  tracer. **Never say growth-anchoring "misses the tracer"** — it LANDS it; the shipped form misses it.
+- **The tracer gain is NOT growth-anchoring's** — the shipped form at a matched `f`=0.174 reads
+  6.730 % against the counterfactual's 6.726 %. It belongs to the SPLIT, whatever produces it.
+- **D-259's bracket was the PRE-MODIFIER frame — corrected to 21.3-33.7 % (leucine).** A
+  growth-anchored draw carries **none** of growth's rate modifiers (they attach by Process NAME;
+  D-32 is the rule). **D-104's 20.9 % now sits BELOW the corrected low edge, not at the top.**
+  Refusal + order correction SURVIVE; every number moves, and "monotonically inverted" does not
+  describe the corrected form (valine brackets Crépin's 41, threonine sits above her 38).
+- **The live question is the isoamyl DENOMINATOR, and it is commensurability, NOT calibration.**
+  Joint satisfaction needs ≤ 1170 µM; the fixture makes 2123; Rollero's own print 793-1365.
+  **`k_isoamyl_alcohol` is RIGHT (D-112) — this is not a licence to re-fit it.**
+
 **Fusel node (D-245) — read before touching the de-novo helpers or citing D-120**
 - **`_de_novo_share` must use `ehrlich_primary_share`, never `(1-f)`.** Valine's Ehrlich carbon
   splits AGAIN (0.15 isobutanol / 0.23 isoamyl via KIC), so `(1-f)=0.38` charges isobutanol with
