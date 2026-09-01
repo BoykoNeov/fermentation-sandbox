@@ -17,9 +17,12 @@ by the snippet in [Checking this document](#checking-this-document) at the end.
 
 ## Layering
 
-Four layers with strictly one-directional dependencies — a lower layer never imports a higher one:
+Five layers with strictly one-directional dependencies — a lower layer never imports a higher one:
 
 ```
+  app (interface)         local Streamlit console + written HTML report
+        │  imports the engine; the engine does not know it exists
+  ──────┼──────────────────────────────────────────────────────────
   scenario / validation   declarative recipes, benchmark comparison, analysis
         │  consumes time-series; owns no physics
   ──────┼──────────────────────────────────────────────────────────
@@ -35,6 +38,13 @@ Four layers with strictly one-directional dependencies — a lower layer never i
 `analysis` and `sensory` are **top-layer readouts**, siblings of `validation`: they consume a
 finished `Trajectory` and are imported by nothing lower. The chemistry never imports them back.
 
+`app/` is a **top-level package outside `src/`** (decision D-261) and is the only layer that is
+not shipped in the wheel. It exists so the packaged library stays exactly what it was — four
+runtime dependencies and no interface code — while the console it drives lives in the same
+repository and is held to the same lint, type and test gates. Its dependencies (Streamlit,
+Plotly) sit in the `ui` dependency group, so `uv sync` alone does not install them; run
+`uv sync --group ui` for the app. See `app/README.md`.
+
 ### Package map
 
 | Layer | Package | Contents |
@@ -47,6 +57,7 @@ finished `Trajectory` and are imported by nothing lower. The chemistry never imp
 | validation | `fermentation.validation` | `assert_conserved`, `assert_nonnegative`, `total_carbon`, `total_nitrogen`, `total_mass`, `BenchmarkSpec`, `ReferenceSeries`, `compare_series` |
 | analysis | `fermentation.analysis` | `ph_series`, `titratable_acidity_series`, `molecular_so2_series`, `free_so2_series`, `bound_so2_series`, `ibu_series`, `astringency_series`, `polymeric_pigment_series`, `color_series`, `observed_color_series`, `attribute_spread` |
 | sensory | `fermentation.sensory` | `oav_series`, `sensory_profile`, `oav_tier`, `load_thresholds`, `AROMA_COMPOUNDS`; `MaxRuleProjector`/`DescriptorProjector`; `StevensProjector`, `dominant_flip_sensitivity` |
+| app | `app` (top level, not packaged) | `main` (the Streamlit page, the only Streamlit importer); `render` (framework-free figures/panels); `readouts`, `runner`, `provenance`, `report`, `fidelity`, `library` |
 
 ## The core
 

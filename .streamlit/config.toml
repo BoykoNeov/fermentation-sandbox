@@ -1,0 +1,20 @@
+# The console commits to one light theme rather than following the viewer's OS.
+#
+# The chart palette in app/render.py is picked from the subject — garnet, must gold, bottle
+# glass, tank steel, oak, hop, copper, lees — and those are mid-to-dark hues chosen to read
+# against a warm near-white. Letting the ground flip to near-black would leave the darkest
+# two of them barely visible, and confidence is carried here by line WEIGHT and dash pattern,
+# which is exactly what gets lost when a thin dotted line loses contrast. A palette is
+# designed against a ground; this pins the ground.
+[theme]
+base = "light"
+primaryColor = "#7c1d3f"
+backgroundColor = "#fbfaf7"
+secondaryBackgroundColor = "#f0ece4"
+textColor = "#1c1a17"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false

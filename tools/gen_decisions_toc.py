@@ -319,6 +319,31 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"speciate",
         ),
     ),
+    (
+        # The interface layer above the engine (D-261). Its own bucket rather than folded
+        # into "tooling": a record about what a user is SHOWN, and how much confidence the
+        # showing claims, is a different search from one about build tooling — and the
+        # honesty traps it turns up (an untouched slot reading `validated`, a falsy tier)
+        # are what someone should re-read before touching any output surface.
+        "Interface, readouts & reporting",
+        (
+            r"\bapp\b",
+            r"\bui\b",
+            r"interface",
+            r"streamlit",
+            r"\bplotly\b",
+            r"\bconsole\b",
+            r"\bchart",
+            r"\bfigure",
+            r"\bbadge",
+            r"\breport",
+            r"\breadout",
+            r"user-facing",
+            r"plain language",
+            r"\bcaveat",
+            r"\binert\b",
+        ),
+    ),
 ]
 
 UNBUCKETED = "Matching no rule (a `TOPIC_RULES` gap — fix the rules, not this line)"

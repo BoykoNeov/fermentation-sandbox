@@ -22,10 +22,11 @@ makes each expansion an *addition* rather than a rewrite.
 
 ## Architecture
 
-Four layers, strictly one-directional dependencies (lower layers know nothing of
+Five layers, strictly one-directional dependencies (lower layers know nothing of
 higher ones):
 
 ```
+  app (interface)         local console + written report — NOT part of the package
   scenario / validation   declarative recipes, benchmark comparison, analysis
   runtime                 time-stepping, events, phase switching, ensembles
   domain core             pure deterministic state + Process derivatives
@@ -74,6 +75,19 @@ Benchmarks (skipped until kinetics land) are marked; run only them with:
 ```bash
 uv run pytest -m benchmark
 ```
+
+### The console
+
+There is a local app for building a batch, running it, and following any line on the
+chart back to the papers the numbers came from. It is optional and installs nothing by
+default — the packaged library remains four runtime dependencies with no interface code.
+
+```bash
+uv sync --group ui
+uv run streamlit run app/main.py
+```
+
+See [`app/README.md`](app/README.md).
 
 ## License
 
