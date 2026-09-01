@@ -26,6 +26,7 @@ all". Every check here is ``is None``.
 from __future__ import annotations
 
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 # Streamlit runs this file as a script, so the repo root is not on the path — only app/ is.
@@ -148,6 +149,12 @@ def badge(tier: object) -> str:
 
 
 # -- session state -------------------------------------------------------------------------
+#
+# Every number in the batch form is owned by its widget *key* and by nothing else. No widget
+# below passes both ``key=`` and ``value=``. That combination is what makes a stepper fight
+# the page: ``value=`` is recomputed from state written at the *end* of the previous run, so
+# a click that lands while the previous run is still working gets overwritten by the older
+# number the moment the page redraws — which reads, correctly, as "it reset itself".
 
 if "interventions" not in st.session_state:
     st.session_state.interventions = []
@@ -155,22 +162,51 @@ if "saved" not in st.session_state:
     st.session_state.saved = {}
 if "loaded_starter" not in st.session_state:
     st.session_state.loaded_starter = None
+if "editor_epoch" not in st.session_state:
+    st.session_state.editor_epoch = 0
+
+
+def seed_state(key: str, value: object) -> None:
+    """Give a widget key a starting value without ever fighting the widget for it."""
+    if key not in st.session_state:
+        st.session_state[key] = value
+
+
+def seed_composition(medium: str, values: Mapping[str, float]) -> None:
+    """Write a batch's composition straight into the widget keys, replacing what is there."""
+    primary = PRIMARY_INPUTS[medium]
+    extras: list[str] = []
+    for key in primary:
+        st.session_state[f"init_{key}"] = float(
+            values.get(key, DEFAULT_INPUTS[medium].get(key, 0.0))
+        )
+    for key, value in values.items():
+        if key in primary:
+            continue
+        st.session_state[f"extra_{key}"] = float(value)
+        extras.append(key)
+    st.session_state.extra_chosen = sorted(extras)
 
 
 def load_starter(name: str) -> None:
     sc = STARTERS[name]
     st.session_state.loaded_starter = name
     st.session_state.medium = sc.medium
+    st.session_state.loaded_medium = sc.medium
     st.session_state.run_name = sc.name
-    st.session_state.duration = sc.duration_days
+    st.session_state.duration = float(sc.duration_days)
     st.session_state.closure = sc.closure or "(none)"
-    st.session_state.initial = dict(sc.initial)
+    seed_composition(sc.medium, sc.initial)
     st.session_state.temps = [
         {"day": p.day, "celsius": p.celsius} for p in sc.temperature_schedule
     ] or [{"day": 0.0, "celsius": 20.0}]
     st.session_state.interventions = [
         {"day": iv.day, "action": iv.action, "params": dict(iv.params)} for iv in sc.interventions
     ]
+    # The temperature table is a *keyed* editor, and a keyed editor stores edits, not data.
+    # Handed a different batch's rows under the same key it replays the previous batch's
+    # edits on top of them. A fresh key per load is the whole fix.
+    st.session_state.editor_epoch += 1
 
 
 if st.session_state.loaded_starter is None:
@@ -185,79 +221,97 @@ with st.sidebar:
     starter = st.selectbox(
         "Start from",
         list(STARTERS),
-        index=list(STARTERS).index(st.session_state.loaded_starter)
-        if st.session_state.loaded_starter in STARTERS
-        else 0,
+        key="starter_choice",
         help="Loads a complete batch you can then change. Picking a different one starts over.",
     )
     if starter != st.session_state.loaded_starter:
         load_starter(starter)
         st.rerun()
 
-    name = st.text_input("Call this run", value=st.session_state.get("run_name", "Untitled"))
-    medium = st.selectbox(
-        "Wine or beer", MEDIA, index=MEDIA.index(st.session_state.get("medium", "wine"))
-    )
-    if medium != st.session_state.get("medium"):
-        st.session_state.medium = medium
-        st.session_state.initial = dict(DEFAULT_INPUTS[medium])
+    name = st.text_input("Call this run", key="run_name")
+    medium = st.selectbox("Wine or beer", MEDIA, key="medium")
+    if medium != st.session_state.loaded_medium:
+        st.session_state.loaded_medium = medium
+        st.session_state.closure = "(none)"
+        seed_composition(medium, DEFAULT_INPUTS[medium])
+        st.session_state.editor_epoch += 1
         st.rerun()
 
-    duration = st.number_input(
-        "Follow it for (days)",
-        min_value=0.5,
-        max_value=3650.0,
-        value=float(st.session_state.get("duration", 14.0)),
-        step=1.0,
-    )
-
     st.markdown("### What is in it")
-    initial: dict[str, float] = {}
-    stored = st.session_state.get("initial", {})
-    for key in PRIMARY_INPUTS[medium]:
-        unit = input_unit(key)
-        initial[key] = st.number_input(
-            f"{input_label(key)}" + (f" [{unit}]" if unit else ""),
-            value=float(stored.get(key, DEFAULT_INPUTS[medium].get(key, 0.0))),
-            step=0.1,
-            format="%.4g",
-            key=f"init_{key}",
-        )
 
+    # Outside the form on purpose. Choosing an ingredient has to make its box appear at once;
+    # inside the form it would cost an Apply to reveal the box and a second one to set it.
     extra_keys = [k for k in allowed_initial_keys(medium) if k not in PRIMARY_INPUTS[medium]]
     with st.expander(f"Everything else you can put in ({len(extra_keys)} more)"):
         st.caption(
             "The full list the model accepts for this kind of batch, read from the engine "
             "itself so it can never fall behind. Left at zero, an ingredient simply is not "
-            "there."
+            "there. Tick one and its box appears with the rest, below."
         )
+        seed_state("extra_chosen", [])
         chosen = st.multiselect(
             "Add an ingredient or a starting condition",
             extra_keys,
-            default=[k for k in extra_keys if k in stored],
+            key="extra_chosen",
             format_func=lambda k: f"{input_label(k)}  ({k})",
         )
-        for key in chosen:
+
+    # Everything that is a plain number lives in one form, so a stepper does not re-run the
+    # whole model on every click. Nothing here takes effect until Apply.
+    with st.form("batch_form", border=False):
+        initial: dict[str, float] = {}
+        for key in [*PRIMARY_INPUTS[medium], *chosen]:
             unit = input_unit(key)
+            prefix = "init" if key in PRIMARY_INPUTS[medium] else "extra"
+            seed_state(f"{prefix}_{key}", float(DEFAULT_INPUTS[medium].get(key, 0.0)))
             initial[key] = st.number_input(
                 f"{input_label(key)}" + (f" [{unit}]" if unit else ""),
-                value=float(stored.get(key, 0.0)),
                 step=0.1,
                 format="%.4g",
-                key=f"extra_{key}",
+                key=f"{prefix}_{key}",
             )
 
-    st.markdown("### Temperature")
-    st.caption("Straight lines between the points you give. A single row holds it steady.")
-    temps_df = st.data_editor(
-        pd.DataFrame(st.session_state.get("temps", [{"day": 0.0, "celsius": 20.0}])),
-        num_rows="dynamic",
-        width="stretch",
-        column_config={
-            "day": st.column_config.NumberColumn("Day", min_value=0.0, step=1.0),
-            "celsius": st.column_config.NumberColumn("°C", step=0.5),
-        },
-        key="temp_editor",
+        seed_state("duration", 14.0)
+        duration = st.number_input(
+            "Follow it for (days)",
+            min_value=0.5,
+            max_value=3650.0,
+            step=1.0,
+            key="duration",
+        )
+
+        st.markdown("### Temperature")
+        st.caption("Straight lines between the points you give. A single row holds it steady.")
+        temps_df = st.data_editor(
+            pd.DataFrame(st.session_state.temps),
+            num_rows="dynamic",
+            width="stretch",
+            column_config={
+                "day": st.column_config.NumberColumn("Day", min_value=0.0, step=1.0),
+                "celsius": st.column_config.NumberColumn("°C", step=0.5),
+            },
+            key=f"temp_editor_{st.session_state.editor_epoch}",
+        )
+
+        closure_options = ["(none)", *CLOSURES]
+        seed_state("closure", "(none)")
+        closure = st.selectbox(
+            "Bottle closure (wine, for aging)",
+            closure_options,
+            key="closure",
+            disabled=medium != "wine",
+            help="How much oxygen creeps in past the seal. Each closure carries its own "
+            "measured rate, which is why this is a list to choose from rather than a number "
+            "to invent.",
+        )
+
+        st.form_submit_button("Apply and run", type="primary", width="stretch")
+
+    st.caption(
+        "Change as many of the numbers above as you like: nothing is re-run until you press "
+        "Apply. A run takes a second or two, so a page that re-ran on every click could not "
+        "keep up with someone holding a stepper down — and would hand back the older number "
+        "while it caught up."
     )
 
     st.markdown("### Things you do to it")
@@ -300,18 +354,6 @@ with st.sidebar:
                 {"day": float(day), "action": verb, "params": params}
             )
             st.rerun()
-
-    closure_options = ["(none)", *CLOSURES]
-    closure = st.selectbox(
-        "Bottle closure (wine, for aging)",
-        closure_options,
-        index=closure_options.index(st.session_state.get("closure", "(none)"))
-        if st.session_state.get("closure", "(none)") in closure_options
-        else 0,
-        disabled=medium != "wine",
-        help="How much oxygen creeps in past the seal. Each closure carries its own measured "
-        "rate, which is why this is a list to choose from rather than a number to invent.",
-    )
 
     # -- settings: three separate things, never one slider ---------------------------------
     st.markdown("---")
@@ -395,14 +437,35 @@ with st.sidebar:
 
     fidelity = Fidelity(points=points, oxidative=oxidative, strict=strict, **fidelity_kwargs)  # type: ignore[arg-type]
 
+    # -- how the charts are drawn: ink and scale, neither of which touches the answer -------
+    st.markdown("---")
+    st.markdown("### How the charts look")
+
+    appearance = st.radio(
+        "Ink",
+        ["page", "light", "dark"],
+        horizontal=True,
+        key="appearance",
+        format_func=lambda k: {"page": "Match the page", "light": "Light", "dark": "Dark"}[k],
+        help="The page itself is switched under the ⋮ menu at the top right, in "
+        "Settings ▸ Appearance, and 'match the page' follows that. The browser reports a "
+        "theme change one step late, so if the charts lag behind the page for a moment, they "
+        "catch up on the next thing you touch — or pin them here.",
+    )
+    page_theme = getattr(st.context.theme, "type", None) or "light"
+    theme = render.THEMES[page_theme if appearance == "page" else appearance]
+
+    log_y = st.toggle(
+        "Log scale up the side",
+        key="log_y",
+        help="Worth it for anything that grows or decays by factors rather than by amounts — "
+        "yeast in the first two days, an ester climbing from nothing. A log scale has no "
+        "zero, so the parts of a line that sit at zero are drawn along the bottom of the "
+        "axis; the note under the charts says which lines that affected.",
+    )
+
 
 # -- assemble the batch --------------------------------------------------------------------
-
-st.session_state.run_name = name
-st.session_state.duration = duration
-st.session_state.initial = initial
-st.session_state.temps = temps_df.to_dict("records")
-st.session_state.closure = closure
 
 temp_points = [
     TemperaturePoint(day=float(row["day"]), celsius=float(row["celsius"]))
@@ -514,20 +577,29 @@ with tab_run:
 
     drawn: list[readouts.Readout] = []
     groups = readouts.groups_for(result)
+    for _group, live in groups:
+        drawn.extend(live)
+
+    log_panel = render.log_scale_panel(result, drawn) if log_y else None
+    if log_panel is not None:
+        st.warning(f"**{log_panel.title}** — {log_panel.body}")
+
     for i in range(0, len(groups), 2):
         cols = st.columns(2)
         for col, (group, live) in zip(cols, groups[i : i + 2], strict=False):
             with col:
                 st.plotly_chart(
-                    render.series_figure(result, group, live),
+                    render.series_figure(result, group, live, theme=theme, log_y=log_y),
                     width="stretch",
                     key=f"fig_{group.title}",
                 )
                 if group.blurb:
                     st.caption(group.blurb)
+                empty = render.flat_group_panel(result, group, live)
+                if empty is not None:
+                    st.info(f"**{empty.title}** — {empty.body}")
                 for panel in render.caveat_panels(live):
                     st.warning(f"**{panel.title}** — {panel.body}")
-                drawn.extend(live)
 
     # -- the source trail: reachable, deliberately not the headline -------------------------
     st.markdown("---")
@@ -693,7 +765,7 @@ with tab_spread:
         )
         for key in pick:
             st.plotly_chart(
-                render.band_figure(ens, readouts.BY_KEY[key], result),
+                render.band_figure(ens, readouts.BY_KEY[key], result, theme=theme, log_y=log_y),
                 width="stretch",
                 key=f"band_{key}",
             )
@@ -718,7 +790,9 @@ with tab_spread:
         except Exception as exc:
             st.warning(str(exc))
         else:
-            st.plotly_chart(render.spread_figure(att), width="stretch", key="spreadfig")
+            st.plotly_chart(
+                render.spread_figure(att, theme=theme), width="stretch", key="spreadfig"
+            )
             st.caption(
                 f"This simple fit accounts for {att.r_squared:.0%} of the movement; the other "
                 f"{att.unexplained:.0%} comes from numbers interacting with each other, which "
@@ -768,7 +842,7 @@ with tab_compare:
         pairs = [(nm, st.session_state.saved[nm]) for nm in picked]
         for key in chosen:
             st.plotly_chart(
-                render.compare_figure(pairs, readouts.BY_KEY[key]),
+                render.compare_figure(pairs, readouts.BY_KEY[key], theme=theme, log_y=log_y),
                 width="stretch",
                 key=f"cmp_{key}",
             )
@@ -808,7 +882,9 @@ with tab_data:
     st.write(
         "The same charts and the same source tables as this page, in one file that opens in "
         "any browser with nothing else installed. It is produced by the same code that draws "
-        "this screen, so the two cannot end up disagreeing."
+        "this screen, so the two cannot end up disagreeing — including the ink and the "
+        "vertical scale, which are written into the file as they are set right now rather "
+        "than left to flip with whatever machine opens it."
     )
     explain_vars = st.multiselect(
         "Include the source tables for",
@@ -819,7 +895,14 @@ with tab_data:
         out = REPORT_DIR / f"{scenario.name.replace(' ', '-').lower()}.html"
         stored = st.session_state.get("convergence")
         fresh = stored[2] if stored is not None and stored[:2] == (scenario, fidelity) else None
-        path = report.write(result, out, convergence=fresh, explain=tuple(explain_vars))
+        path = report.write(
+            result,
+            out,
+            convergence=fresh,
+            explain=tuple(explain_vars),
+            theme=theme,
+            log_y=log_y,
+        )
         st.success(f"Saved to {path}")
         st.download_button(
             "Download it", data=path.read_bytes(), file_name=path.name, mime="text/html"

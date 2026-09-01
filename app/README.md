@@ -81,8 +81,37 @@ exist for that reason alone.
 
 ## Theme
 
-The console pins a single light theme in `.streamlit/config.toml` rather than following the
-viewer's system setting. The chart palette is drawn from the subject — garnet, must gold,
-bottle glass, tank steel, oak, hop, copper, lees — and those are mid-to-dark hues chosen to
-read against a warm near-white. Confidence is carried here by line weight and dash pattern,
-which is precisely what a thin dotted line loses when the ground flips to near-black.
+The console offers both grounds. `.streamlit/config.toml` carries a `[theme.light]` and a
+`[theme.dark]` block, so **Settings ▸ Appearance** under the ⋮ menu switches the whole page,
+and the sidebar's *Ink* control decides which palette the charts are drawn in — following
+the page by default. It used to pin light, on the argument that the palette is mid-to-dark
+hues chosen against a warm near-white and that confidence is carried by line *weight* and
+dash pattern, which is what a thin dotted line loses on a bad ground. That argument was
+right about the constraint and wrong about the remedy: the fix is a second palette designed
+against near-black, not a ground nobody may change. `render.LIGHT` and `render.DARK` are the
+same eight subject hues chosen twice, and `TIER_STYLE` is deliberately *not* per-theme — a
+ground may change a hue, never the meaning of a dash.
+
+## Vertical scale
+
+The sidebar's *Log scale up the side* applies to every chart on the page and to the written
+report. A log axis needs two guards that Plotly does not give you, both in `render`:
+
+- **Floored off the data, not the dust.** A run ends at ~1e-8 g/L of sugar. Autoscaled, the
+  log axis would span from that dust to 200 g/L and squash the whole ferment into the top
+  decade. Each axis is floored `LOG_DECADES` (six) below its own peak.
+- **Clamped, not dropped.** Plotly silently drops non-positive points, so a sugar line that
+  reaches zero appears to *stop* days before the run ends. Values under the floor are drawn
+  along it and the true value rides in `customdata`, so the hover never lies. Which lines
+  that affected is printed, by name, in `render.log_scale_panel`.
+
+## The chart with nothing on it
+
+A white must has no anthocyanin and no tannin, so the colour chart is four flat lines and
+reads as a broken page. `render.flat_group_panel` says so in words, triggered on the engine's
+own notion — every readout on the chart is *inert* — rather than on how the pixels came out,
+so a chart where three lines are flat and the fourth is the whole story gets no note. The
+sentence about what would fill it lives on the `Group` as `when_empty`, next to its blurb.
+Two batches reach the same empty chart for opposite reasons (a white has no pigment; a red
+has pigment but no aging step to switch the chemistry on), which is why the note reports
+*flat at zero* separately from *flat at the value it started from*.

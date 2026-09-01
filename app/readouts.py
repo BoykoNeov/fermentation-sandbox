@@ -354,6 +354,11 @@ class Group:
     #: Second y-axis for readouts whose scale would otherwise flatten the first.
     secondary: tuple[str, ...] = field(default_factory=tuple)
     blurb: str = ""
+    #: Shown *instead of nothing* when every readout on this chart is inert — no chemistry in
+    #: the run writes to any of them, so the chart is a set of flat lines and reads as broken.
+    #: One sentence naming what would make it move. The generic half of that message lives in
+    #: ``render.flat_group_panel``; this is the part only the group knows.
+    when_empty: str = ""
 
 
 GROUPS: tuple[Group, ...] = (
@@ -370,6 +375,8 @@ GROUPS: tuple[Group, ...] = (
         blurb="Yeast eats beer's three sugars in order rather than all at once. If the "
         "maltotriose line never comes down, the model is showing a beer that stops short "
         "of finishing.",
+        when_empty="The three sugars only move once the yeast starts on them, so a batch "
+        "where nothing ferments leaves all three exactly where they began.",
     ),
     Group(
         "Alcohol and gravity",
@@ -390,6 +397,8 @@ GROUPS: tuple[Group, ...] = (
         secondary=("ph",),
         blurb="pH is not tracked directly. It is worked out from the acids present at each point "
         "in the run, so it only moves because they move.",
+        when_empty="Give the batch a starting pH and some tartaric or malic acid, or add a "
+        "malolactic culture, and these start to move.",
     ),
     Group(
         "Sulfur dioxide",
@@ -398,12 +407,17 @@ GROUPS: tuple[Group, ...] = (
         blurb="Free sulfur dioxide dips early, then comes back. Nobody wrote that dip into the "
         "model: it happens because a compound the yeast makes early on ties the SO2 up, and "
         "releases it again as that compound is used up.",
+        when_empty="There is no sulfur dioxide in this batch. Add some under 'SO2 at the "
+        "crusher' in the extra ingredients, or with an addition on a chosen day.",
     ),
     Group(
         "Oxygen and oxidation",
         ("o2", "quinone", "acetaldehyde", "a420"),
         secondary=("a420",),
         blurb="Oxygen going in at one end, browning coming out at the other.",
+        when_empty="No oxygen reaches this batch. Give it dissolved oxygen at the start, "
+        "aerate it on a chosen day, or seal it under a closure and let it age - a closure "
+        "lets a measured trickle of oxygen through the seal.",
     ),
     Group(
         "Colour and phenolics",
@@ -411,12 +425,19 @@ GROUPS: tuple[Group, ...] = (
         secondary=("a420",),
         blurb="Loose colour pigments bind into stable ones over time. The wine keeps its colour "
         "and, from then on, cannot easily lose it.",
+        when_empty="Two things are needed and a batch can be missing either. There has to be "
+        "pigment in it - a white must has none, so add anthocyanin and tannin under "
+        "'Everything else you can put in', or start from the red wine batch - and the "
+        "pigment chemistry only runs once the wine is aging, so the batch also needs a "
+        "'begin aging' step and long enough after it to matter.",
     ),
     Group(
         "Bitterness",
         ("ibu",),
         blurb="Bitterness drops during fermentation because the bittering compounds stick to the "
         "yeast and get carried out with it. Finished beer is less bitter than the kettle was.",
+        when_empty="Nothing was hopped into this batch, so there is no bitterness to lose. "
+        "Add a hop addition on a chosen day.",
     ),
     Group(
         "Aroma",
@@ -425,12 +446,16 @@ GROUPS: tuple[Group, ...] = (
         blurb="The compounds a taster would put a word to - banana, apple, solventy, buttery, "
         "eggy. These are the least well grounded numbers on the whole page. Read whether a "
         "line rises or falls, not how far.",
+        when_empty="These are made by fermenting yeast, so a batch where nothing ferments "
+        "makes none of them.",
     ),
     Group(
         "Oak and age",
         ("vanillin", "sotolon", "ethylphenols"),
         blurb="Nothing here moves until the run reaches an aging step. Before that these are all "
         "flat by construction.",
+        when_empty="Add a 'begin aging' step on a chosen day, and follow the batch for long "
+        "enough after it, and these start to move. Oak needs an oak addition as well.",
     ),
 )
 

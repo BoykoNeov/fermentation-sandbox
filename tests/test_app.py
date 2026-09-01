@@ -373,3 +373,232 @@ def test_report_is_one_self_contained_file(tmp_path, white_wine):
     assert '<script src="http' not in text, "nothing may be fetched from the network"
     # The warnings have to survive the trip into the file.
     assert "Trust the starting value" in text or "under-count" in text
+
+
+# -- the drawing: theme, log scale, and the chart that has nothing on it -----------------------
+#
+# These do not check that a chart is pretty. They check the three ways a change to the drawing
+# can be silently WRONG: a theme that quietly drops the channel confidence is carried in, a log
+# axis that reports solver dust as the story, and a chart of flat lines that reads as a broken
+# page rather than as an answer about the batch.
+
+
+def test_a_theme_may_change_the_hue_but_never_the_confidence_channel():
+    """Line weight and dash pattern are the tier. A ground is allowed to change neither.
+
+    ``TIER_STYLE`` is deliberately not a per-theme table. If someone ever splits it into one,
+    a dark chart could carry a different dash for "speculative" than the light chart of the
+    same run, and the two screenshots would disagree about how far a curve can be trusted.
+    """
+    pytest.importorskip("plotly")
+    from app import render
+
+    for theme in render.THEMES.values():
+        assert len(theme.palette) == len(render.LIGHT.palette)
+        assert theme.inert not in theme.palette, "inert must not collide with a live series"
+    assert render.TIER_STYLE[Tier.SPECULATIVE] == ("dot", 1.8)
+    assert render.TIER_STYLE[None] == ("longdash", 1.0)
+
+
+def test_both_themes_draw_the_same_run_with_the_same_dashes(white_wine):
+    """Same batch, two grounds: only the colours may differ, trace for trace."""
+    pytest.importorskip("plotly")
+    from app import render
+    from app.readouts import groups_for
+
+    group, live = groups_for(white_wine)[0]
+    light = render.series_figure(white_wine, group, live, theme=render.LIGHT)
+    dark = render.series_figure(white_wine, group, live, theme=render.DARK)
+    assert len(light.data) == len(dark.data)
+    for a, b in zip(light.data, dark.data, strict=True):
+        assert (a.line.dash, a.line.width) == (b.line.dash, b.line.width)
+        assert a.name == b.name
+        assert a.line.color != b.line.color
+
+
+def test_a_log_axis_is_floored_off_the_data_not_off_the_solver_dust(white_wine):
+    """A run that ends at 1e-8 g/L must not hand a log axis eight decades of nothing.
+
+    Sugar finishes at solver dust of order 1e-8 and ethanol starts at exactly zero. Left to
+    autoscale, a log axis would span from that dust to 200 g/L and squash the entire ferment
+    into the top decade; left to Plotly's own handling, every non-positive point would be
+    dropped and the sugar line would appear to *stop* days before the run ends.
+    """
+    pytest.importorskip("plotly")
+    import numpy as np
+
+    from app import render
+    from app.readouts import groups_for
+
+    group, live = groups_for(white_wine)[0]
+    fig = render.series_figure(white_wine, group, live, log_y=True)
+
+    assert fig.layout.yaxis.type == "log"
+    low, high = fig.layout.yaxis.range
+    assert high - low < render.LOG_DECADES + 1.0, "the axis reaches below its own floor"
+
+    floor = 10.0**low
+    for trace in fig.data:
+        drawn, truth = np.asarray(trace.y), np.asarray(trace.customdata)
+        assert len(drawn) == len(truth), "every point is still drawn, none dropped"
+        assert drawn.min() >= floor * 0.5, "a point below the floor would vanish"
+        # The hover reads off customdata, so clamping the line never falsifies a number.
+        assert np.allclose(truth, np.asarray(trace.customdata))
+        assert truth.min() <= drawn.min() + 1e-12
+
+
+def test_a_log_axis_is_refused_where_nothing_is_positive(white_wine):
+    """An all-zero chart gets no decade ruler drawn over it, log scale asked for or not."""
+    pytest.importorskip("plotly")
+    from app import render
+    from app.readouts import groups_for
+
+    colour = [g for g in groups_for(white_wine) if g[0].title.startswith("Colour")]
+    assert colour, "the white wine fixture is supposed to have an empty colour chart"
+    group, live = colour[0]
+    fig = render.series_figure(white_wine, group, live, log_y=True)
+    assert fig.layout.yaxis.type != "log"
+
+
+def test_a_flat_axis_is_never_given_a_negative_range(white_wine):
+    """Four lines flat at zero get 0 to 1, not Plotly's -1 to 1.
+
+    The default range is not merely ugly: on a chart labelled g/L it draws half an axis of
+    negative concentrations, which do not exist and which a reader will take as the model's
+    claim about the batch.
+    """
+    pytest.importorskip("plotly")
+    from app import render
+    from app.readouts import groups_for
+
+    group, live = [g for g in groups_for(white_wine) if g[0].title.startswith("Colour")][0]
+    fig = render.series_figure(white_wine, group, live)
+    assert fig.layout.yaxis.range is not None
+    assert fig.layout.yaxis.range[0] == 0.0
+    assert fig.layout.yaxis2.range[0] == 0.0, "the second axis needs the same treatment"
+
+
+def test_an_all_inert_chart_says_so_and_a_partly_live_one_does_not(white_wine):
+    """The colour chart is empty because a white must has no pigment in it. Say that.
+
+    The trigger has to be inertness rather than flatness. The oxygen chart in this same run
+    has three lines pinned at zero and one — acetaldehyde — carrying the whole story; a note
+    saying "nothing here moves" would be false there, and the assertion below is what stops
+    a later, looser trigger from putting it there.
+    """
+    pytest.importorskip("plotly")
+    from app import render
+    from app.readouts import groups_for
+
+    noted = {}
+    for group, live in groups_for(white_wine):
+        panel = render.flat_group_panel(white_wine, group, live)
+        if panel is not None:
+            noted[group.title] = panel
+
+    assert "Colour and phenolics" in noted
+    body = noted["Colour and phenolics"].body
+    assert "flat at zero" in body
+    assert "anthocyanin" in body, "the note must say what would make the chart move"
+    assert "Oxygen and oxidation" not in noted
+    assert "Fermentation" not in noted
+
+
+def test_the_empty_colour_note_separates_no_pigment_from_no_aging(white_wine):
+    """Two different batches land on the same empty chart for opposite reasons.
+
+    A white must has no pigment at all, so its colour lines sit at zero. A red *does* carry
+    anthocyanin and tannin, but the pigment chemistry only switches on once the wine ages, so
+    its lines sit at the values it was given. A note that blamed the missing ingredient would
+    be plainly false on the red one, standing beside a sidebar that shows 0.5 g/L of it.
+    """
+    pytest.importorskip("plotly")
+    from app import render
+    from app.readouts import groups_for
+    from app.runner import run_once
+
+    red = run_once(STARTERS["Red wine, warm ferment then malolactic"], DRAFT)
+    bodies = {}
+    for label, result in (("white", white_wine), ("red", red)):
+        group, live = next(g for g in groups_for(result) if g[0].title.startswith("Colour"))
+        panel = render.flat_group_panel(result, group, live)
+        assert panel is not None, f"the {label} colour chart is empty and must say so"
+        bodies[label] = panel.body
+
+    assert "flat at zero" in bodies["white"]
+    assert "flat at the value it started from" in bodies["red"]
+    # And whichever it is, the advice has to cover both halves of the answer.
+    for body in bodies.values():
+        assert "anthocyanin" in body and "aging" in body
+
+
+def test_the_advice_on_the_empty_colour_chart_actually_fills_it():
+    """Following the note has to work, or it is decoration.
+
+    Pigment plus an aging step is what the note asks for; this is that batch, and every line
+    it names must then be driven. Without this the note could go on recommending something
+    the engine stopped supporting and nothing would notice.
+    """
+    pytest.importorskip("plotly")
+    from app import render
+    from app.readouts import groups_for
+    from app.runner import run_once
+
+    aged = STARTERS["Bottle-aged white, screwcap"]
+    with_pigment = aged.model_copy(
+        update={"initial": {**aged.initial, "anthocyanin_gpl": 0.5, "tannin_gpl": 1.5}}
+    )
+    result = run_once(with_pigment, DRAFT)
+    group, live = next(g for g in groups_for(result) if g[0].title.startswith("Colour"))
+    assert render.flat_group_panel(result, group, live) is None
+    assert all(r.tier(result) is not None for r in live)
+
+
+def test_every_group_that_can_come_up_empty_says_what_would_fill_it():
+    """A note that only says "this is empty" is not worth printing."""
+    from app.readouts import GROUPS
+
+    for group in GROUPS:
+        if group.title in {"Fermentation", "Alcohol and gravity", "Yeast"}:
+            continue  # a run in which these are inert is a run that did not happen
+        assert group.when_empty, f"{group.title} can be empty and has nothing to suggest"
+
+
+def test_the_log_note_names_the_lines_it_is_about(white_wine):
+    """Named, not left for the reader to work out which line is sitting on the floor."""
+    pytest.importorskip("plotly")
+    from app import render
+    from app.readouts import BY_KEY
+
+    ethanol = BY_KEY["ethanol"]  # starts at exactly zero
+    panel = render.log_scale_panel(white_wine, [ethanol])
+    assert panel is not None and "Ethanol" in panel.body
+
+    temperature = BY_KEY["temperature"]  # in celsius, never near zero in this run
+    assert render.log_scale_panel(white_wine, [temperature]) is None
+
+
+def test_the_written_report_pins_its_own_ground(tmp_path, white_wine):
+    """A dark report must not flip its page to white on the reader's machine.
+
+    The figures inside are drawn once and baked in. A ``prefers-color-scheme`` query around
+    them would eventually put a dark chart on a white page, so the file commits to the ground
+    the run was drawn in.
+    """
+    pytest.importorskip("plotly")
+    from app import render, report
+
+    # Checked on the stylesheet this module writes, not on the whole file: Plotly's own
+    # bundled CSS carries a prefers-color-scheme query of its own that is none of our business.
+    assert "prefers-color-scheme" not in report._style(render.DARK)
+    assert "color-scheme: dark" in report._style(render.DARK)
+    assert "color-scheme: light" in report._style(render.LIGHT)
+
+    dark = report.write(white_wine, tmp_path / "dark.html", theme=render.DARK).read_text(
+        encoding="utf-8"
+    )
+    light = report.write(white_wine, tmp_path / "light.html", theme=render.LIGHT).read_text(
+        encoding="utf-8"
+    )
+    assert render.DARK.palette[0] in dark and render.DARK.palette[0] not in light
+    assert render.LIGHT.palette[0] in light

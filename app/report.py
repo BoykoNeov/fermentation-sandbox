@@ -19,37 +19,49 @@ from pathlib import Path
 import plotly.graph_objects as go
 
 from app import provenance, readouts, render
+from app.render import Theme
 from app.runner import ConvergenceCheck, RunResult
 from fermentation.core.tiers import Tier
 
+#: Page tokens per ground, matched to ``render.LIGHT`` / ``render.DARK``.
+#:
+#: Deliberately NOT a ``prefers-color-scheme`` query. The figures inside the file are drawn
+#: once, in whichever ink the run was drawn in, and baked into the HTML; a page that flipped
+#: its own text and background on the reader's operating system would sooner or later put a
+#: dark chart on a white page. One decision, made when the file is written, and it travels
+#: with the file.
+_TOKENS: dict[str, dict[str, str]] = {
+    "light": {
+        "scheme": "light",
+        "ink": "#1c1a17",
+        "ink-soft": "#55504a",
+        "paper": "#ffffff",
+        "panel": "#f4f1ec",
+        "rule": "#ddd8d0",
+        "garnet": "#7c1d3f",
+        "steel": "#2b5d7d",
+        "warn-bg": "#fdf1e7",
+        "warn-edge": "#c8862b",
+        "stop-bg": "#fbeaea",
+        "stop-edge": "#a33b1f",
+    },
+    "dark": {
+        "scheme": "dark",
+        "ink": "#ece7df",
+        "ink-soft": "#a49d93",
+        "paper": "#141310",
+        "panel": "#211e19",
+        "rule": "#37342f",
+        "garnet": "#e8798f",
+        "steel": "#7bb9e2",
+        "warn-bg": "#2a2118",
+        "warn-edge": "#c8862b",
+        "stop-bg": "#2c1c19",
+        "stop-edge": "#d2603f",
+    },
+}
+
 _CSS = """
-:root {
-  color-scheme: light dark;
-  --ink: #1c1a17;
-  --ink-soft: #55504a;
-  --paper: #ffffff;
-  --panel: #f4f1ec;
-  --rule: #ddd8d0;
-  --garnet: #7c1d3f;
-  --warn-bg: #fdf1e7;
-  --warn-edge: #c8862b;
-  --stop-bg: #fbeaea;
-  --stop-edge: #a33b1f;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #ece7df;
-    --ink-soft: #a49d93;
-    --paper: #161513;
-    --panel: #201e1b;
-    --rule: #37342f;
-    --garnet: #d4718f;
-    --warn-bg: #2a2118;
-    --warn-edge: #c8862b;
-    --stop-bg: #2c1c19;
-    --stop-edge: #d2603f;
-  }
-}
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -86,7 +98,7 @@ p { margin: 0 0 12px; max-width: 68ch; }
   letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; border-radius: 2px;
   border: 1px solid currentColor; }
 .tier.validated { color: var(--ink-soft); border-style: dashed; opacity: 0.72; }
-.tier.plausible { color: #2b5d7d; }
+.tier.plausible { color: var(--steel); }
 .tier.speculative { color: var(--garnet); }
 .tier.inert { color: var(--ink-soft); opacity: 0.7; }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
@@ -104,6 +116,15 @@ footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--rule);
 
 def _esc(text: object) -> str:
     return html.escape(str(text))
+
+
+def _style(theme: Theme) -> str:
+    """The stylesheet with one ground's tokens written into it, and no media query."""
+    tokens = _TOKENS[theme.name]
+    lines = [":root {", f"  color-scheme: {tokens['scheme']};"]
+    lines += [f"  --{k}: {v};" for k, v in tokens.items() if k != "scheme"]
+    lines.append("}")
+    return "\n".join(lines) + _CSS
 
 
 def _tier_badge(tier: Tier | None) -> str:
@@ -125,8 +146,10 @@ def build(
     *,
     convergence: ConvergenceCheck | None = None,
     explain: Sequence[str] = (),
+    theme: Theme = render.LIGHT,
+    log_y: bool = False,
 ) -> str:
-    """Render one run as a complete HTML document."""
+    """Render one run as a complete HTML document, in the ink it was drawn in."""
     sc = result.scenario
     parts: list[str] = []
     a = parts.append
@@ -166,13 +189,25 @@ def build(
     a("<h2>How it got there</h2>")
     first = True
     all_drawn: list[readouts.Readout] = []
-    for group, live in readouts.groups_for(result):
-        fig = render.series_figure(result, group, live)
+    groups = readouts.groups_for(result)
+    for _, live in groups:
+        all_drawn.extend(live)
+    if log_y:
+        log_panel = render.log_scale_panel(result, all_drawn)
+        if log_panel is not None:
+            a(
+                f'<div class="panel caveat"><b>{_esc(log_panel.title)}</b>'
+                f"{_esc(log_panel.body)}</div>"
+            )
+    for group, live in groups:
+        fig = render.series_figure(result, group, live, theme=theme, log_y=log_y)
         a(f'<div class="fig">{_fig_html(fig, first)}</div>')
         first = False
         if group.blurb:
             a(f"<p>{_esc(group.blurb)}</p>")
-        all_drawn.extend(live)
+        empty = render.flat_group_panel(result, group, live)
+        if empty is not None:
+            a(f'<div class="panel"><b>{_esc(empty.title)}</b>{_esc(empty.body)}</div>')
     for panel in render.caveat_panels(all_drawn):
         a(f'<div class="panel caveat"><b>{_esc(panel.title)}</b>{_esc(panel.body)}</div>')
 
@@ -233,7 +268,7 @@ def build(
     return (
         "<!doctype html>\n<html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-        f"<title>{_esc(sc.name)}</title><style>{_CSS}</style></head>"
+        f"<title>{_esc(sc.name)}</title><style>{_style(theme)}</style></head>"
         f"<body><main>{body}</main></body></html>"
     )
 
@@ -244,9 +279,14 @@ def write(
     *,
     convergence: ConvergenceCheck | None = None,
     explain: Sequence[str] = (),
+    theme: Theme = render.LIGHT,
+    log_y: bool = False,
 ) -> Path:
     """Write the report and return the path it landed on."""
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(build(result, convergence=convergence, explain=explain), encoding="utf-8")
+    out.write_text(
+        build(result, convergence=convergence, explain=explain, theme=theme, log_y=log_y),
+        encoding="utf-8",
+    )
     return out
