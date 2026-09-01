@@ -17,7 +17,10 @@ import numpy as np
 import pytest
 
 from fermentation.core.chemistry import (
+    M_ISOAMYL_OH,
+    MOLAR_MASS,
     carbon_mass_fraction,
+    nitrogen_mass_fraction,
     sugar_species,
 )
 from fermentation.core.kinetics import (
@@ -27,15 +30,20 @@ from fermentation.core.kinetics import (
     PrecursorNonEhrlichFates,
     non_ehrlich_fraction_param,
 )
-from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS
+from fermentation.core.kinetics.amino_acid_pools import SPEC_BY_SPECIES, depletion_gate
+from fermentation.core.kinetics.byproducts import ehrlich_draws
+from fermentation.core.kinetics.carbon_routing import FUSEL_SPECS, refund_carbon_to_sugar
+from fermentation.core.kinetics.growth import biomass_growth_rate
 from fermentation.core.media import wine_schema
-from fermentation.core.process import ProcessSet
+from fermentation.core.process import Process, ProcessSet
 from fermentation.core.state import FloatArray, StateSchema
 from fermentation.core.tiers import Tier
 from fermentation.parameters.store import default_data_dir, load_parameters
-from fermentation.runtime import simulate
+from fermentation.runtime import simulate, simulate_scheduled
 from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 from fermentation.validation import assert_conserved, total_carbon, total_nitrogen
+from tests.test_defined_media import commensurate_scenario
+from tests.test_fusel_keto_acid_node import _OTHER_PRECURSOR_CONSUMERS
 
 SINK = PrecursorNonEhrlichFates.name
 REROUTE = FuselAminoAcidReroute.name
@@ -606,4 +614,388 @@ def test_precursor_consumption_rides_the_ALCOHOL_rate_and_that_is_what_blocks_th
     assert abs(slow_n - base_n) < 0.02, (
         f"the extracellular nitrogen slot moved {base_n:.4f} -> {slow_n:.4f} of its initial "
         "value under the k scaling - the same objection as the biomass arm above"
+    )
+
+
+# ---------------------------------------------------------------------------------------------
+# D-259 — D-104 Finding 4's growth-anchored counterfactual, re-measured on today's model.
+# ---------------------------------------------------------------------------------------------
+#: **This composition is THIS SUITE's, not the repo's, and that is the first finding.** D-104
+#: refused a growth-anchored sink by measuring the split it produces at "biomass composition",
+#: and **no such composition exists anywhere in this project** — not in ``src/``, not in the
+#: D-104 record, and there is no ``d104-*`` receipts folder. (``must_aa_fraction_*`` is the MUST
+#: spectrum, a different quantity.) So D-104's numbers cannot be reproduced as recorded, and the
+#: honest replacement is a stated BRACKET rather than a borrowed point: protein as a fraction of
+#: yeast dry weight, times each residue's share of that protein. It is deliberately NOT a
+#: ``Parameter`` — prime directive 2 governs numbers the MODEL reads, and nothing in ``src/``
+#: reads this; it is a counterfactual input read only by this suite, like
+#: ``CHEMISTRY_OF_BEER_GROWTH_FOLD`` (D-258). If a Process is ever built to it, it moves to YAML.
+_D259_PROTEIN_FRACTION_OF_DRY_WEIGHT = {"lo": 0.40, "mid": 0.45, "hi": 0.50}
+_D259_RESIDUE_SHARE_OF_PROTEIN = {  # g residue / 100 g yeast protein
+    "leucine": {"lo": 6.0, "mid": 7.5, "hi": 9.0},
+    "isoleucine": {"lo": 4.0, "mid": 5.0, "hi": 6.0},
+    "valine": {"lo": 4.5, "mid": 5.5, "hi": 6.5},
+    "threonine": {"lo": 4.0, "mid": 5.0, "hi": 6.0},
+    "phenylalanine": {"lo": 3.5, "mid": 4.5, "hi": 5.5},
+}
+_D259_EDGES = ("lo", "mid", "hi")
+
+#: D-104 Finding 4's own growth-anchored numbers, % of consumed precursor reaching the lump.
+_D104_GROWTH_ANCHORED_PCT = {
+    "leucine": 20.9, "isoleucine": 28.8, "valine": 45.8, "threonine": 49.7,
+}  # fmt: skip
+#: Crépin *et al.* 2017's measured protein shares, the target D-104 scored against.
+_CREPIN_PROTEIN_PCT = {
+    "leucine": (77.0, 86.0), "isoleucine": (51.0, 51.0),
+    "valine": (41.0, 41.0), "threonine": (38.0, 38.0),
+}  # fmt: skip
+#: Rollero *et al.* 2017 Table S2 (13C leucine), EF column: labelled isoamyl alcohol over total,
+#: across his six fermentations — 37.3/1066, 45.5/1337, 55.2/1314, 64.2/1365, 65.0/793, 70.3/1034.
+#: Transcribed at D-256 §3; the table itself is ``tableS2.png`` in the D-255 receipts folder.
+_ROLLERO_LEUCINE_SHARE_OF_ISOAMYL_PCT = (3.4, 8.2)
+
+
+class _GrowthAnchoredFates(Process):
+    """D-100's prescription, built ONLY as a counterfactual: the lump drawn by GROWTH.
+
+    ``draw_i = w_i * base_dx * gate_i`` — the same relative-depletion gate the Ehrlich re-route
+    reads, the same carbon-to-``S`` / nitrogen-to-``N`` refund the shipped sink makes. It takes
+    the shipped sink's ``name`` so it REPLACES it in a ProcessSet rather than joining it.
+    **Nothing in ``src/`` changes; this class exists so the refusal D-257 §7 must clear can be
+    re-measured instead of quoted.**
+    """
+
+    name = PrecursorNonEhrlichFates.name
+    tier = Tier.SPECULATIVE
+    touches = ("S", "N", *(spec.precursor_amino_acid for spec in FUSEL_SPECS))
+    reads: tuple[str, ...] = (
+        "mu_max", "K_s", "K_n", "biomass_N_fraction", "K_amino_acids",
+        *(SPEC_BY_SPECIES[s.precursor_amino_acid].fraction_param for s in FUSEL_SPECS),
+    )  # fmt: skip
+
+    def __init__(self, weights: Mapping[str, float]) -> None:
+        self.weights = dict(weights)
+
+    def derivatives(self, t, y, schema, params):
+        d = schema.zeros()
+        base_dx = biomass_growth_rate(y, schema, params)
+        if base_dx <= 0.0:
+            return d
+        carbon = nitrogen = 0.0
+        for species, w_i in self.weights.items():
+            spec = SPEC_BY_SPECIES[species]
+            gate = depletion_gate(y, schema, params, (spec,))
+            if gate <= 0.0:
+                continue
+            mass = w_i * base_dx * gate
+            d[schema.slice(spec.pool)] -= mass
+            carbon += mass * carbon_mass_fraction(species)
+            nitrogen += mass * nitrogen_mass_fraction(species)
+        if carbon <= 0.0:
+            return d
+        d[schema.slice("N")] = nitrogen
+        refund_carbon_to_sugar(d, y, schema, carbon)
+        return d
+
+
+def _d259_weights(edge: str) -> dict[str, float]:
+    return {
+        species: _D259_PROTEIN_FRACTION_OF_DRY_WEIGHT[edge] * shares[edge] / 100.0
+        for species, shares in _D259_RESIDUE_SHARE_OF_PROTEIN.items()
+    }
+
+
+def _d259_growth_anchored_split(edge: str) -> dict[str, dict[str, float]]:
+    """Realised consumed-to-lump split per species, on Crépin's own must, growth-anchored.
+
+    Carries its own **quadrature control**: the two integrated draws must reproduce the pool
+    depletion the solver actually realised (``closure``). D-103's trapezoid trap is why an
+    integral read off a trajectory is never trusted here without one.
+    """
+    compiled = compile_scenario(commensurate_scenario("crepin", days=14.0))
+    for name in _OTHER_PRECURSOR_CONSUMERS:
+        compiled.process_set.disable(name)
+    compiled.process_set._processes[_GrowthAnchoredFates.name] = _GrowthAnchoredFates(
+        _d259_weights(edge)
+    )
+    traj = simulate_scheduled(
+        compiled.process_set,
+        compiled.param_values,
+        compiled.y0,
+        compiled.t_span_h,
+        events=compiled.events,
+        param_tiers=compiled.parameters.tier_map(),
+        t_eval=np.linspace(0.0, compiled.t_span_h[1], 4001),
+    )
+    assert traj.success, traj.message
+    y = np.asarray(traj.y, dtype=float)
+    t = np.asarray(traj.t, dtype=float)
+    schema, params = compiled.schema, compiled.param_values
+
+    species_list = tuple(_D259_RESIDUE_SHARE_OF_PROTEIN)
+    sink = {s: np.zeros_like(t) for s in species_list}
+    ehrlich = {s: np.zeros_like(t) for s in species_list}
+    weights = _d259_weights(edge)
+    for i in range(t.size):
+        column = y[:, i]
+        base_dx = max(biomass_growth_rate(column, schema, params), 0.0)
+        for species in species_list:
+            gate = depletion_gate(column, schema, params, (SPEC_BY_SPECIES[species],))
+            sink[species][i] = weights[species] * base_dx * gate
+        for draw in ehrlich_draws(column, schema, params):
+            if draw.precursor.species in ehrlich:
+                ehrlich[draw.precursor.species][i] += draw.precursor_carbon / carbon_mass_fraction(
+                    draw.precursor.species
+                )
+    out: dict[str, dict[str, float]] = {}
+    for species in species_list:
+        lump = float(np.trapezoid(sink[species], t))
+        alcohol = float(np.trapezoid(ehrlich[species], t))
+        pool = y[schema.slice(species), :][0]
+        depleted = float(pool[0] - pool[-1])
+        assert depleted > 0.0, f"vacuous: the must's {species} was not consumed"
+        closure = (lump + alcohol) / depleted
+        # THE CONTROL, asserted HERE rather than only in a consumer. Both draws are recomputed
+        # from their own formulae along the trajectory, so a `pct` can be produced even when the
+        # Process that ran was not the growth-anchored one -- and it would be meaningless. This
+        # closure is the only thing tying the reported split to the run that produced it, and a
+        # mutation arm that swapped the counterfactual back for the shipped sink passed three of
+        # four D-259 guards until this assert moved out of one test and into the fixture.
+        assert closure == pytest.approx(1.0, abs=0.02), (
+            f"quadrature control failed for {species} at edge {edge}: the growth-anchored and "
+            f"Ehrlich draws together account for {closure:.4f} of the depletion the solver "
+            "actually realised. Either the counterfactual Process is not the one that ran, or "
+            "the t_eval grid is too coarse to integrate it (D-103's trapezoid trap). The split "
+            "is a ratio of these two integrals and means nothing until this closes"
+        )
+        out[species] = {"pct": 100.0 * lump / (lump + alcohol), "closure": closure}
+    return out
+
+
+@pytest.fixture(scope="module")
+def growth_anchored_split():
+    """Computed ONCE for all three composition edges (the D-245 shared-fixture pattern)."""
+    return {edge: _d259_growth_anchored_split(edge) for edge in _D259_EDGES}
+
+
+def test_the_growth_anchored_split_spans_a_bracket_and_d104s_point_sits_at_its_TOP(
+    growth_anchored_split,
+):
+    """D-104's refusal is reproducible only at one end of an input it never recorded (D-259).
+
+    D-104 Finding 4 refused the growth-anchored sink because the split it produces is
+    "monotonically inverted" against Crépin. **The biomass composition that measurement rests on
+    is recorded nowhere** (see :data:`_D259_PROTEIN_FRACTION_OF_DRY_WEIGHT`), so this re-measures
+    it across a stated bracket instead of borrowing a point.
+
+    Leucine spans **13.1 -> 22.0 %** across that bracket. D-104's 20.9 % sits at the **top** of
+    it. The refusal survives — every edge is far below Crépin's 77-86 % — but "the model says
+    20.9 %" is a statement about one composition, not about the model, and this test is what
+    stops the next beat quoting it as the latter.
+    """
+    for edge, result in growth_anchored_split.items():
+        for species, row in result.items():
+            assert row["closure"] == pytest.approx(1.0, abs=0.02), (
+                f"quadrature control failed for {species} at edge {edge}: the two integrated "
+                f"draws account for {row['closure']:.4f} of the depletion the solver realised. "
+                "The split below is a ratio of those integrals and is not trustworthy until "
+                "this closes (D-103's trapezoid trap)"
+            )
+
+    low = growth_anchored_split["lo"]["leucine"]["pct"]
+    high = growth_anchored_split["hi"]["leucine"]["pct"]
+    assert low < high, "vacuous: the composition bracket does not move the split at all"
+    assert high - low > 5.0, (
+        f"leucine's growth-anchored share spans only {low:.1f}-{high:.1f} % across the "
+        "composition bracket. If the bracket has stopped mattering, the unrecorded-input "
+        "finding is void and D-104's point number can be quoted directly again"
+    )
+    assert high == pytest.approx(_D104_GROWTH_ANCHORED_PCT["leucine"], abs=3.0), (
+        f"the TOP edge reads {high:.1f} % against D-104's {_D104_GROWTH_ANCHORED_PCT['leucine']} "
+        "%. That correspondence is what lets this suite claim it re-measured D-104 rather than "
+        "measured something else; if it has moved, re-derive rather than re-pin"
+    )
+    for edge in _D259_EDGES:
+        leucine = growth_anchored_split[edge]["leucine"]["pct"]
+        assert leucine < _CREPIN_PROTEIN_PCT["leucine"][0], (
+            f"at edge {edge} leucine reaches {leucine:.1f} % against Crépin's 77-86 %. D-104's "
+            "refusal of the growth-anchored sink would no longer hold and must be re-opened"
+        )
+
+
+def test_only_the_ENDS_of_d104s_order_are_inverted_now_and_valine_is_why(growth_anchored_split):
+    """**Corrects D-104's "exactly reversed"**: the isoleucine/valine pair now AGREES (D-259).
+
+    D-104 measured model ``leu < ile < val < thr`` against Crépin's ``thr < val < ile < leu`` and
+    called the order exactly reversed. Today the model reads ``leu < val < ile < thr``:
+    **isoleucine above valine, which is the order Crépin measures.** Only the two ends are
+    swapped.
+
+    **Valine is the species that moved** — 45.8 % at D-104 to ~25 % here — and it is the only
+    precursor carrying a SECOND Ehrlich branch, D-111's valine -> KIC -> isoamyl alcohol, built
+    after D-104. A second branch raises valine's catabolic draw and drops its lump share, which
+    is exactly the direction observed. The inversion at the ends is untouched and still the
+    finding; what is corrected is the word "exactly".
+    """
+    mid = growth_anchored_split["mid"]
+    leucine, isoleucine = mid["leucine"]["pct"], mid["isoleucine"]["pct"]
+    valine, threonine = mid["valine"]["pct"], mid["threonine"]["pct"]
+
+    assert leucine < threonine, (
+        f"leucine {leucine:.1f} % is no longer below threonine {threonine:.1f} %; the end-to-end "
+        "inversion D-104 found has closed and that record's headline needs re-opening"
+    )
+    assert isoleucine > valine, (
+        f"isoleucine {isoleucine:.1f} % is no longer above valine {valine:.1f} %. D-104 measured "
+        "the opposite (28.8 vs 45.8) and this test exists to record that the pair stopped being "
+        "inverted; if it has flipped back, D-111's second valine branch is the thing to check"
+    )
+    assert valine < _D104_GROWTH_ANCHORED_PCT["valine"] - 10.0, (
+        f"valine reads {valine:.1f} % against D-104's {_D104_GROWTH_ANCHORED_PCT['valine']} %. "
+        "The correction above is attributed to D-111's second valine branch; if valine has "
+        "returned to D-104's level that attribution is wrong"
+    )
+
+
+def test_growth_anchoring_LANDS_the_sourced_fate_where_a_de_novo_route_exists(
+    growth_anchored_split,
+):
+    """The positive result, and it argues FOR the form D-104 refused (D-259).
+
+    Phenylalanine is **not in D-104's table**, and it is the one precursor carrying a sourced
+    de-novo route — ``f_de_novo_2_phenylethanol`` = 0.9827 (D-118), which cuts its Ehrlich draw
+    ~11x. Under the growth-anchored sink it lands at **97-99 %** to the non-Ehrlich lump against
+    its **sourced** ``f_non_ehrlich_phenylalanine`` of 0.975.
+
+    **The leucine arm below is the control, and without it this test proves nothing.** Growth's
+    cumulative protein demand exceeds the must's supply for every precursor (3.4-6.3x for
+    leucine), so "the pool is stripped" would land ~100 % for *everything* and the phenylalanine
+    agreement would be an artefact of supply limitation rather than evidence about the form.
+    Leucine reads ~17 %. So the split is set by the size of each species' Ehrlich draw, and where
+    that draw is cut by a SOURCED de-novo share the growth-anchored form reproduces the measured
+    fate. **The inversion is a property of the four precursors that lack reality's de-novo route,
+    not a property of anchoring to growth.**
+
+    **VERIFIED BY MUTATION, and this is what makes it an attribution rather than a coincidence.**
+    Setting ``f_de_novo_2_phenylethanol`` to 0 — removing the sourced route while changing nothing
+    else — drops phenylalanine from **98.0 % to 37.1 %**, down among the four precursors that
+    never had one, and fails *only* this guard of D-259's four. So the agreement is caused by the
+    de-novo route specifically, not by the fixture, the gate, or supply limitation.
+    """
+    for edge in _D259_EDGES:
+        phenylalanine = growth_anchored_split[edge]["phenylalanine"]["pct"]
+        assert 96.0 < phenylalanine < 99.5, (
+            f"at edge {edge} the growth-anchored sink sends {phenylalanine:.1f} % of consumed "
+            f"phenylalanine to the lump, against the sourced {100.0 * _PHE_MEASURED_LUMP:.1f} %. "
+            "This agreement is D-259's positive finding; re-derive it rather than re-pinning"
+        )
+        # THE CONTROL: not everything is stripped to ~100 %, so the agreement is not an artefact.
+        leucine = growth_anchored_split[edge]["leucine"]["pct"]
+        assert leucine < 25.0, (
+            f"at edge {edge} leucine reads {leucine:.1f} %. If leucine has risen toward "
+            "phenylalanine's ~98 %, supply limitation alone is forcing both numbers and the "
+            "phenylalanine agreement above is NOT evidence about the growth-anchored form"
+        )
+
+
+def _d259_shipped_leucine_share_of_isoamyl() -> tuple[float, float, float, float]:
+    """On the SHIPPED model and Crépin's own must: how much isoamyl comes from consumed leucine.
+
+    Returns ``(must_leucine_uM, ehrlich_drawn_uM, isoamyl_uM, share_pct)``. The Ehrlich draw is
+    integrated off the trajectory and checked against the pool the solver actually emptied.
+    """
+    compiled = compile_scenario(commensurate_scenario("crepin", days=14.0))
+    for name in _OTHER_PRECURSOR_CONSUMERS:
+        compiled.process_set.disable(name)
+    traj = simulate_scheduled(
+        compiled.process_set,
+        compiled.param_values,
+        compiled.y0,
+        compiled.t_span_h,
+        events=compiled.events,
+        param_tiers=compiled.parameters.tier_map(),
+        t_eval=np.linspace(0.0, compiled.t_span_h[1], 4001),
+    )
+    assert traj.success, traj.message
+    y = np.asarray(traj.y, dtype=float)
+    t = np.asarray(traj.t, dtype=float)
+    schema, params = compiled.schema, compiled.param_values
+
+    drawn = np.zeros_like(t)
+    for i in range(t.size):
+        for draw in ehrlich_draws(y[:, i], schema, params):
+            if draw.precursor.species == "leucine":
+                drawn[i] += draw.precursor_carbon / carbon_mass_fraction("leucine")
+    drawn_g = float(np.trapezoid(drawn, t))
+    leucine_mw = MOLAR_MASS["leucine"]
+    drawn_um = drawn_g / leucine_mw * 1e6
+    supply_um = float(y[schema.slice("leucine"), 0][0]) / leucine_mw * 1e6
+    isoamyl_um = float(y[schema.slice("isoamyl_alcohol"), -1][0]) / M_ISOAMYL_OH * 1e6
+    assert supply_um > 0.0 and isoamyl_um > 0.0, "vacuous: no leucine in the must, or no isoamyl"
+    return supply_um, drawn_um, isoamyl_um, 100.0 * drawn_um / isoamyl_um
+
+
+def test_un_inverting_by_CUTTING_the_ehrlich_draw_is_refused_by_rolleros_leucine_tracer(
+    growth_anchored_split,
+):
+    """One knob, two observables, opposite directions — and the SCOPE is half the finding (D-259).
+
+    Un-inverting leucine under a growth-anchored sink means changing the ratio of growth's draw
+    to the Ehrlich route's draw. **This test measures one of the two ways to do that**: cutting
+    the Ehrlich draw, which is what a de-novo isoamyl route (the D-118 shape, one precursor over)
+    would do. The same draw is what supplies leucine-derived isoamyl alcohol, so it is
+    constrained a second time by Rollero's 13C-leucine table — in the opposite direction.
+
+    Shipped model on Crépin's must: leucine supplies **~1.5 %** of the isoamyl alcohol, already
+    **below** Rollero's measured 3.4-8.2 %. Reaching Crépin's 77-86 % protein share needs the
+    draw cut ~12-41x, which takes that share to **0.04-0.13 %**, tens of times under the
+    measured floor. There is no overlap anywhere in the composition bracket.
+
+    **READ THE SCOPE BEFORE QUOTING THIS.** It refuses un-inversion **by lowering the Ehrlich
+    draw**. It does **not** refuse un-inversion in general and it does **not** fence the D-116
+    keto-acid milestone as a whole. The split is a RATIO: a repair that instead RAISES growth's
+    own leucine draw — toward the 580-1088 uM of protein demand the must's 173 uM cannot meet —
+    moves the split while leaving the Ehrlich draw, and therefore the tracer share, untouched.
+    That side is **untested here**. What is refused is the one-knob version.
+
+    Why reality is not contradicted: real ferments make ~20x more isoamyl alcohol than the must's
+    leucine could supply, so leucine can be 77-86 % protein AND supply 3.4-8.2 % of the isoamyl
+    at the same time. The model reproduces the tracer share and misses the protein share because
+    its biomass does not eat the must's amino acids, not because the split is mis-weighted.
+    """
+    supply_um, drawn_um, isoamyl_um, share_pct = _d259_shipped_leucine_share_of_isoamyl()
+    floor_pct, ceiling_pct = _ROLLERO_LEUCINE_SHARE_OF_ISOAMYL_PCT
+
+    assert drawn_um < supply_um, (
+        f"the Ehrlich route drew {drawn_um:.1f} uM of a {supply_um:.1f} uM leucine supply; a draw "
+        "at or above supply means the pool is being over-drawn and the share below is not a share"
+    )
+    assert share_pct < floor_pct, (
+        f"the shipped model sources {share_pct:.2f} % of its isoamyl alcohol from consumed "
+        f"leucine, against Rollero's measured {floor_pct}-{ceiling_pct} %. This test's whole "
+        "argument is that there is NO headroom to cut that draw further; if the model has risen "
+        "into Rollero's band the fence must be re-measured rather than re-pinned"
+    )
+
+    # The cut each composition edge would need, and what it costs on the tracer axis.
+    worst_surviving = 0.0
+    for edge in _D259_EDGES:
+        realised = growth_anchored_split[edge]["leucine"]["pct"]
+        current_ratio = realised / (100.0 - realised)
+        for target in _CREPIN_PROTEIN_PCT["leucine"]:
+            needed_ratio = target / (100.0 - target)
+            cut = needed_ratio / current_ratio
+            assert cut > 5.0, (
+                f"at edge {edge}, reaching {target:.0f} % needs the Ehrlich draw cut only "
+                f"{cut:.1f}x. Under a cut that small the tracer objection may no longer bind and "
+                "this fence must be re-derived"
+            )
+            worst_surviving = max(worst_surviving, share_pct / cut)
+
+    assert worst_surviving < floor_pct / 10.0, (
+        f"the most favourable un-inversion in the bracket still leaves only "
+        f"{worst_surviving:.3f} % of the isoamyl alcohol leucine-derived, against Rollero's "
+        f"{floor_pct}-{ceiling_pct} %. This assert is the fence; if it ever passes marginally, "
+        "the two observables have come within reach of each other and the refusal is no longer "
+        "safe to quote"
     )

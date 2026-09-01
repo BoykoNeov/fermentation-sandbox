@@ -31,7 +31,7 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-08-31)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-258** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **2074 + 6 xfail** (D-257 and D-258 add 1 and 2, both changing NO production code; the xfail SET is unchanged) (3 D-188 Herzan; 2 D-215's own; **1 fusel** — D-244's five became one at **D-248**, which closed four by un-coupling nitrogen uptake and lowered NO sourced threshold) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats. Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-259** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **2078 + 6 xfail** (D-257/D-258/D-259 add 1, 2 and 4, NONE changing production code; the xfail SET is unchanged) (3 D-188 Herzan; 2 D-215's own; **1 fusel** — D-244's five became one at **D-248**, which closed four by un-coupling nitrogen uptake and lowered NO sourced threshold) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats. Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation; **D-254 an 8th, the first living in a CODE COMMENT** (two fixtures, one copy dead and one still live); **D-255 a 9th and the FIRST closed by BUILDING the missing thing**; **D-256 a 10th — Rollero's SECOND tracer table (13C leucine) sat unread in D-255's OWN folder**, the D-230 shape repeating one beat later.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Beer acid-base = **NINE** beats BUILT (D-178→D-183, D-207→D-209, D-211, **D-239**), `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING** — day-1 pH admits an acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms. **D-239 BUILT D-209 §8's buffer-removal half and its day-7 cost puts the high `z̄` edge OUTSIDE Tyrell's envelope ON PURPOSE — never xfail that edge.**
@@ -55,6 +55,13 @@ still named the withdrawn "under-bound SO₂ pool" (D-143) as open.
 unconditional and lives here; the linked file only tells you *why*. **Read the file before proposing
 work that touches its subject.** Split out at D-185 from 320 inline lines
 [[feedback-a-doc-rots-where-it-duplicates]].
+- **Growth-anchored precursor sink (D-259)** — D-104's "20.9 %" is the TOP EDGE of a composition
+  recorded NOWHERE (13.1-22.0 across the bracket); "exactly reversed" CORRECTED (ile > val now matches
+  Crépin, D-111's second valine branch is why). **Growth-anchoring LANDS the sourced fate where a
+  de-novo route exists** — phenylalanine 98 % vs sourced 0.975, mutation-verified (zero the route →
+  37.1 %), so D-104 does NOT refuse the FORM. The tracer fence is **SCOPED to cutting the Ehrlich
+  draw** and does NOT fence D-116; the numerator side is UNTESTED. D-257 §7's blocker DOES clear.
+  **Build stays owner-gated.** → `prohibitions/aroma-and-milestone-3-tail.md`
 - **Sampling surfaces (D-153 → D-162)** — BOTH archive-wide sweeps DONE; four surfaces and two
   distributions PINNED; D-157's contradiction CLOSED (never re-narrow 0.084); `reads` has TWO masters;
   closure ordering SCOPED. Do not re-run, re-audit or "simplify" any of it.

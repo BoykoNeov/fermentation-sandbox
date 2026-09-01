@@ -51,6 +51,29 @@ past it from this file.** **Never evict an old prohibition to buy a line.**
   **wine +24 %**. Acetic band IARC ale **[12,155]
   PRINTED**, nominal **CONSTRUCTED**; **never Wang's 311 as nominal** (sour-inflated; its 10 % backs **FORM** only). Beer lands **below** published — **accepted**. **Beer pH 4.30 is a COINCIDENCE** (empty balance; 7.0 at t0 *and* packaging).
 
+**D-259 — the growth-anchored sink, RE-MEASURED. Read before citing D-104's refusal or D-257 §7.**
+- **D-104's "leucine 20.9 %" is ONE EDGE of an input recorded NOWHERE.** No yeast protein
+  composition exists in `src/`, in the D-104 record, or in any receipts folder (`must_aa_fraction_*`
+  is the MUST spectrum, a different thing). Re-measured across a stated bracket leucine spans
+  **13.1-22.0 %** and D-104's number sits at the **top**. The refusal survives at every edge — the
+  point number does not. **Never quote 20.9 % as "the model's" growth-anchored split.**
+- **"Exactly reversed" is CORRECTED.** Only the two ENDS are inverted now; **isoleucine > valine
+  matches Crépin**. Valine moved 45.8 → ~25 % and it is the only precursor that gained a second
+  Ehrlich branch after D-104 (D-111).
+- **THE POSITIVE RESULT: growth-anchoring LANDS the sourced fate where a de-novo route exists.**
+  Phenylalanine reads **97.2-98.5 %** against its sourced 0.975. **Verified by mutation** — zero the
+  de-novo share and it falls to **37.1 %**, so it is the ROUTE, not supply limitation (leucine's
+  ~17 % is the control). **The inversion is a property of the four precursors WITHOUT a de-novo
+  route, not of anchoring to growth** — so do not cite D-104 as refusing the FORM.
+- **THE FENCE, AND IT IS SCOPED — do not quote it wider.** Un-inverting leucine **by cutting the
+  Ehrlich draw** needs 11.9-40.7×, which takes the model's leucine share of isoamyl from **1.51 %**
+  (already BELOW Rollero's measured 3.4-8.2 %) to **0.037-0.127 %**. Refused. It does **NOT** refuse
+  un-inversion in general and does **NOT** fence D-116: the split is a RATIO, and the
+  **numerator-side repair — raising growth's own draw — is UNTESTED**. The real defect is the
+  denominator: the model eats **173 µM** leucine against a protein demand of **580-1088 µM**.
+- **D-257 §7's blocker DOES clear** (phenylalanine 45.45 → 0.09 % under the `k` rescale) — but that
+  is **within-fixture**; never quote it against D-257's own 20.3/65.8 %. **The build stays owner-gated.**
+
 **Fusel node (D-245) — read before touching the de-novo helpers or citing D-120**
 - **`_de_novo_share` must use `ehrlich_primary_share`, never `(1-f)`.** Valine's Ehrlich carbon
   splits AGAIN (0.15 isobutanol / 0.23 isoamyl via KIC), so `(1-f)=0.38` charges isobutanol with
