@@ -31,7 +31,7 @@ the harness load limit is REPORTED every write; it truncates SILENTLY, which is 
   the "keep the plans updated" rule is **RETIRED** (D-184). `CLAUDE.md` = prime directives + archive conventions.
 
 ## Status (2026-09-01)
-M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-260** (D-231/D-242 are tooling, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **2083 + 6 xfail** — MEASURED off a green `-n auto` run, 378 s (D-257→D-260 add 1, 2, 4 and 5; only D-260 touches production code, and only a DOCSTRING; the xfail SET is unchanged) (3 D-188 Herzan; 2 D-215's own; **1 fusel** — D-244's five became one at **D-248**, which closed four by un-coupling nitrogen uptake and lowered NO sourced threshold) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats. Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
+M0/M1/M2 **complete**. **M3** (sensory/OAV + Tier-3 aging, D-66) at **D-261** (D-231/D-242/**D-261** are tooling+interface, not model); sensory 1a/1b + **D-139's leftovers ALL closed** (D-148/9). Suite **2111 + 6 xfail** — MEASURED off a green `-n auto` run, 507 s (**D-261 adds 28 app guards and NO model test**; the 2083 body is unchanged) (D-257→D-260 add 1, 2, 4 and 5; only D-260 touches production code, and only a DOCSTRING; the xfail SET is unchanged) (3 D-188 Herzan; 2 D-215's own; **1 fusel** — D-244's five became one at **D-248**, which closed four by un-coupling nitrogen uptake and lowered NO sourced threshold) — MEASURED off a green full run, never inferred: the ledger read 1861 for two beats. Slot/Process/oxidative counts live in `docs/ARCHITECTURE.md` — never restate here, that rotted it (D-184).
 **§2.2's beer criterion PASSES since D-223** (6.04 d in 5-7) but is partly self-referential and is labelled so in its own docstring. **"Blocked on external sourcing" wrong 6× (D-191/196/199/208/209/211)** — **D-230 adds a 7th shape: the source was in THIS REPO**, transcribed at D-209 for another derivation; **D-254 an 8th, the first living in a CODE COMMENT** (two fixtures, one copy dead and one still live); **D-255 a 9th and the FIRST closed by BUILDING the missing thing**; **D-256 a 10th — Rollero's SECOND tracer table (13C leucine) sat unread in D-255's OWN folder**, the D-230 shape repeating one beat later.
 **D-203/205/206 REFUSED** the sotolon-ascorbate route, Pham's pH+ethanol terms and the Strecker split — "expressible" ≠ "identifiable"; D-202 completed Fig 24.12's top group and D-204 shipped its pin.
 Beer acid-base = **NINE** beats BUILT (D-178→D-183, D-207→D-209, D-211, **D-239**), `ACID_STATE` NOT medium-agnostic (D-179); **D-212 BUILT NOTHING** — day-1 pH admits an acetic WINDOW that Tyrell's own 145 sits OUTSIDE at all 3 arms. **D-239 BUILT D-209 §8's buffer-removal half and its day-7 cost puts the high `z̄` edge OUTSIDE Tyrell's envelope ON PURPOSE — never xfail that edge.**
@@ -55,6 +55,14 @@ still named the withdrawn "under-bound SO₂ pool" (D-143) as open.
 unconditional and lives here; the linked file only tells you *why*. **Read the file before proposing
 work that touches its subject.** Split out at D-185 from 320 inline lines
 [[feedback-a-doc-rots-where-it-duplicates]].
+- **The console / `app/` (D-261)** — a Streamlit app + written HTML report **IS BUILT** and is a
+  FIFTH layer outside `src/`, so it is not in the wheel; deps live in the `ui` group
+  (`uv sync --group ui`; `uv run streamlit run app/main.py`). **Do not re-propose "the engine has
+  no UI".** Fidelity is THREE separate controls, never one slider — maths care / points kept /
+  chemistry included — and only the third moves reality; RK45 is in no preset, `max_step` is
+  custom-only. `app/` is under ruff AND mypy (the engine now ships `py.typed`). Two traps that
+  bite every output surface: an untouched slot reads `validated`, and `Tier.SPECULATIVE` is falsy.
+  Owner rules: papers **reachable, not central**; **no in-house jargon in anything a user sees**.
 - **Growth-anchored precursor sink (D-259 → D-260)** — "exactly reversed" CORRECTED (ile > val
   matches Crépin); growth-anchoring **LANDS the sourced fate where a de-novo route exists** (Phe 98 %
   vs 0.975, mutation-verified), so D-104 does NOT refuse the FORM. **D-260: the numerator side is
