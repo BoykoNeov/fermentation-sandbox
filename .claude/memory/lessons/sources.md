@@ -15,7 +15,7 @@ nothing until this file is read — the same arrangement `prohibitions/` has had
 like pedantry, open its file — every one of them cost a beat.
 
 - ["Paywalled" is one host, not a paper](../feedback-paywalled-is-one-host.md) — check author/institutional/thesis/trade-reprint copies — and a standards body's OWN site — before recording a source as blocked; wrong 6× so far
-- [Re-read the source you already mined](../feedback-re-read-the-source-you-already-mined.md) — D-179 took Tyrell's table and stopped; the same PDF's trial FIGURES held the wort levels, the matching pH curve and the divisor that unblocked D-180. Re-read local sources in FULL before recording a block
+- [Re-read the source you already mined](../feedback-re-read-the-source-you-already-mined.md) — 4 cases, sharpest LAST: D-213 quoted the sentences BEFORE and AFTER "multiply four- or fivefold" and skipped it; 3 records then audited that extent against one trial. The blind spot is the QUOTE BOUNDARY (D-258)
 - [A text screen has units and self-reference](../feedback-a-text-screen-has-units-and-self-reference.md) — "is my number in the text" missed every J/mol-vs-kJ/mol hit (14→42) and scored notes that quote their own invented edge as sourced; 14 of 42 hits died on reading
 - [A note can state its span twice](../feedback-a-note-can-state-its-span-twice.md) — one note gave its band as both kJ/mol and a Q10; converted they were near-disjoint, so "move it to its cited range" was ill-posed. Cross-check a note against itself
 - [Transcribe tables, not prose](../feedback-transcribe-tables-not-prose.md) — the table beat the prose twice (4 numbers, then a direction); a search summary once shipped a fabricated E_a

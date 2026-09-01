@@ -38,13 +38,36 @@ that the timing "was never calibrated against a wort FAN time course" — while 
 growth curve the project has, for the very ferment being scored, sat in the panel below the one
 being read. It re-derived `mu_max` (2.88× too fast) with no new source at all.
 
+**The fourth case (D-258) is cheaper than all three and it is the one to remember: the sentence
+BETWEEN two sentences already quoted.** D-213 built `k_o2_uptake_beer`'s timescale argument out
+of two quotes from one paragraph of *The Chemistry of Beer* — the lag phase ("several hours to
+adapt … before growth begins") and the removal ("the oxygen present at the start of pitching is
+rapidly used up"). Both are in the parameter's provenance. **The sentence sitting between them
+is "the yeast will multiply four- or fivefold by a process of budding"** — the only printed beer
+growth EXTENT in the corpus, and the quantity D-222, D-230 and D-232 then spent three records
+auditing against a single experiment's cell counts, because nothing else was known to exist. The
+passage was open, quoted, and cited from *both sides*.
+
+**What that adds to the three above: the blind spot is not the source, it is the QUOTE
+BOUNDARY.** Cases 1-3 are "you did not open the other figure/panel". This one is "you had the
+words on screen and the extraction was scoped to the claim you arrived with". A number that
+answers a question you are not currently asking reads as connective prose and gets skipped —
+and it is *most* likely to be skipped in a passage you are quoting, because quoting feels like
+having read.
+
 **Why:** a paper gets mined for the one thing you went looking for. Tables are what a search
 surfaces and what [[feedback-transcribe-tables-not-prose]] trains you to prefer, so a
 compilation table can mask the authors' own experiment sitting a page later in figures. The
 cost of re-reading a PDF already on disk is minutes; the cost of recording a false block is a
 beat deferred indefinitely, and it compounds — the block gets copied into memory as fact.
 
-**How to apply:** before writing "blocked on sourcing", list the sources already local
+**How to apply (D-258's addition first, because it is the cheapest):** when you quote a source,
+**read the whole paragraph and say what every number in it is**, including the ones irrelevant to
+the beat in hand — and when a later beat needs a quantity, re-read the *passages this repo already
+quotes* before searching for new ones. `grep` the repo for the source's title and re-open every
+passage it cites. Quoting a sentence is not evidence its neighbours were read.
+
+Then: before writing "blocked on sourcing", list the sources already local
 (`_pdf/`, `_txt/`, the `SOURCES.md` of past beats) and check each for the *missing* quantity
 specifically, including **figures and methods sections**, not just tables. Ask what the
 authors measured that they did not tabulate. A screening/comparison paper almost always ran

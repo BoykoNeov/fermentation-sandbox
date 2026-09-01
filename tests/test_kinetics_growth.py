@@ -192,6 +192,31 @@ TYRELL_CELL_COUNT = {
 TYRELL_PITCH_CELLS = 9.96
 TYRELL_PEAK_DAY = 3
 
+#: **The SECOND extent figure, and the extent audit ran three records without it (D-258).**
+#: *The Chemistry of Beer*, verbatim: "The yeast will multiply **four- or fivefold** by a
+#: process of budding and build up its nutrient store while at the same time commencing the
+#: conversion of sugars in the wort."
+#:
+#: D-213 transcribed the sentence BEFORE this one (the lag phase) and the sentence AFTER it
+#: ("the oxygen present at the start of pitching is rapidly used up") into
+#: ``k_o2_uptake_beer``'s provenance, and skipped the one in between — which is the only
+#: printed beer growth EXTENT in the corpus. D-222/D-230/D-232 all priced the extent against
+#: Tyrell's counts alone because nothing else was known to exist.
+#:
+#: **ONE source, not two**: the passage appears twice in that text (p.850 and p.1083), the
+#: second a verbatim duplicate of the first. Do not cite it as two independent readings.
+#:
+#: **It is a different FRAME from Tyrell's counts and that is the whole point.** This is cells
+#: MADE by budding; Tyrell's panel is cells COUNTED in suspension at the day-3 peak. The two
+#: differ by whatever has already settled out, which is exactly D-230's branch 2.
+#:
+#: Transcribed HERE rather than added to ``beer_generic.yaml`` deliberately: it is a scoring
+#: target read only by the suite, like :data:`TYRELL_CELL_COUNT` beside it and
+#: ``BEER_COUNTED_PITCH_CELLS_PER_ML`` in ``conftest``. Nothing in ``src/`` reads it, so it is
+#: not a model constant and does not earn a Parameter entry (prime directive 2 governs numbers
+#: the MODEL reads). If a Process is ever built to this band, it moves to YAML at that point.
+CHEMISTRY_OF_BEER_GROWTH_FOLD = (4.0, 5.0)
+
 #: The wort nitrogen Tyrell's trial is modelled at, mg N/L. **An ASSUMPTION** - the paper prints
 #: none (the wort is a dilution of Bavarian Pilsener malt extract and the strains' amino-acid
 #: profile is "data not shown"). Named rather than left as a literal at D-230, so the guard that
@@ -216,6 +241,7 @@ def _tyrell_growth_fraction_spread(day: int) -> tuple[float, float]:
 
 def _tyrell_beer_growth(
     data_dir: Path | None = None,
+    yan_mgl: float | None = None,
 ) -> tuple["CompiledScenario", FloatArray, FloatArray, FloatArray]:
     from fermentation.scenario import Scenario, TemperaturePoint, compile_scenario
 
@@ -227,7 +253,12 @@ def _tyrell_beer_growth(
                 "glucose_gpl": 0.15 * TYRELL_CELL_SUGAR_GPL,
                 "maltose_gpl": 0.70 * TYRELL_CELL_SUGAR_GPL,
                 "maltotriose_gpl": 0.15 * TYRELL_CELL_SUGAR_GPL,
-                "yan_mgl": TYRELL_ASSUMED_YAN_MGL,
+                # `yan_mgl` is an OVERRIDE HOOK, not a knob anyone should tune: D-230 measured
+                # that moving wort nitrogen is not isolable (8 tests red where 4 were
+                # predicted). It exists so D-258 can emulate a LOWERED CEILING through the
+                # `dx = YAN/f_N` identity the extent audit already runs on. Default is the
+                # scenario's own assumption and every pre-D-258 caller gets it unchanged.
+                "yan_mgl": TYRELL_ASSUMED_YAN_MGL if yan_mgl is None else yan_mgl,
                 # Tyrell's OWN counted pitch (D-222). It was a flat 1.0 g/L — 2.51x the
                 # biomass Tyrell pitched — until D-222 converted the paper's count through
                 # the settled 40 pg/cell. `mu_max` is fitted ON this curve, so the fit frame
@@ -625,6 +656,122 @@ def _tyrell_cells_per_gram_nitrogen(yan_mgl: float = TYRELL_ASSUMED_YAN_MGL) -> 
     return sorted(
         (peak - TYRELL_PITCH_CELLS) * 1e6 * 1e3 / (yan_mgl / 1000.0)
         for peak in TYRELL_CELL_COUNT[TYRELL_PEAK_DAY]
+    )
+
+
+def test_the_printed_extent_sits_between_the_model_and_tyrells_counts():
+    """The SECOND extent figure, and what it does to a 1.546x overshoot (D-258).
+
+    D-222 entered the extent gap, D-230 closed both nitrogen candidates and D-232 refused both
+    ways of deciding the residue — **all three against Tyrell's counts as the only extent
+    measurement.** :data:`CHEMISTRY_OF_BEER_GROWTH_FOLD` is a second one, printed, and it was
+    on disk the whole time inside a passage D-213 quoted from BOTH sides.
+
+    It does not close the gap. It **re-scales** it, and it does so in the direction that
+    matters: the model is ~1.08x above a printed 4-5x where it is 1.546x above Tyrell's
+    counted 2.92-3.48x. The printed figure lands BETWEEN the two, nearer the model.
+
+    **This does NOT resolve D-230's branch ambiguity and must not be read as doing so.** It is
+    a third measurement, not a verdict: the frame difference between "cells made by budding"
+    and "cells counted in suspension" IS branch 2, so the printed figure is consistent with
+    settling — but it is a textbook generalisation with no error bar and it cannot rule out
+    branch 1. ``test_the_extent_residue_is_a_two_way_frame_ambiguity_and_both_branches_are_priced``
+    keeps both branches priced and keeps passing unchanged; this test sits beside it.
+    """
+    _, _, x, _ = _tyrell_beer_growth()
+    model_fold = float(x.max() / x[0])
+    printed_lo, printed_hi = CHEMISTRY_OF_BEER_GROWTH_FOLD
+    counted_lo = TYRELL_CELL_COUNT[TYRELL_PEAK_DAY][0] / TYRELL_PITCH_CELLS
+    counted_hi = TYRELL_CELL_COUNT[TYRELL_PEAK_DAY][1] / TYRELL_PITCH_CELLS
+
+    # THE ORDERING IS THE FINDING. If it ever breaks, the two sources have stopped
+    # disagreeing in the way that made the frame question live.
+    assert counted_hi < printed_lo < printed_hi < model_fold, (
+        f"the printed extent {printed_lo}-{printed_hi}x no longer sits BETWEEN Tyrell's "
+        f"counted {counted_lo:.3f}-{counted_hi:.3f}x and the model's {model_fold:.3f}x. "
+        "D-258's whole re-scaling rests on that ordering"
+    )
+    assert model_fold / printed_hi == pytest.approx(1.076, abs=0.02), (
+        f"the model is {model_fold / printed_hi:.3f}x the printed high edge; D-258 measured "
+        "1.076 — against 1.546x the COUNTED high edge, which is the same model against a "
+        "different frame and not a repair"
+    )
+    # The frame gap the two sources imply, stated as the settled share branch 2 needs. It is
+    # SMALLER than the 43.6-56.5 % D-230 priced against the model, because the printed figure
+    # is itself below the model — do not conflate the two numbers.
+    implied_settled = sorted(
+        1.0 - c / p for c in (counted_lo, counted_hi) for p in (printed_lo, printed_hi)
+    )
+    lo_pct, hi_pct = implied_settled[0] * 100, implied_settled[-1] * 100
+    assert implied_settled[0] == pytest.approx(0.129, abs=0.01), (
+        f"printed-vs-counted implies {lo_pct:.1f}-{hi_pct:.1f} % settled; "
+        "D-258 measured 12.9-41.6 %"
+    )
+
+
+def test_a_ceiling_that_lands_tyrells_counted_fold_breaks_tyrells_own_timing():
+    """**The measurement that refuses the O2->growth coupling's target (D-258).**
+
+    The owner re-opened D-213 §7's declined O2->growth coupling because its stated blocker had
+    expired: "none of the six directional predictions is reachable" stopped being true when
+    three tests began scoring growth EXTENT (D-230). An oxygen/sterol budget IS an extent
+    limiter and points the right way, so the question was which extent to aim it at.
+
+    **It cannot be Tyrell's counted fold, and this runs the reason rather than arguing it.**
+    ``mu_max`` was fitted (D-211/D-222) on the growth fraction at days 1-2 NORMALISED on each
+    curve's own peak. Lowering the ceiling to land the counted fold pushes the day-1 normalised
+    fraction OUT of the spread measured on **the same panel of the same figure**: one figure's
+    two readings cannot both be matched by a ceiling change. At the printed 4-5x target the
+    same fit survives.
+
+    That is a constraint on ANY extent repair, not only an oxygen one, and it is why D-258
+    refuses the coupling rather than building it: the target it was reopened to reach is
+    self-inconsistent, and the target that is left (the printed 4-5x) is a 1.08x move bought
+    with a speculative parameter whose yield must be fitted 1.8-2.4x away from its own
+    independent physiological sizing — one observable, one free knob, no predictive residual.
+
+    The ceiling is emulated through ``yan_mgl`` because ``dx = YAN/f_N`` is the identity the
+    whole extent audit runs on. **That is the CEILING's effect in isolation** — an actual O2
+    cap would be a carrying-capacity factor with a logistic shape — so a RED here means the
+    ceiling/rate separation moved, not that some particular O2 form was refuted.
+    """
+    f_n = load_parameters(default_data_dir() / "beer_generic.yaml")["biomass_N_fraction"].value
+    x0 = cells_per_ml_to_pitch_gpl(TYRELL_PITCH_CELLS * 1e6)
+    meas_lo, meas_hi = _tyrell_growth_fraction_spread(1)
+
+    def day1_fraction_at_fold(target_fold: float) -> float:
+        yan = (target_fold - 1.0) * x0 * f_n * 1000.0
+        _, t_h, _, frac = _tyrell_beer_growth(yan_mgl=yan)
+        return float(np.interp(24.0, t_h, frac))
+
+    # THE ARM THAT REFUSES THE TARGET: the counted high edge is the most FAVOURABLE of
+    # Tyrell's two edges (the low edge is worse), so failing here fails at both.
+    counted_hi = TYRELL_CELL_COUNT[TYRELL_PEAK_DAY][1] / TYRELL_PITCH_CELLS
+    at_counted = day1_fraction_at_fold(counted_hi)
+    assert at_counted > meas_hi, (
+        f"a ceiling landing Tyrell's counted {counted_hi:.3f}x now puts the day-1 normalised "
+        f"fraction at {at_counted:.4f}, INSIDE the same figure's measured {meas_lo:.4f}-"
+        f"{meas_hi:.4f}. The self-inconsistency D-258 refused the coupling on would be gone, "
+        "and the coupling would need re-pricing against the counted frame"
+    )
+    assert at_counted == pytest.approx(0.494, abs=0.02), (
+        f"day-1 fraction at the counted-fold ceiling is {at_counted:.4f}; D-258 measured 0.494"
+    )
+
+    # THE CONTROL: at the PRINTED target the same fit survives, so the RED above is about the
+    # counted target specifically and not about lowering a ceiling at all. Without this arm the
+    # test would equally support "no ceiling may ever move", which is not what was measured.
+    at_printed = day1_fraction_at_fold(CHEMISTRY_OF_BEER_GROWTH_FOLD[0])
+    assert meas_lo <= at_printed <= meas_hi, (
+        f"at the printed 4x the day-1 fraction {at_printed:.4f} has left the measured "
+        f"{meas_lo:.4f}-{meas_hi:.4f}; the printed target would then cost a `mu_max` refit too, "
+        "and D-258's 'half two of D-213's decline is void at this target' no longer holds"
+    )
+    # **STATED AS THE NEAR MISS IT IS.** 0.4209 clears the 0.4476 edge by 0.027 — about 6 % of
+    # the envelope's own width. Do not quote this arm as a comfortable pass.
+    assert meas_hi - at_printed == pytest.approx(0.027, abs=0.015), (
+        f"the printed-target margin is {meas_hi - at_printed:.4f}; D-258 measured 0.027, a NEAR "
+        "miss. If it has widened, say what moved — the claim rests on a thin margin"
     )
 
 

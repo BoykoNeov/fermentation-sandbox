@@ -121,6 +121,35 @@ The owner authorised **measuring which branch the evidence favours**, explicitly
   `g/hL`. Nothing. What turns up is a **third instance of the PRODUCT-dosing frame D-219 rejected**
   (*Concepts in Wine Chemistry*: 20 g/hL ↔ 1e6 cells/cc ⇒ **200 pg**). It is not a rival reading.
 
+# D-258 — THERE IS A SECOND, PRINTED EXTENT FIGURE. Read this before quoting "1.55x overshoot" as the model's error.
+
+*The Chemistry of Beer*: **"The yeast will multiply four- or fivefold by a process of budding."**
+`CHEMISTRY_OF_BEER_GROWTH_FOLD = (4.0, 5.0)` in `tests/test_kinetics_growth.py`.
+
+* **It was on disk the whole time, between two sentences D-213 already quoted** — the lag-phase
+  quote and the "oxygen rapidly used up" quote are both in `k_o2_uptake_beer`'s provenance and
+  this sentence sits BETWEEN them. D-222/D-230/D-232 audited the extent against Tyrell's counts
+  alone for three records. 11th instance of the on-disk-source shape; the first on a TARGET.
+  [[feedback-re-read-the-source-you-already-mined]] (its 4th case).
+* **ONE source, not two** — the passage is duplicated verbatim at p.850 and p.1083. A textbook
+  generalisation, no error bar, no stated wort/strain/aeration.
+* **It RE-SCALES the gap, it does NOT close it.** model **5.378x** / printed **4-5x** / Tyrell
+  counted **2.918-3.483x**. The printed figure sits BETWEEN and near the model: **1.076x** above
+  its high edge against **1.544x** above Tyrell's. **Never quote 1.546x as "the model's extent
+  error" unqualified again — it is a statement about ONE frame.**
+* **It leans toward branch 2 and closes NOTHING.** Printed-vs-counted implies **12.9-41.6 %**
+  settled; **that is NOT D-230's 43.6-56.5 %**, which is settling priced against the MODEL. Do
+  not quote the two as one number. Both branches stay priced and
+  `test_the_extent_residue_is_a_two_way_frame_ambiguity_and_both_branches_are_priced` is
+  UNTOUCHED and still passing. A textbook generalisation is not D-219's count-plus-weighing.
+* **It is NOT a `Parameter` and that is deliberate** — nothing in `src/` reads it, so prime
+  directive 2 does not apply; it is a scoring target beside `TYRELL_CELL_COUNT`. It moves to
+  YAML only if a Process is ever built to it.
+* **NEW CONSTRAINT ON ANY EXTENT REPAIR, not just an oxygen one:** a ceiling change that lands
+  Tyrell's counted FOLD breaks Tyrell's counted TIMING (day-1 0.494-0.604 vs a measured
+  0.235-0.448, one figure's two readings). At the printed target the fit survives — but by
+  **0.027, ~6 % of the envelope width**, a NEAR MISS that the guard states as one.
+
 ## Still open after D-232
 
 1. **The extent gap itself** — attributed and bounded, NOT closed, and now **THREE-way**. Both

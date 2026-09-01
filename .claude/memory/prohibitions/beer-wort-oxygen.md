@@ -51,11 +51,25 @@ prohibition looks unconvincing, go read D-213 — do not argue past it from this
   (1.1e-9 → 3.4e-12 → 1.1e-13 as rtol goes 1e-6 → 1e-9 → 1e-11), because a threshold cannot
   separate mesh from coupling. **The shipped test asserts convergence.** The pool also
   undershoots to ~−1.2e-10 g/L — an `atol` artifact; pin "physically zero" against the seed.
-- **The O₂→growth coupling is DECLINED, by the owner, before building.** The source sentence
-  carries **six** directional predictions (more growth, harder fermentation, less residual N,
-  faster pH drop, more acetaldehyde + VDK precursors, more esters/higher alcohols) and **none is
-  reachable in the default set**. Beer's `mu_max` was calibrated ONE BEAT earlier (D-211) and a
-  second growth limitation re-opens it, on a relation the corpus does not quantify.
+- **The O₂→growth coupling is REFUSED at D-258 — RE-OPENED by the owner, worked, and refused on
+  MEASUREMENT. Do not re-propose it, and above all do not re-propose it on "the predictions are
+  reachable now": that is D-258's own §3 and it is answered.** D-213's ground (six directional
+  predictions, "none reachable in the default set") really had EXPIRED — extent is scored. The
+  decline survives on two better grounds. (1) **The target contradicts itself**: `mu_max` is
+  fitted on a curve NORMALISED on its own peak, so a ceiling that lands Tyrell's counted fold
+  puts day-1 at 0.494-0.604 against **0.235-0.448 measured on the same panel**. (2) At the only
+  target left (the printed 4-5x, §below) it is a **1.076x** move needing a yield fitted 1.8-2.4x
+  off its own physiological sizing — one observable, one knob, no residual (D-206 shape). What
+  WOULD re-open it: a printed **residual FAN for finished beer**, or a sourced O₂-per-new-biomass
+  yield. **`mu_max`'s refit is answered PER TARGET** (void at the printed one, live at the
+  counted one) — do not re-measure it. → [[feedback-a-normalised-fit-couples-level-and-timing]]
+- **Two D-213 objections are DEAD and must not be re-used (D-258 §5).** (a) D-213 §4's timing
+  argument rejected `y·dX/dt` as an **uptake RATE LAW**; it does **not** block a cumulative
+  sterol-BUDGET ceiling, which leaves the shipped rate law untouched. (b) The "a pure O₂ cap
+  predicts zero growth unaerated" objection is closed BY THE CORPUS — *Craft Beers*: "in the
+  absence of aeration, yeast growth is thought to be minimal or nonexistent". Also checked and
+  clean: **no double-count** with `BiomassCarryingCapacity` (whose docstring names oxygen/sterol
+  limitation) — it is wine-only and opt-in, "beer carrying capacity is deferred".
 - **The O₂→acetate route stays REFUSED (D-212) and D-213 REINFORCES it.** Magnitude is not the
   obstacle — 8.0 mg/L = 0.25 mmol/L bounds at **≤ 30 mg/L** of acid via `y_acetaldehyde_per_o2`'s
   best case × an impossible 100 % conversion, more than the +6 to +14 needed. But that chain is
