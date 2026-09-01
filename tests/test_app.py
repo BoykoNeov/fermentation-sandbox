@@ -746,6 +746,16 @@ def test_a_port_something_is_already_serving_is_never_offered() -> None:
     listens and never accepts fills its backlog after the first probe and then refuses the
     next one, so the second question gets the answer "free" from a port that is plainly
     busy -- which is the test lying, not the probe. A real server accepts.
+
+    The stand-in is stopped by ASKING the thread to leave, not by closing the socket under
+    it. Closing an fd another thread is blocked in ``accept()`` on is undefined by POSIX:
+    Windows aborts the accept at once, Linux may leave the thread parked in the kernel,
+    still holding the listening socket open. The port then goes on serving after ``close()``
+    and the final probe correctly reports it busy -- a green Windows test failing on CI for
+    a reason that is nothing to do with what it pins. Measured on WSL: 7 failures in 60
+    rounds under load, and the thread was still alive in exactly those 7. So the socket
+    carries a timeout, the loop watches a flag, and the join is ASSERTED rather than
+    given two seconds and ignored -- the unchecked join was the defect.
     """
     import socket
     import threading
@@ -756,12 +766,16 @@ def test_a_port_something_is_already_serving_is_never_offered() -> None:
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind(("127.0.0.1", 0))
     server.listen(8)
+    server.settimeout(0.1)
     busy = server.getsockname()[1]
+    asked_to_stop = threading.Event()
 
     def accept_until_closed() -> None:
-        while True:
+        while not asked_to_stop.is_set():
             try:
                 connection, _ = server.accept()
+            except TimeoutError:  # a subclass of OSError -- must be caught first
+                continue
             except OSError:
                 return
             connection.close()
@@ -772,8 +786,12 @@ def test_a_port_something_is_already_serving_is_never_offered() -> None:
         assert not port_is_free(busy)
         assert choose_port((busy,)) is None, "a busy port must not be handed to the server"
     finally:
+        asked_to_stop.set()
+        accepting.join(timeout=10)
+        stopped = not accepting.is_alive()
         server.close()
-        accepting.join(timeout=2)
+
+    assert stopped, "the stand-in server never stopped, so the probe below proves nothing"
 
     # Closed again: the same port is free, so the probe is not simply always saying "busy".
     assert port_is_free(busy)
