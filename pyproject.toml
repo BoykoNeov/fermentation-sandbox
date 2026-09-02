@@ -46,6 +46,9 @@ packages = ["src/fermentation"]
 line-length = 100
 src = ["src", "tests", "."]  # "." so the top-level app/ package sorts as first-party
 target-version = "py313"
+# docs/receipts/ holds a beat's probes as it ran them -- frozen artefacts beside the JSON they
+# produced, not maintained code. Linting them would invite edits to a receipt.
+extend-exclude = ["docs/receipts"]
 
 [tool.ruff.lint]
 # pycodestyle, pyflakes, isort, pep8-naming, pyupgrade, bugbear, simplify, comprehensions

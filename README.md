@@ -48,15 +48,24 @@ rationale.
 
 ## Status
 
-**Milestone 0 — honest skeleton (current).** Layering, the Process interface, the
-provenance-backed parameter store, the unit-conversion boundary, a runnable
-deterministic integrator, and a validation harness (conservation checks +
-benchmark specs) — all tested, *before* any real kinetics. The §2.2 acceptance
-benchmarks are encoded as skipped tests waiting for the kinetics.
+Milestones 0 (skeleton), 1 (single-strain primary fermentation) and 2 (pH as a charge
+balance, byproducts, MLF/Brett, the amino-acid ledger) are complete; Milestone 3 (the
+oxidative aging axis and the sensory readout) is where the work is now. The engine carries
+around 80 Process implementations across two media, a stochastic ensemble runtime, a local
+console, and a test suite of roughly 2100 tests. Nothing is tiered `validated`: that tier is
+reserved for checks against independent measured time-series, and the §2.2 acceptance
+benchmarks earn `plausible`.
 
-**Milestone 1 (next).** Single-strain, isothermal, nitrogen-limited primary
-fermentation; pass the wine (~24 °Brix → dry in 10–14 days) and beer (~1.048 OG
-→ ~1.010 in 5–7 days) benchmarks. See [`docs/plans/`](docs/plans/).
+Three documents carry the state, and none of them is written by hand from memory:
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the structure map: where every subsystem
+  lives, the state vector, the Process registry, with every count derived from the code.
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — the append-only archive of every engineering
+  decision, with a generated index and correction map.
+- [`docs/OPEN.md`](docs/OPEN.md) — what is scientifically open right now, generated from the
+  suite's `xfail` markers and the archive's declared-but-unshipped reversals.
+
+`docs/plans/` holds the original milestone plans as frozen logs; they are history, not status.
 
 ## Running it
 

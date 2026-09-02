@@ -53,5 +53,11 @@ jobs:
       - name: Decisions index is current
         run: uv run --group ui --python ${{ matrix.python-version }} python tools/gen_decisions_toc.py --check
 
+      # The derived ledger of open work (xfail markers + Flags/Unflags markers). Same
+      # staleness class as the index: a new xfail or marker whose ledger was not
+      # regenerated is a doc that lies about what is open.
+      - name: Open ledger is current
+        run: uv run --group ui --python ${{ matrix.python-version }} python tools/gen_open_ledger.py --check
+
       - name: Test (pytest)
         run: uv run --group ui --python ${{ matrix.python-version }} pytest -n auto -q

@@ -118,7 +118,9 @@ def test_a_correction_always_postdates_what_it_corrects(body: str) -> None:
         assert preceding, "a marker appeared before any D-heading"
         source = int(preceding[-1].group(2))
         for target in re.findall(r"D-(\d+)", match.group(2)):
-            if int(target) >= source:
+            # A record may FLAG a section of itself (D-164..D-167 do: identified there,
+            # deliberately not shipped); it cannot CORRECT itself or point forward.
+            if int(target) > source or (int(target) == source and match.group(1) != "Flags"):
                 backwards.append(f"D-{source} claims to correct D-{target}")
     assert not backwards, "; ".join(backwards)
 
@@ -136,6 +138,38 @@ def test_marker_regex_parses_both_single_and_comma_list_targets() -> None:
     assert got_listed is not None
     assert got_listed.group(1) == "Flags"
     assert re.findall(r"D-\d+", got_listed.group(2)) == ["D-71", "D-74", "D-132"]
+
+    # The two forms six shipped markers used and the grammar silently rejected until the
+    # ledger generator counted them: a section on the target, and a `/`-joined pair.
+    sectioned = "**Flags:** D-164 §6 — the admissible range is still the epistemic band."
+    got_sectioned = gen.MARKER.match(sectioned)
+    assert got_sectioned is not None
+    assert re.findall(r"D-\d+", got_sectioned.group(2)) == ["D-164"]
+
+    slashed = "**Corrects:** D-127/D-176 — slot presence standing in for medium."
+    got_slashed = gen.MARKER.match(slashed)
+    assert got_slashed is not None
+    assert re.findall(r"D-\d+", got_slashed.group(2)) == ["D-127", "D-176"]
+
+    # A record's own prose must not be swept in: the marker word is anchored to the line.
+    assert gen.MARKER.match("prose that says **Flags:** D-1 — no") is None
+
+
+def test_a_retired_flag_is_annotated_on_its_index_row() -> None:
+    """`**Unflags:**` turns ⚠ flagged-by into ✓ retired-by on the target's row, and only
+    for the pair it names; the ledger generator owns the validation."""
+    archive = (
+        f"{gen.BEGIN}\n{gen.END}\n"
+        "## D-1 — one\n\nbody\n\n"
+        "## D-2 — two\n\n**Flags:** D-1 — not yet.\n\n"
+        "## D-3 — three\n\n**Flags:** D-1 — also not yet.\n\n"
+        "## D-4 — four\n\n**Unflags:** D-2 — shipped.\n\n"
+    )
+    index, count = gen.build_index(archive)
+    assert count == 4
+    row = next(line for line in index.splitlines() if line.startswith("- [**D-1**]"))
+    assert "✓ flagged by [D-2](#d-2--two), **retired by [D-4](#d-4--four)**" in row
+    assert "⚠ **flagged by [D-3](#d-3--three)**" in row
 
 
 def test_so2_titles_do_not_leak_into_the_oxygen_bucket() -> None:

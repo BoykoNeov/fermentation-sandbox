@@ -120,3 +120,14 @@ past it from this file.** **Never evict an old prohibition to buy a line.**
   conclusion — `k_isoamyl_alcohol` is right — **stands**, and the undosed anchor test is the control
   that proves it (bit-for-bit through D-244).
 
+**D-266 — the JOINT repair (D-257's blend + D-259/D-260's growth sink), MEASURED. Read before citing either refusal.**
+- **Neither refusal was a measurement of the pair, and the pair was never run until D-266.** It clears
+  D-257's blocker (Phe 72.9 % → 0.000 % left) and keeps the blend's timing (36.6 / 48.5 / 57.0 % at NT vs
+  42-54; response 1.30×). **The pre-registered "pays on the tracer" was WRONG**: leucine split 27.6 → 54.5 %
+  (46-61 across the composition bracket), tracer 3.62 % INSIDE Rollero's 3.4-8.2. Isoamyl on Crépin's must
+  2123 → 2177 µM, so **D-260's line does not move — the joint arm is a different point on it**, ceiling 1170 unchanged.
+- **What the pair costs, and no half could show it:** ile/val/thr over-shoot Crépin (66/65/81 vs 51/41/38);
+  the growth sink ALONE breaks the propanol 0.80 floor (0.714) and the blend restores it (0.875); Rollero-must
+  leucine enrichment brackets (1.78/5.44/8.33 vs 3.4/4.2-4.7/6.8-8.2) while the labelled AMOUNT is 1.6-2.5× over;
+  valine's tracer moves the WRONG way. **Per-axis closer, not overall — the fork stays the owner's.** Receipts
+  are IN the repo: `docs/receipts/d266-joint-fusel-repair/`; guards in `tests/test_fusel_joint_repair.py`.

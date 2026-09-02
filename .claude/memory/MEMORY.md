@@ -1,6 +1,6 @@
 # Memory index — Fermentation Sandbox
 
-**The 170 epistemics lessons are NOT rows in this file.** They live in `.claude/memory/lessons/`
+**The 171 epistemics lessons are NOT rows in this file.** They live in `.claude/memory/lessons/`
 — five files reached BY PATH, carrying no index row of their own, so they cost nothing until
 read. Same arrangement `prohibitions/` has had since D-185, applied here on 2026-08-26.
 **Open the matching lessons file BEFORE you build, verify, measure or source — not after the
@@ -13,7 +13,7 @@ shrink, and every new row adds ~90 bytes of it whatever the prose discipline.
 
 ## Lessons — by path, not loaded at boot
 - [Guards, tests & mutation arms](lessons/guards.md) — What a test actually catches: designing a mutation, reading what a RED names, pinning bands and tolerances, and the guards that quietly forbid nothing (53 lessons)
-- [Measuring a run & attributing the number](lessons/measurement.md) — Reading a number off the model and deciding what caused it: baselines, controls, censuses, sampling grids, summary statistics and null results (50 lessons)
+- [Measuring a run & attributing the number](lessons/measurement.md) — Reading a number off the model and deciding what caused it: baselines, controls, censuses, sampling grids, summary statistics and null results (51 lessons)
 - [Parameters, bands, fits & identifiability](lessons/parameters.md) — Where a constant's freedom lives: per-parameter bands vs joint claims, calibrated levels that decay, rate-law coordinates, and fitting vs scoring (30 lessons)
 - [Sources, literature & transcription](lessons/sources.md) — Getting a number out of a paper intact: access, tables vs prose, units, measurement frames, the scope of a negative, and notes that drift from the source (20 lessons)
 - [Records, docs, memory & tooling](lessons/records.md) — The archive and the session-boot surfaces: stale breadcrumbs, refusals that read as gaps, doc rot, caps that become targets, and shell/commit mechanics (17 lessons)

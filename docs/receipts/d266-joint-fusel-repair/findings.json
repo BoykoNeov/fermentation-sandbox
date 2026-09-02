@@ -1,0 +1,448 @@
+{
+ "shipped": {
+  "crepin": {
+   "splits": {
+    "leucine": 81.5,
+    "isoleucine": 51.0,
+    "valine": 61.99999999999999,
+    "threonine": 82.0,
+    "phenylalanine": 97.5
+   },
+   "closure": {
+    "leucine": 1.0000120887407282,
+    "isoleucine": 0.9999976674074058,
+    "valine": 0.9999875763697881,
+    "threonine": 0.9999982877980705,
+    "phenylalanine": 1.0000005297535635
+   },
+   "left_pct": {
+    "leucine": -6.714016806001999e-07,
+    "isoleucine": -8.236014737279432e-10,
+    "valine": -5.612436792359512e-10,
+    "threonine": 6.38438480209536e-15,
+    "phenylalanine": 1.3540852528566294
+   },
+   "leucine_supply_um": 172.99999999999997,
+   "leucine_consumed_um": 173.00000116152486,
+   "leucine_ehrlich_um": 32.00538711503171,
+   "leucine_lump_um": 140.99670539865318,
+   "isoamyl_um": 2123.3101911857134,
+   "isoamyl_mgl": 187.16979335302062,
+   "leucine_tracer_pct": 1.5073345028857532,
+   "de_novo_share": {
+    "propanol": 0.8776696570381173,
+    "isobutanol": 0.9427959915090859,
+    "active_amyl_alcohol": 0.9349024354340664,
+    "isoamyl_alcohol": 0.9660528367988608,
+    "2_phenylethanol": 0.9897684504377324
+   },
+   "biomass_peak_gpl": 3.2160736606631217,
+   "carbon_rel_drift": 8.704227710160776e-15,
+   "nitrogen_rel_drift": 7.715599118268681e-14
+  },
+  "rollero": {
+   "70": {
+    "nt_fraction_pct": 100.6008007913058,
+    "gate_closure_h": 45.0,
+    "isoamyl_ef_um": 1204.930537894677,
+    "valine_enrichment_pct": 1.230455190510995,
+    "leucine_enrichment_pct": 0.9896906934036456,
+    "arms_differ": true
+   },
+   "250": {
+    "nt_fraction_pct": 100.6187209986082,
+    "gate_closure_h": 40.0,
+    "isoamyl_ef_um": 2080.0194510408674,
+    "valine_enrichment_pct": 2.442989556895978,
+    "leucine_enrichment_pct": 2.047713798037167,
+    "arms_differ": true
+   },
+   "425": {
+    "nt_fraction_pct": 100.5831016271323,
+    "gate_closure_h": 41.0,
+    "isoamyl_ef_um": 2736.3422400466598,
+    "valine_enrichment_pct": 3.0871890466730867,
+    "leucine_enrichment_pct": 2.6463070109568356,
+    "arms_differ": true
+   }
+  },
+  "anchor_mgl": {
+   "250": 170.5389329624488,
+   "300": 170.85146926803776
+  },
+  "d104": {
+   "phe_left_pct": 20.33990987741016,
+   "worst_joint_c_refund": 0.5837550683173145,
+   "max_net_dS_dt": 0.0,
+   "isoamyl_mgl": 169.8876851041029,
+   "biomass_final_gpl": 0.9217970350246179,
+   "carbon_rel_drift": 5.90429086809817e-14,
+   "nitrogen_rel_drift": 1.3178518621781532e-12
+  }
+ },
+ "blend": {
+  "crepin": {
+   "splits": {
+    "leucine": 81.5,
+    "isoleucine": 50.99999999999999,
+    "valine": 61.99999999999999,
+    "threonine": 82.0,
+    "phenylalanine": 97.5
+   },
+   "closure": {
+    "leucine": 1.0000103479908622,
+    "isoleucine": 0.9999985930306272,
+    "valine": 0.9999873541586947,
+    "threonine": 0.9999995254436653,
+    "phenylalanine": 0.9999998895780335
+   },
+   "left_pct": {
+    "leucine": -3.474648256243488e-06,
+    "isoleucine": 8.002973456830689e-11,
+    "valine": 2.6415240930493104e-10,
+    "threonine": 0.021497567059542613,
+    "phenylalanine": 56.20439435963145
+   },
+   "leucine_supply_um": 172.99999999999997,
+   "leucine_consumed_um": 173.00000601114147,
+   "leucine_ehrlich_um": 32.00533229952024,
+   "leucine_lump_um": 140.9964639141026,
+   "isoamyl_um": 2173.6517718490486,
+   "isoamyl_mgl": 191.6074036884936,
+   "leucine_tracer_pct": 1.4724222487714507,
+   "de_novo_share": {
+    "propanol": 0.8801945029583236,
+    "isobutanol": 0.9439647251317798,
+    "active_amyl_alcohol": 0.9362323327005134,
+    "isoamyl_alcohol": 0.9668390720796756,
+    "2_phenylethanol": 0.9955503284634538
+   },
+   "biomass_peak_gpl": 3.202976083052177,
+   "carbon_rel_drift": 1.1581048733010523e-13,
+   "nitrogen_rel_drift": 5.362750341213603e-13
+  },
+  "rollero": {
+   "70": {
+    "nt_fraction_pct": 36.485282535317175,
+    "gate_closure_h": 45.0,
+    "isoamyl_ef_um": 1577.3681514969048,
+    "valine_enrichment_pct": 0.9399925789901543,
+    "leucine_enrichment_pct": 0.7560275523680073,
+    "arms_differ": true
+   },
+   "250": {
+    "nt_fraction_pct": 48.387149518440694,
+    "gate_closure_h": 40.0,
+    "isoamyl_ef_um": 1845.3106704301767,
+    "valine_enrichment_pct": 2.7541220450196873,
+    "leucine_enrichment_pct": 2.308238937186542,
+    "arms_differ": true
+   },
+   "425": {
+    "nt_fraction_pct": 56.91803040867697,
+    "gate_closure_h": 41.0,
+    "isoamyl_ef_um": 2046.9978419968395,
+    "valine_enrichment_pct": 4.127740941207226,
+    "leucine_enrichment_pct": 3.5376297003958763,
+    "arms_differ": true
+   }
+  },
+  "anchor_mgl": {
+   "250": 172.3693637577129,
+   "300": 172.46514247627056
+  },
+  "d104": {
+   "phe_left_pct": 72.86359464465554,
+   "worst_joint_c_refund": 0.26309600316528675,
+   "max_net_dS_dt": 0.0,
+   "isoamyl_mgl": 172.05961484866776,
+   "biomass_final_gpl": 0.9188364641686462,
+   "carbon_rel_drift": 2.5921276981894407e-14,
+   "nitrogen_rel_drift": 6.790749912368529e-13
+  }
+ },
+ "growth": {
+  "crepin": {
+   "splits": {
+    "leucine": 27.582001931270092,
+    "isoleucine": 38.40360805410322,
+    "valine": 37.17010715357031,
+    "threonine": 57.863986516901655,
+    "phenylalanine": 98.87074953968882
+   },
+   "closure": {
+    "leucine": 1.0000104980309412,
+    "isoleucine": 1.0000020326083707,
+    "valine": 0.9999982619648361,
+    "threonine": 0.999999014535637,
+    "phenylalanine": 0.9999979014184075
+   },
+   "left_pct": {
+    "leucine": -1.5611425164122175e-09,
+    "isoleucine": -4.297083889347767e-08,
+    "valine": -9.772386029611874e-13,
+    "threonine": 0.00017576575394906928,
+    "phenylalanine": 3.7385780212813122e-06
+   },
+   "leucine_supply_um": 172.99999999999997,
+   "leucine_consumed_um": 173.00000000270074,
+   "leucine_ehrlich_um": 125.28445188710367,
+   "leucine_lump_um": 47.71736427494996,
+   "isoamyl_um": 2123.4637848452444,
+   "isoamyl_mgl": 187.18333263410824,
+   "leucine_tracer_pct": 5.900004171544384,
+   "de_novo_share": {
+    "propanol": 0.7136589336369283,
+    "isobutanol": 0.9008483574970587,
+    "active_amyl_alcohol": 0.9181733476463391,
+    "isoamyl_alcohol": 0.9108481716125213,
+    "2_phenylethanol": 0.9953153152488579
+   },
+   "biomass_peak_gpl": 3.2163937266827207,
+   "carbon_rel_drift": 8.350157430425423e-14,
+   "nitrogen_rel_drift": 4.094992888918572e-13
+  },
+  "rollero": {
+   "70": {
+    "nt_fraction_pct": 100.59372940355082,
+    "gate_closure_h": 45.0,
+    "isoamyl_ef_um": 1205.1500713005626,
+    "valine_enrichment_pct": 2.0443165734717192,
+    "leucine_enrichment_pct": 3.791798918353947,
+    "arms_differ": true
+   },
+   "250": {
+    "nt_fraction_pct": 100.61747483069541,
+    "gate_closure_h": 40.0,
+    "isoamyl_ef_um": 2081.1982457305676,
+    "valine_enrichment_pct": 3.6396269123692466,
+    "leucine_enrichment_pct": 7.842322922116482,
+    "arms_differ": true
+   },
+   "425": {
+    "nt_fraction_pct": 100.58346496384665,
+    "gate_closure_h": 41.0,
+    "isoamyl_ef_um": 2739.795529411962,
+    "valine_enrichment_pct": 4.275512213771795,
+    "leucine_enrichment_pct": 10.127690586376879,
+    "arms_differ": true
+   }
+  },
+  "anchor_mgl": {
+   "250": 170.5389329624488,
+   "300": 170.85146926803776
+  },
+  "d104": {
+   "phe_left_pct": 5.164112171069378e-05,
+   "worst_joint_c_refund": 0.23595794518048543,
+   "max_net_dS_dt": 0.0,
+   "isoamyl_mgl": 170.21641160357936,
+   "biomass_final_gpl": 0.9235333206461908,
+   "carbon_rel_drift": 1.252861720791563e-14,
+   "nitrogen_rel_drift": 5.484677500738307e-13
+  }
+ },
+ "joint": {
+  "crepin": {
+   "splits": {
+    "leucine": 54.499514677740784,
+    "isoleucine": 66.21805175001884,
+    "valine": 65.24985295403852,
+    "threonine": 81.18976258101043,
+    "phenylalanine": 99.6374375091909
+   },
+   "closure": {
+    "leucine": 1.0000162893521107,
+    "isoleucine": 1.0000073605217463,
+    "valine": 1.0000002151698122,
+    "threonine": 0.9999991550921148,
+    "phenylalanine": 0.9999997198954543
+   },
+   "left_pct": {
+    "leucine": -5.5151408807829485e-12,
+    "isoleucine": -2.844617082494986e-12,
+    "valine": 7.978387801981906e-11,
+    "threonine": 0.0355331613999036,
+    "phenylalanine": 4.466532826224866e-06
+   },
+   "leucine_supply_um": 172.99999999999997,
+   "leucine_consumed_um": 173.00000000000952,
+   "leucine_ehrlich_um": 78.71712183754084,
+   "leucine_lump_um": 94.28569622038385,
+   "isoamyl_um": 2176.5746291247656,
+   "isoamyl_mgl": 191.86505355734806,
+   "leucine_tracer_pct": 3.616559744114734,
+   "de_novo_share": {
+    "propanol": 0.8749877426943845,
+    "isobutanol": 0.9458473896272882,
+    "active_amyl_alcohol": 0.9560955881094684,
+    "isoamyl_alcohol": 0.9476800792890735,
+    "2_phenylethanol": 0.9985285164849759
+   },
+   "biomass_peak_gpl": 3.21634977549127,
+   "carbon_rel_drift": 8.763239423450001e-14,
+   "nitrogen_rel_drift": 2.464629541666038e-12
+  },
+  "rollero": {
+   "70": {
+    "nt_fraction_pct": 36.56000656036228,
+    "gate_closure_h": 45.0,
+    "isoamyl_ef_um": 1578.7145991649245,
+    "valine_enrichment_pct": 0.8726654543923246,
+    "leucine_enrichment_pct": 1.7839109812951386,
+    "arms_differ": true
+   },
+   "250": {
+    "nt_fraction_pct": 48.483764901956334,
+    "gate_closure_h": 40.0,
+    "isoamyl_ef_um": 1848.4951673829748,
+    "valine_enrichment_pct": 2.1530599418477823,
+    "leucine_enrichment_pct": 5.4412953067535454,
+    "arms_differ": true
+   },
+   "425": {
+    "nt_fraction_pct": 57.02281603233541,
+    "gate_closure_h": 41.0,
+    "isoamyl_ef_um": 2051.6428279280867,
+    "valine_enrichment_pct": 2.854975320783183,
+    "leucine_enrichment_pct": 8.334137716367762,
+    "arms_differ": true
+   }
+  },
+  "anchor_mgl": {
+   "250": 172.3693637577129,
+   "300": 172.46514247627056
+  },
+  "d104": {
+   "phe_left_pct": 6.141575288474682e-05,
+   "worst_joint_c_refund": 0.23595794518048546,
+   "max_net_dS_dt": 0.0,
+   "isoamyl_mgl": 172.4375277480706,
+   "biomass_final_gpl": 0.9236958951468293,
+   "carbon_rel_drift": 3.1119933087707674e-13,
+   "nitrogen_rel_drift": 1.6471391692496084e-11
+  }
+ },
+ "joint_edges": {
+  "lo": {
+   "splits": {
+    "leucine": 46.01087172421615,
+    "isoleucine": 58.244504510171595,
+    "valine": 57.6988997893017,
+    "threonine": 75.44761919437886,
+    "phenylalanine": 99.47719983993616
+   },
+   "closure": {
+    "leucine": 1.0000165371139527,
+    "isoleucine": 1.0000065430471137,
+    "valine": 0.9999963669388452,
+    "threonine": 0.9999995209150938,
+    "phenylalanine": 0.9999993713994367
+   },
+   "left_pct": {
+    "leucine": -1.5575242636582792e-09,
+    "isoleucine": -9.528011554599248e-12,
+    "valine": 2.5895338654250177e-08,
+    "threonine": 0.7653622449637449,
+    "phenylalanine": 0.005649444660991217
+   },
+   "leucine_supply_um": 172.99999999999997,
+   "leucine_consumed_um": 173.0000000026945,
+   "leucine_ehrlich_um": 93.40273650471487,
+   "leucine_lump_um": 79.60012441869348,
+   "isoamyl_um": 2176.436596707593,
+   "isoamyl_mgl": 191.8528859997743,
+   "leucine_tracer_pct": 4.291544106821672,
+   "de_novo_share": {
+    "propanol": 0.8380065741198123,
+    "isobutanol": 0.9341987400665137,
+    "active_amyl_alcohol": 0.9457294249335019,
+    "isoamyl_alcohol": 0.9373907975913343,
+    "2_phenylethanol": 0.9978781668097696
+   },
+   "biomass_peak_gpl": 3.2158305011102284,
+   "carbon_rel_drift": 1.4929963462174077e-13,
+   "nitrogen_rel_drift": 2.9045277458118515e-12
+  },
+  "mid": {
+   "splits": {
+    "leucine": 54.499514677740784,
+    "isoleucine": 66.21805175001884,
+    "valine": 65.24985295403852,
+    "threonine": 81.18976258101043,
+    "phenylalanine": 99.6374375091909
+   },
+   "closure": {
+    "leucine": 1.0000162893521107,
+    "isoleucine": 1.0000073605217463,
+    "valine": 1.0000002151698122,
+    "threonine": 0.9999991550921148,
+    "phenylalanine": 0.9999997198954543
+   },
+   "left_pct": {
+    "leucine": -5.5151408807829485e-12,
+    "isoleucine": -2.844617082494986e-12,
+    "valine": 7.978387801981906e-11,
+    "threonine": 0.0355331613999036,
+    "phenylalanine": 4.466532826224866e-06
+   },
+   "leucine_supply_um": 172.99999999999997,
+   "leucine_consumed_um": 173.00000000000952,
+   "leucine_ehrlich_um": 78.71712183754084,
+   "leucine_lump_um": 94.28569622038385,
+   "isoamyl_um": 2176.5746291247656,
+   "isoamyl_mgl": 191.86505355734806,
+   "leucine_tracer_pct": 3.616559744114734,
+   "de_novo_share": {
+    "propanol": 0.8749877426943845,
+    "isobutanol": 0.9458473896272882,
+    "active_amyl_alcohol": 0.9560955881094684,
+    "isoamyl_alcohol": 0.9476800792890735,
+    "2_phenylethanol": 0.9985285164849759
+   },
+   "biomass_peak_gpl": 3.21634977549127,
+   "carbon_rel_drift": 8.763239423450001e-14,
+   "nitrogen_rel_drift": 2.464629541666038e-12
+  },
+  "hi": {
+   "splits": {
+    "leucine": 61.48236179661809,
+    "isoleucine": 72.31348243633988,
+    "valine": 71.1621261134486,
+    "threonine": 85.18349616959185,
+    "phenylalanine": 99.73246435269719
+   },
+   "closure": {
+    "leucine": 1.0000159911838282,
+    "isoleucine": 1.0000096699689391,
+    "valine": 0.9999991789855164,
+    "threonine": 0.9999993108983861,
+    "phenylalanine": 0.999999462984953
+   },
+   "left_pct": {
+    "leucine": -2.5949492692671708e-09,
+    "isoleucine": -7.894977044373308e-12,
+    "valine": -3.622582256923628e-11,
+    "threonine": 0.0009880633091972982,
+    "phenylalanine": 1.2020551468885121e-09
+   },
+   "leucine_supply_um": 172.99999999999997,
+   "leucine_consumed_um": 173.00000000448924,
+   "leucine_ehrlich_um": 66.63657967433522,
+   "leucine_lump_um": 106.3661868049564,
+   "isoamyl_um": 2176.609578717159,
+   "isoamyl_mgl": 191.86813436391753,
+   "leucine_tracer_pct": 3.061485179790912,
+   "de_novo_share": {
+    "propanol": 0.9014975252429911,
+    "isobutanol": 0.9549963185759884,
+    "active_amyl_alcohol": 0.9640179610325907,
+    "isoamyl_alcohol": 0.9559944522940788,
+    "2_phenylethanol": 0.9989142069544428
+   },
+   "biomass_peak_gpl": 3.2163777965348146,
+   "carbon_rel_drift": 5.1930307694518525e-14,
+   "nitrogen_rel_drift": 9.59951395598022e-13
+  }
+ }
+}

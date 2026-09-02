@@ -107,7 +107,8 @@ regression, not a fixture one — don't cite the worksteal reason against them.
   answer to "why". Its counts are *derived* — re-run the snippet at the foot of that file
   instead of hand-editing a number, and if the two disagree the code is right.
 - **`docs/plans/milestone-*.md` are FROZEN LOGS, not live status.** Never read them for what
-  is built, open, or next — that is `ARCHITECTURE.md` and `DECISIONS.md`. Do not resume
+  is built, open, or next — that is `ARCHITECTURE.md`, `DECISIONS.md` and the generated
+  `docs/OPEN.md` (what is open, derived from xfails and flags). Do not resume
   maintaining them. The old "keep the plans updated" rule is retired: it was followed for a
   while, then silently stopped, and the half-updated result caused two re-proposals of
   shipped work. A doc nobody updates is worse than one that says it is history.
@@ -143,6 +144,24 @@ When appending a record:
   behaviour. The generator derives the back-edge, so the corrected record grows a
   ⚠ without being edited (the archive stays append-only). **The map only knows
   what a marker declares** — absence of ⚠ is not a guarantee a record is current.
-- Then run `uv run python tools/gen_decisions_toc.py`. CI and
-  `tests/test_decisions_index.py` both fail on a stale index, a wrapped heading,
-  and a marker pointing at a nonexistent or later record.
+  A target may carry a section (`D-164 §6`), and a record may flag a section of
+  *itself* (identified here, deliberately not shipped); nothing may point forward.
+- **When a flagged reversal finally ships, retire the flag** in the shipping record:
+  `**Unflags:** D-257 — clause` retires every flag D-257 declared;
+  `**Unflags:** D-258 on D-222 — clause` retires only that pair. The index row turns
+  ⚠ into ✓ and the ledger moves the row to "retired". Never edit the old flag.
+- Then run `uv run python tools/gen_decisions_toc.py` **and**
+  `uv run python tools/gen_open_ledger.py`. CI, `tests/test_decisions_index.py` and
+  `tests/test_open_ledger.py` fail on a stale index or ledger, a wrapped heading, a
+  marker pointing at a nonexistent or later record, or an `Unflags` naming no flag.
+
+## What is open — `docs/OPEN.md`, derived, never written
+
+`docs/OPEN.md` is the live answer to "what is scientifically open". It is **generated**
+by `tools/gen_open_ledger.py` from the only two machine-checkable signals: every
+`xfail`/`skip` marker under `tests/` (a test that states what is true of a source and
+false of the model) and every open `Flags:` pair in the archive. It reads no prose —
+a record's own "what stays open" section is a breadcrumb list (that trap bit twice) —
+so **an item absent from it is not proven closed**, and an owner-gated build described
+only in prose does not appear. To close a row, fix the model (strict xfail forces the
+marker's removal) or append a record with `Unflags:`; then regenerate. `--check` in CI.
