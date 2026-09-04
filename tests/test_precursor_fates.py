@@ -9,6 +9,11 @@ fate and the alcohol.
 This suite pins: the closure algebra (carbon + nitrogen), that the imposed split is *exactly*
 ``f`` at the ProcessSet level, that production is untouched, the joint-nitrogen-budget guard the
 D-32 swap's ``psi`` no longer covers alone, and undosed isolability.
+
+The growth-anchored alternative these guards bracket (D-259/D-260, re-priced onto Lange &
+Heijnen's sourced composition at D-268) was adjudicated at **D-269 and REFUSED**, jointly with
+D-257's temporal blend. The brackets and re-pricing ratios below therefore pin a *declined*
+design's price, not a pending one; the shipped static form is unchanged.
 """
 
 from collections.abc import Mapping

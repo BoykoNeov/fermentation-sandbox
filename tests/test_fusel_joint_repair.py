@@ -17,6 +17,17 @@ first reproduce D-257's and D-260's own published numbers before any ``joint`` n
 
 Receipts, in the repo this time: ``docs/receipts/d266-joint-fusel-repair/`` (the
 pre-registration written before the first number, the probe, its JSON, the findings).
+
+**The design measured here is REFUSED (D-269) — it is not a pending build.** D-268 re-priced
+every arm onto Lange & Heijnen's sourced yeast protein composition and the joint arm's leucine
+tracer left Rollero's band at every edge of the bracket (3.356 / 3.131 / 2.934 % against a 3.4 %
+floor), joining the leucine split it already missed; the three splits Crépin's numbers are
+imposed on moved 3-8 points further out; and the one axis that improved is an enrichment
+*ratio* whose labelled amount runs 1.35-2.10x the source. The fork D-266 §6 left to the owner had
+two directions only at the unsourced composition. What survives is the measurement, not the
+design: the blocker clearance
+(:func:`test_the_joint_arm_CLEARS_the_blocker_d257_refused_the_blend_on`)
+and the blend's temporal gains. This module stays as the record of what was priced.
 """
 
 from __future__ import annotations
