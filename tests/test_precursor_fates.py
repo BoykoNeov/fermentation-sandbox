@@ -1594,7 +1594,7 @@ def test_the_sourced_composition_is_above_every_bracket_edge_in_the_frame_the_dr
         )
         assert share / mid > 1.2, (
             f"{species}: the sourced share is only {share / mid:.3f}x the MID composition that "
-            "D-259/D-260/D-266 quote as their headline. D-267 recorded 1.22-1.43x; if that gap "
+            "D-259/D-260/D-266 quote as their headline. D-267 recorded 1.217-1.432x; if that gap "
             "has closed, the 'low estimate' claim in those records no longer holds"
         )
 

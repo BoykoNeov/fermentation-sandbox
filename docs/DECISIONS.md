@@ -37614,7 +37614,7 @@ Receipts: `docs/receipts/d266-joint-fusel-repair/` — `PREREGISTER.md`, `probe_
 ## D-267 — the yeast protein composition every growth-anchored number rests on is sourced at last, and the source does not fit: converted into the frame the draw actually uses, all five precursors sit ABOVE the bracket's high edge, so D-259's, D-260's and D-266's splits are all low estimates
 
 **Corrects:** D-259 — §2's "no such composition exists anywhere in this project" and its consequence, that "the honest replacement is a stated BRACKET rather than a borrowed point". A measured composition exists (Lange & Heijnen 2001 Table IV) and is now transcribed in-repo with its conversion and its receipts. The bracket was the honest replacement while nothing was found; it is no longer the best available number.
-**Flags:** D-259 — the five residue shares in `_D259_RESIDUE_SHARE_OF_PROTEIN` are contradicted at the high edge by that composition, by 1.02-1.21x on `hi` and 1.22-1.43x on the `mid` those records quote. Identified and measured here; the constants still carry the old numbers because moving them re-prices every arm of the owner-gated build D-266 §9 reserved, which is not a transcription beat's to take.
+**Flags:** D-259 — the five residue shares in `_D259_RESIDUE_SHARE_OF_PROTEIN` are contradicted at the high edge by that composition, by 1.015-1.212x on `hi` and 1.217-1.432x on the `mid` those records quote. Identified and measured here; the constants still carry the old numbers because moving them re-prices every arm of the owner-gated build D-266 §9 reserved, which is not a transcription beat's to take.
 
 Opened by the owner off a three-item menu as the cheapest unblocked item on it. `w_i` is the
 yeast protein amino-acid composition that D-259's growth-anchored counterfactual multiplies by
@@ -37696,7 +37696,7 @@ isoleucine and valine — which is why the fork had to be decided rather than av
 
 **The consequence, stated and not acted on.** A larger `w_i` draws more precursor into the lump,
 so the direction is unambiguous: every growth-anchored number in D-259, D-260 and D-266 was
-computed at a per-precursor draw **22-43 % below** what the only measured composition plus the
+computed at a per-precursor draw **21.7-43.2 % below** what the only measured composition plus the
 engine's own molar masses imply, and the `mid` composition those records quote as their headline
 is the furthest from it. **D-260's 27.58 % leucine split and D-266's joint 54.50 % are low
 estimates**, and D-266 §6's per-axis fork was priced at a composition the source does not

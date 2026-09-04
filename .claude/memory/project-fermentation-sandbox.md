@@ -101,6 +101,14 @@ work that touches its subject.** Split out at D-185 from 320 inline lines
   does not move (2123 → 2177), so **D-260's line is the same line**. Costs neither half showed: ile/val/thr
   over-shoot, valine tracer wrong way, growth sink ALONE breaks the propanol floor. **Not shipped — a
   per-axis fork, owner's call.** Receipts IN-REPO `docs/receipts/d266-*`; `docs/OPEN.md` + `Unflags:` born here.
+- **`w_i`, the yeast protein composition (D-267)** — **SOURCED; never call it unrecorded again.**
+  Lange & Heijnen 2001 Table IV (mol %), image + conversion in `docs/receipts/d267-*`. **NOT a
+  prime-directive-2 violation and it does NOT move to YAML** — nothing in `src/` reads it. The
+  finding is the CONVERSION: the draw leaves the FREE amino-acid pool and the engine's
+  `MOLAR_MASS` is the free acid, so in THAT frame all five precursors sit ABOVE the bracket's
+  high edge (1.015-1.212x) and 1.217-1.432x above the `mid` D-259/D-260/D-266 quote — **their
+  splits are LOW estimates and D-266 §6's fork was priced at a composition the source does not
+  support.** Flagged, not shipped: moving the five IS the owner-gated build. → [[feedback-a-mole-table-is-two-mass-frames]]
 - **Sampling surfaces (D-153 → D-162)** — BOTH archive-wide sweeps DONE; four surfaces and two
   distributions PINNED; D-157's contradiction CLOSED (never re-narrow 0.084); `reads` has TWO masters;
   closure ordering SCOPED. Do not re-run, re-audit or "simplify" any of it.

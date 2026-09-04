@@ -79,7 +79,7 @@ model's own arithmetic. The residue frame is named as the loser and is what the 
 comment currently says.
 
 **Consequence, stated and not acted on.** Every growth-anchored number in D-259, D-260 and D-266
-was computed at a per-precursor draw **22–43 % below** what the only measured composition plus
+was computed at a per-precursor draw **21.7–43.2 % below** what the only measured composition plus
 the engine's own molar masses imply, and the mid composition those records quote as the headline
 is the furthest from it. The direction is unambiguous: a larger `w_i` draws more precursor into
 the lump, so D-260's 27.58 % leucine split and D-266's joint 54.50 % are **low estimates**, and
