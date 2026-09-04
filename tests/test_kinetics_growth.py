@@ -530,8 +530,11 @@ def test_the_extent_overshoot_cannot_be_a_nitrogen_budget_error():
     with both inputs sourced. Invert it against Tyrell's counted crop and it prices ITSELF.
 
     **At the settled 40 pg/cell, Tyrell's cells would have to be 20-26 % nitrogen by dry
-    weight.** Real yeast is 7-12 % and this engine's own ``biomass_N_fraction`` band tops out at
-    14 %. So no admissible partition of the nitrogen budget reproduces the counted crop: the
+    weight.** Sourced wine yeast is 6.4-8.3 % (D-270, from D-267 §6's two protein statements;
+    this docstring said an unsourced "7-12 %" until then) and this engine's own
+    ``biomass_N_fraction`` band tops out at 14 %. Against the sourced range the demand is
+    2.42-4.09x outside rather than 1.44-1.87x, so the sourcing **strengthens** this refusal.
+    So no admissible partition of the nitrogen budget reproduces the counted crop: the
     overshoot is not a nitrogen error, and a term draining nitrogen away from suspended biomass
     would have to drain about half of it to a destination nothing in the corpus names.
 
@@ -562,7 +565,8 @@ def test_the_extent_overshoot_cannot_be_a_nitrogen_budget_error():
     )
     assert min(implied) / f_n.value > 1.7, (
         "the demanded nitrogen fraction is within 1.7x of the shipped one. D-230's refusal "
-        "rests on the demand being physically impossible (real yeast 7-12 % N), not merely high"
+        "rests on the demand being physically impossible (sourced wine yeast 6.4-8.3 % N, "
+        "D-270), not merely high"
     )
 
 

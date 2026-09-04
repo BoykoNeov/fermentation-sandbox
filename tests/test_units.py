@@ -212,7 +212,10 @@ def test_the_elemental_route_corroborates_colemans_assumption():
 
     It also settles the frame Coleman left open. He writes *"cell mass"*, never *"dry
     weight"*; read as a WET mass, 4e-11 g would make yeast ~33 % nitrogen on a dry basis
-    against a real 7-12 %. The engine declares ``biomass_C_fraction`` and
+    against a sourced 6.4-8.3 % (D-270; this said an unsourced "7-12 %" until then).
+    **The fraction fed here must stay the STATIC elemental one** - wine's compiled value is
+    Coleman's own inverse and would make this identity exact rather than corroborating
+    (``tests/test_biomass_nitrogen_frame.py``). The engine declares ``biomass_C_fraction`` and
     ``biomass_N_fraction`` on dry cell weight in both medium files, so dry is the frame
     those parameters need and the arithmetic agrees.
 

@@ -232,7 +232,14 @@ def abv_from_ethanol(ethanol_gpl: float) -> float:
 # 34.9 against 40 is a 13 % agreement between an assumption made for a counting
 # chamber and the elemental formula, and it settles wet-vs-dry: read as a WET mass,
 # 40 pg would make yeast 33 % nitrogen on a dry basis, which is absurd against the
-# 7-12 % real range. The engine's biomass_C_fraction / biomass_N_fraction are
+# sourced 6.4-8.3 % (decision D-270: wine yeast at 40-45 % crude protein on the
+# source's own N x 6.25, and 50 % protein at one-sixth nitrogen -- the two statements
+# D-267 sec 6 found; this line carried an unsourced wider range until then, and the
+# sourced ceiling makes the wet reading MORE absurd, not less).
+# NOTE the fraction below must stay the STATIC elemental one: wine's compiled
+# biomass_N_fraction is 1/Y_X/N, Coleman's own inverse, and feeding it here returns
+# 4e-11 g identically -- the check is only independent while its composition is
+# (tests/test_biomass_nitrogen_frame.py). The engine's biomass_C_fraction / biomass_N_fraction are
 # declared on dry cell weight in both medium files, so this is the frame they need.
 # A geometric cross-check agrees on magnitude: a 100-150 fL wine/ale cell at
 # rho ~ 1.11 g/mL and ~30 % dry matter is 30-57 pg.

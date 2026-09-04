@@ -1,0 +1,128 @@
+{
+  "rows": [
+    {
+      "arm": "wine yan=50",
+      "declared_yan_mgl": 50.0,
+      "f_N": 0.03617091268978068,
+      "tier": 1,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=50 mg/L"
+    },
+    {
+      "arm": "wine yan=80",
+      "declared_yan_mgl": 80.0,
+      "f_N": 0.04030821438124706,
+      "tier": 1,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=80 mg/L"
+    },
+    {
+      "arm": "wine yan=100",
+      "declared_yan_mgl": 100.0,
+      "f_N": 0.04332610234848241,
+      "tier": 1,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=100 mg/L"
+    },
+    {
+      "arm": "wine yan=150",
+      "declared_yan_mgl": 150.0,
+      "f_N": 0.05189670387392582,
+      "tier": 1,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=150 mg/L"
+    },
+    {
+      "arm": "wine yan=250",
+      "declared_yan_mgl": 250.0,
+      "f_N": 0.07445949445834335,
+      "tier": 1,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=250 mg/L"
+    },
+    {
+      "arm": "wine yan=300",
+      "declared_yan_mgl": 300.0,
+      "f_N": 0.08918878285949065,
+      "tier": 1,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=300 mg/L"
+    },
+    {
+      "arm": "wine yan=330",
+      "declared_yan_mgl": 330.0,
+      "f_N": 0.09939037509878874,
+      "tier": 1,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=330 mg/L"
+    },
+    {
+      "arm": "wine yan=350",
+      "declared_yan_mgl": 350.0,
+      "f_N": 0.10683176196432037,
+      "tier": 1,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=350 mg/L"
+    },
+    {
+      "arm": "wine yan=400",
+      "declared_yan_mgl": 400.0,
+      "f_N": 0.10683176196432037,
+      "tier": 0,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=350 mg/L \u2014 HELD at the fit's upper edge; the scenario declares 400 mg/L, outside the domain the regression was fitted on (decision D-244)"
+    },
+    {
+      "arm": "wine yan=500",
+      "declared_yan_mgl": 500.0,
+      "f_N": 0.10683176196432037,
+      "tier": 0,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=350 mg/L \u2014 HELD at the fit's upper edge; the scenario declares 500 mg/L, outside the domain the regression was fitted on (decision D-244)"
+    },
+    {
+      "arm": "wine yan=250+aa2",
+      "declared_yan_mgl": 700.8930914860864,
+      "f_N": 0.10683176196432037,
+      "tier": 0,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=350 mg/L \u2014 HELD at the fit's upper edge; the scenario declares 700.893 mg/L, outside the domain the regression was fitted on (decision D-244)"
+    },
+    {
+      "arm": "wine yan=250+aa4",
+      "declared_yan_mgl": 1151.7861829721728,
+      "f_N": 0.10683176196432037,
+      "tier": 0,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=350 mg/L \u2014 HELD at the fit's upper edge; the scenario declares 1151.79 mg/L, outside the domain the regression was fitted on (decision D-244)"
+    },
+    {
+      "arm": "wine yan=80+aa2",
+      "declared_yan_mgl": 530.8930914860864,
+      "f_N": 0.10683176196432037,
+      "tier": 0,
+      "conditions": "computed at compile from Coleman Y_X/N regression at YAN=350 mg/L \u2014 HELD at the fit's upper edge; the scenario declares 530.893 mg/L, outside the domain the regression was fitted on (decision D-244)"
+    },
+    {
+      "arm": "beer yan=200 (static, no override)",
+      "declared_yan_mgl": 200.0,
+      "f_N": 0.114,
+      "tier": 1,
+      "conditions": "S. cerevisiae dry cell weight, nitrogen mass fraction (ale yeast is S. cerevisiae)"
+    }
+  ],
+  "summary": {
+    "sourced_range_g_N_per_g_DW": [
+      0.064,
+      0.08333333333333334
+    ],
+    "sourced_points": {
+      "crude_protein_40": 0.064,
+      "crude_protein_45": 0.07200000000000001,
+      "uwc_arithmetic": 0.08333333333333334
+    },
+    "wine_compiled_f_N_span": [
+      0.03617091268978068,
+      0.10683176196432037
+    ],
+    "wine_arms_inside_sourced_range": 1,
+    "wine_arm_count": 13,
+    "static_yaml_value": 0.114,
+    "static_band": [
+      0.08,
+      0.14
+    ],
+    "compile_bracket": [
+      0.03,
+      0.15
+    ]
+  }
+}
