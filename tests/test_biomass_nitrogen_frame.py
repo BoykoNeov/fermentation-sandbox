@@ -74,8 +74,13 @@ _SOURCED_N_FRACTION = {
 _SOURCED_LO = min(_SOURCED_N_FRACTION.values())
 _SOURCED_HI = max(_SOURCED_N_FRACTION.values())
 
-#: Every declared assimilable nitrogen [mg N/L] the suite's wine scenarios evaluate the yield fit
-#: at, low to high. The bare values; the three dosed arms below carry the D-244 migration sum.
+#: A SAMPLED GRID, not an enumeration: the distinct literal ``yan_mgl`` values a grep of the suite
+#: returns, low to high. A fixture passing it as a kwarg would not appear here, so the census in
+#: :func:`test_the_suites_musts_straddle_the_sourced_range_rather_than_sitting_above_it` is a
+#: property of this grid and not of the suite's scenario set — the span, the monotonicity, the
+#: hold and the identity in :func:`test_the_compiled_fraction_hands_colemans_own_gram_back_exactly`
+#: are properties of the override itself and do not depend on it (D-270 §2).
+#: The three dosed arms below are constructed here to reach the D-244 hold; they carry its sum.
 _WINE_DECLARED_YAN = (50.0, 80.0, 100.0, 150.0, 250.0, 300.0, 330.0, 350.0, 400.0, 500.0)
 _WINE_DOSED_ARMS = ((250.0, 2.0), (250.0, 4.0), (80.0, 2.0))
 

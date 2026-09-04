@@ -38028,7 +38028,7 @@ harness's own reproduction, so shipping the joint repair turns that test red and
 
 ## D-270 — `biomass_N_fraction` is not a composition in wine, it is a yield residual: the number D-267 §6 compared against a sourced cell composition is one wine never runs, the compiled value ranges 0.0362-0.1068 across the suite's own musts, and the mismatch that survives is beer's band — priced at a growth extent of 7.4-9.6x and refused
 
-**Corrects:** D-267 — §6's frame. "The engine ships `biomass_N_fraction` = 0.114 … 1.6-1.8x the nitrogen those two wine-yeast statements imply" reads the YAML literal, and wine never runs on it: `_apply_nitrogen_dependent_yield` overrides it at the compile boundary from Coleman's `Y_X/N`, so wine's value is a function of the must's declared nitrogen and spans **0.0362 to 0.1068** (2.95x) across the musts this suite runs. Four of thirteen wine arms sit BELOW the sourced range, one inside, eight above; the low arms miss by more (1.77x) than the high ones (1.28x). The mismatch is real but it is **beer's and the band's**, not "the engine's".
+**Corrects:** D-267 — §6's frame. "The engine ships `biomass_N_fraction` = 0.114 … 1.6-1.8x the nitrogen those two wine-yeast statements imply" reads the YAML literal, and wine never runs on it: `_apply_nitrogen_dependent_yield` overrides it at the compile boundary from Coleman's `Y_X/N`, so wine's value is a function of the must's declared nitrogen and spans **0.0362 to 0.1068** (2.95x) over a grid spanning the declared values the suite's wine fixtures use. Four of thirteen sampled arms sit BELOW the sourced range, one inside, eight above; the low arms miss by more (1.77x) than the high ones (1.28x). The mismatch is real but it is **beer's and the band's**, not "the engine's".
 **Flags:** D-14 — beer is gated off the yield override and keeps the static elemental 0.114, which is 1.37x the highest sourced estimate, while its ensemble draws over `[0.08, 0.14]` — a band overlapping the sourced `[0.0640, 0.0833]` over only 5.6 % of its width. Identified and priced here (§5); the code still carries it, because the repair takes beer's growth extent from 5.378x to 7.4-9.6x against a counted 2.918-3.483x and a printed 4-5x, and choosing between a sourced composition and a sourced extent is the owner's.
 
 D-267 §6 recorded a nitrogen-frame mismatch, did nothing with it, carried no flag for it, and
@@ -38066,7 +38066,15 @@ Every dosed fixture reaches the plateau, because the D-244 migration form declar
 **A cell composition cannot depend on the medium's nitrogen by a factor of three. A yield residual
 can, and must.** The census against the sourced range is **4 below / 1 inside / 8 above** — the
 quantity *straddles* the source rather than sitting 1.6-1.8x above it, and the single arm that
-lands inside (250 mg N/L → 0.0745) is the suite's most-used must by coincidence, not by design.
+lands inside (250 mg N/L → 0.0745) is the suite's most-used declared value by coincidence, not by
+design.
+
+**The arm set is a SAMPLED GRID, not an enumeration of the suite's scenarios**, and the counts
+above are a property of that sample. It is the distinct literal `yan_mgl` values a grep of the
+suite returns, plus three dosed arms constructed here to reach the D-244 hold — a kwargs-form
+fixture would not appear in it. What does NOT depend on the sample, and is what the record rests
+on, is the span, the monotonicity, the hold and §3's identity: those are properties of the
+override itself. Do not quote 4/1/8 as a census of the suite's fixtures.
 
 ### 3. The proof, and it is exact
 
