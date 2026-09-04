@@ -631,22 +631,31 @@ def test_precursor_consumption_rides_the_ALCOHOL_rate_and_that_is_what_blocks_th
 #: reads this; it is a counterfactual input read only by this suite, like
 #: ``CHEMISTRY_OF_BEER_GROWTH_FOLD`` (D-258). If a Process is ever built to it, it moves to YAML.
 #:
-#: **D-267 SOURCED IT AND THE BRACKET DID NOT SURVIVE THE SOURCING — these values are retained
-#: DELIBERATELY, not because they are right.** The protein fraction below is corroborated at all
-#: three edges (§2 of the D-267 receipts). The residue shares are not: Lange & Heijnen 2001's
-#: measured composition, converted into the frame this Process's draw actually uses, sits ABOVE
-#: the high edge for all five precursors (see ``_LANGE_HEIJNEN_2001_TABLE_IV_MOL_PCT``). Moving
-#: them re-prices every growth-anchored number in D-259, D-260 and D-266, which is the
-#: owner-gated build D-266 §9 reserved — so the repair is FLAGGED, not shipped. If you change a
-#: number here you are taking that build: retire D-267's flag in the record that does it.
+#: **D-267 SOURCED IT AND THE BRACKET DID NOT SURVIVE. D-268 TOOK THE REPAIR.** The paragraph
+#: above is D-259's own reasoning and is kept because it is why the bracket existed; it is no
+#: longer the state of the world. The protein fraction below IS corroborated at all three edges
+#: (D-267 §3) and stays a bracket. The residue half is not a bracket any more: it is a measured
+#: composition (Lange & Heijnen 2001 Table IV), and :func:`_d259_weights` now derives it from
+#: that transcription rather than reading a stated one. The stated bracket survives BELOW as
+#: :data:`_D259_BRACKET_SUPERSEDED_AT_D268`, read only by the D-267 guards, which measure the
+#: ratio between the source and what D-259 stated — a permanent record of what was found, not a
+#: live input.
 _D259_PROTEIN_FRACTION_OF_DRY_WEIGHT = {"lo": 0.40, "mid": 0.45, "hi": 0.50}
-_D259_RESIDUE_SHARE_OF_PROTEIN = {  # g residue / 100 g yeast protein
+
+#: D-259's stated residue bracket, g residue / 100 g yeast protein. **SUPERSEDED at D-268 and
+#: retained as a record, not as a candidate.** Nothing that runs the model reads it; the D-267
+#: guards do, because D-267's finding IS a ratio between the sourced composition and these five
+#: numbers, and a finding whose baseline has been deleted cannot be re-checked.
+_D259_BRACKET_SUPERSEDED_AT_D268 = {
     "leucine": {"lo": 6.0, "mid": 7.5, "hi": 9.0},
     "isoleucine": {"lo": 4.0, "mid": 5.0, "hi": 6.0},
     "valine": {"lo": 4.5, "mid": 5.5, "hi": 6.5},
     "threonine": {"lo": 4.0, "mid": 5.0, "hi": 6.0},
     "phenylalanine": {"lo": 3.5, "mid": 4.5, "hi": 5.5},
 }
+#: The edges of the ONE bracket that is left — the protein fraction of dry weight. Before D-268
+#: these named a joint edge of two brackets moving in lockstep, which is why every number they
+#: index moved when the second one was sourced.
 _D259_EDGES = ("lo", "mid", "hi")
 
 #: D-267 — the composition D-259 could not find. Lange HC, Heijnen JJ (2001), *Biotechnol
@@ -685,7 +694,7 @@ def _lange_heijnen_shares(frame: str) -> dict[str, float]:
     """Table IV in mass terms, g per 100 g of protein, in one of the two frames.
 
     ``residue`` weights each mole by the residue it contributes to the chain — the frame
-    ``_D259_RESIDUE_SHARE_OF_PROTEIN``'s comment declares. ``free`` weights it by the free acid
+    ``_D259_BRACKET_SUPERSEDED_AT_D268``'s comment declared. ``free`` weights it by the free
     that must LEAVE THE POOL to contribute it, which is the frame :class:`_GrowthAnchoredFates`
     actually draws in, because it subtracts its product from the free amino-acid slots and the
     engine's ``MOLAR_MASS`` is the free acid. The denominator is the protein mass either way (the
@@ -762,9 +771,32 @@ class _GrowthAnchoredFates(Process):
 
 
 def _d259_weights(edge: str) -> dict[str, float]:
+    """g precursor drawn per g of biomass built, at one edge of the protein-fraction bracket.
+
+    **D-268 took D-267's flagged repair.** The residue share is no longer D-259's stated
+    bracket: it is Lange & Heijnen 2001 Table IV, converted into the free-acid frame this draw
+    actually uses, and it is DERIVED from the transcription rather than re-typed — so the only
+    hand-entered numbers on this path stay the table's own 19 rows, which
+    :func:`test_lange_heijnen_table_iv_closes_as_a_mole_composition` guards. What is left of the
+    bracket is the protein fraction alone, corroborated at all three edges by D-267 §3.
+    """
+    shares = _lange_heijnen_shares("free")
+    return {
+        species: _D259_PROTEIN_FRACTION_OF_DRY_WEIGHT[edge] * shares[code] / 100.0
+        for species, code in _TABLE_IV_NAME.items()
+    }
+
+
+def _d259_superseded_weights(edge: str) -> dict[str, float]:
+    """The weights D-259 stated, reconstructed — the ONLY thing that reproduces its numbers.
+
+    Kept live rather than deleted because a re-pricing whose baseline cannot be re-run is not
+    auditable: the arms that reproduce D-260's and D-266's published numbers read this, and the
+    arms that report today's numbers read :func:`_d259_weights`.
+    """
     return {
         species: _D259_PROTEIN_FRACTION_OF_DRY_WEIGHT[edge] * shares[edge] / 100.0
-        for species, shares in _D259_RESIDUE_SHARE_OF_PROTEIN.items()
+        for species, shares in _D259_BRACKET_SUPERSEDED_AT_D268.items()
     }
 
 
@@ -795,7 +827,7 @@ def _d259_growth_anchored_split(edge: str) -> dict[str, dict[str, float]]:
     t = np.asarray(traj.t, dtype=float)
     schema, params = compiled.schema, compiled.param_values
 
-    species_list = tuple(_D259_RESIDUE_SHARE_OF_PROTEIN)
+    species_list = tuple(_TABLE_IV_NAME)
     sink = {s: np.zeros_like(t) for s in species_list}
     ehrlich = {s: np.zeros_like(t) for s in species_list}
     weights = _d259_weights(edge)
@@ -841,20 +873,21 @@ def growth_anchored_split():
     return {edge: _d259_growth_anchored_split(edge) for edge in _D259_EDGES}
 
 
-def test_the_growth_anchored_split_spans_a_bracket_and_d104s_point_sits_at_its_TOP(
+def test_the_sourced_composition_NARROWS_the_bracket_and_d104s_point_falls_INSIDE_it(
     growth_anchored_split,
 ):
-    """D-104's refusal is reproducible only at one end of an input it never recorded (D-259).
+    """**Corrects D-259's headline number.** The bracket is under half the width it was (D-268).
 
     D-104 Finding 4 refused the growth-anchored sink because the split it produces is
-    "monotonically inverted" against Crépin. **The biomass composition that measurement rests on
-    is recorded nowhere** (see :data:`_D259_PROTEIN_FRACTION_OF_DRY_WEIGHT`), so this re-measures
-    it across a stated bracket instead of borrowing a point.
+    "monotonically inverted" against Crépin. D-259 could find no biomass composition anywhere in
+    this project and so re-measured it across a stated bracket rather than borrowing a point;
+    D-267 sourced the composition and D-268 took the repair. Half of what was a bracket is now a
+    measurement, and only the protein fraction of dry weight is still a range.
 
-    Leucine spans **13.1 -> 22.0 %** across that bracket. D-104's 20.9 % sits at the **top** of
-    it. The refusal survives — every edge is far below Crépin's 77-86 % — but "the model says
-    20.9 %" is a statement about one composition, not about the model, and this test is what
-    stops the next beat quoting it as the latter.
+    Leucine spanned **13.1-22.0 %** across the stated bracket and spans **19.4-23.2 %** across
+    what is left of it — the span falls from 8.9 points to 3.7. D-259 read D-104's 20.9 % at the
+    **top** of its bracket; on the sourced composition it falls **inside**, between the low edge
+    and the middle. The refusal is untouched: every edge is still far below Crépin's 77-86 %.
     """
     for edge, result in growth_anchored_split.items():
         for species, row in result.items():
@@ -868,15 +901,21 @@ def test_the_growth_anchored_split_spans_a_bracket_and_d104s_point_sits_at_its_T
     low = growth_anchored_split["lo"]["leucine"]["pct"]
     high = growth_anchored_split["hi"]["leucine"]["pct"]
     assert low < high, "vacuous: the composition bracket does not move the split at all"
-    assert high - low > 5.0, (
-        f"leucine's growth-anchored share spans only {low:.1f}-{high:.1f} % across the "
-        "composition bracket. If the bracket has stopped mattering, the unrecorded-input "
-        "finding is void and D-104's point number can be quoted directly again"
+    # Pinned TWO-SIDED, and the upper bound is the finding. Before D-268 this asserted a span
+    # WIDER than 5 points, because a stated bracket that moved nothing would have made D-259's
+    # unrecorded-input finding vacuous. The input is no longer unrecorded, so the live question
+    # is the opposite one — how much freedom is left — and the answer is 3.7 points.
+    assert 2.0 < high - low < 5.0, (
+        f"leucine's growth-anchored share spans {low:.1f}-{high:.1f} % ({high - low:.1f} points) "
+        "across what is LEFT of the bracket — the protein fraction of dry weight alone, since "
+        "D-268 sourced the residue half. D-259 measured 8.9 points across both halves moving "
+        "together. A span back above 5 points means the residue half is varying again"
     )
-    assert high == pytest.approx(_D104_GROWTH_ANCHORED_PCT["leucine"], abs=3.0), (
-        f"the TOP edge reads {high:.1f} % against D-104's {_D104_GROWTH_ANCHORED_PCT['leucine']} "
-        "%. That correspondence is what lets this suite claim it re-measured D-104 rather than "
-        "measured something else; if it has moved, re-derive rather than re-pin"
+    assert low < _D104_GROWTH_ANCHORED_PCT["leucine"] < high, (
+        f"D-104's {_D104_GROWTH_ANCHORED_PCT['leucine']} % no longer falls inside the sourced "
+        f"bracket {low:.1f}-{high:.1f} %. D-259 read it at the TOP of the stated one; that it "
+        "moves INSIDE when the composition is sourced is what lets this suite claim it "
+        "re-measured D-104 rather than measured something else"
     )
     for edge in _D259_EDGES:
         leucine = growth_anchored_split[edge]["leucine"]["pct"]
@@ -892,9 +931,10 @@ def test_only_the_ENDS_of_d104s_order_are_inverted_now_and_valine_is_why(growth_
     D-104 measured model ``leu < ile < val < thr`` against Crépin's ``thr < val < ile < leu`` and
     called the order exactly reversed. Today the model reads ``leu < val < ile < thr``:
     **isoleucine above valine, which is the order Crépin measures.** Only the two ends are
-    swapped.
+    swapped. D-268 re-priced every number here onto the sourced composition; the
+    isoleucine-over-valine margin narrows from 1.0 to 0.9 points and the order does not change.
 
-    **Valine is the species that moved** — 45.8 % at D-104 to ~25 % here — and it is the only
+    **Valine is the species that moved** — 45.8 % at D-104 to ~32 % here — and it is the only
     precursor carrying a SECOND Ehrlich branch, D-111's valine -> KIC -> isoamyl alcohol, built
     after D-104. A second branch raises valine's catabolic draw and drops its lump share, which
     is exactly the direction observed. The inversion at the ends is untouched and still the
@@ -934,10 +974,16 @@ def test_growth_anchoring_LANDS_the_sourced_fate_where_a_de_novo_route_exists(
     cumulative protein demand exceeds the must's supply for every precursor (3.4-6.3x for
     leucine), so "the pool is stripped" would land ~100 % for *everything* and the phenylalanine
     agreement would be an artefact of supply limitation rather than evidence about the form.
-    Leucine reads ~17 %. So the split is set by the size of each species' Ehrlich draw, and where
+    Leucine reads ~21 %. So the split is set by the size of each species' Ehrlich draw, and where
     that draw is cut by a SOURCED de-novo share the growth-anchored form reproduces the measured
     fate. **The inversion is a property of the four precursors that lack reality's de-novo route,
     not a property of anchoring to growth.**
+
+    **D-268 re-priced this onto the sourced composition and the control survives**, which was
+    not guaranteed: raising every weight raises leucine too, and the control means nothing once
+    leucine approaches phenylalanine. Leucine reads **19.4-23.2 %** (was 13.1-22.0) against
+    phenylalanine's **98.3-98.6 %** (was 97.2-98.5), so the margin narrowed by 1.2 points and is
+    still 75 points wide.
 
     **VERIFIED BY MUTATION, and this is what makes it an attribution rather than a coincidence.**
     Setting ``f_de_novo_2_phenylethanol`` to 0 — removing the sourced route while changing nothing
@@ -1011,8 +1057,10 @@ def test_un_inverting_by_CUTTING_the_ehrlich_draw_is_refused_by_rolleros_leucine
 
     Shipped model on Crépin's must: leucine supplies **~1.5 %** of the isoamyl alcohol, already
     **below** Rollero's measured 3.4-8.2 %. Reaching Crépin's 77-86 % protein share needs the
-    draw cut ~12-41x, which takes that share to **0.04-0.13 %**, tens of times under the
-    measured floor. There is no overlap anywhere in the composition bracket.
+    draw cut ~11-25x — D-259 measured 12-41x at its stated composition, and D-268's sourced one
+    starts from a higher split so less of a cut is needed — which takes that share to
+    **0.06-0.14 %**, tens of times under the measured floor. There is no overlap anywhere in
+    what is left of the composition bracket.
 
     **READ THE SCOPE BEFORE QUOTING THIS.** It refuses un-inversion **by lowering the Ehrlich
     draw**. It does **not** refuse un-inversion in general and it does **not** fence the D-116
@@ -1066,13 +1114,20 @@ def test_un_inverting_by_CUTTING_the_ehrlich_draw_is_refused_by_rolleros_leucine
 
 # D-260 — the NUMERATOR side of D-259 §5, measured: it is DEGENERATE with the split, not fenced.
 # ---------------------------------------------------------------------------------------------
-#: The over-draw multiplier on growth's own gated demand that reaches Crépin's band. Not a
-#: parameter and not a mechanism — a *dial* on the counterfactual, here to price how far the
-#: numerator lever has to be pushed and what that costs on the other axis.
+#: The over-draw multiplier on growth's own gated demand. Not a parameter and not a mechanism —
+#: a *dial* on the counterfactual, here to price how far the numerator lever has to be pushed and
+#: what that costs on the other axis. **Deliberately UNCHANGED at D-268**, which re-priced what
+#: it buys rather than retuning it to keep a window green: on D-259's stated composition λ=5
+#: landed the split at **73.29 %**, BELOW Crépin's 77 % floor, while D-260's own prose said it
+#: "lands the split in Crépin's band"; on the sourced composition the same λ lands **77.83 %**
+#: and the sentence becomes true. λ≈4.8 is where the crossing now sits.
 _D260_LAMBDA = 5.0
 #: ``f_non_ehrlich_leucine`` chosen to MATCH the growth-anchored split, so the control below
-#: compares two mechanisms at one split rather than at two.
-_D260_MATCHED_F = 0.174
+#: compares two mechanisms at one split rather than at two. It is a CALIBRATION OF A CONTROL to
+#: its own definition and carries no interpretive weight: the shipped form's realised split is
+#: exactly ``f``, so this is the pre-modifier growth-anchored split read off the run. **0.174
+#: before D-268 sourced the composition, 0.2135 after** — re-derived, not retuned.
+_D260_MATCHED_F = 0.2135
 #: Rollero's own printed isoamyl totals across his six ferments (µM), from the same Table S2 the
 #: tracer band comes from. The model's isoamyl on this fixture is ~2123 µM — the incommensurate
 #: denominator D-112 recorded — and that gap is what makes the two targets collide here.
@@ -1224,6 +1279,21 @@ def d260_arms():
         arms[f"growth_mods_{edge}"] = _d260_arm(
             sink=_D260GrowthAnchoredFates(_d259_weights(edge)), attach_growth_modifiers=True
         )
+    # The REPRODUCTION arms: the same counterfactual on the composition D-259 stated, kept so
+    # that D-260's published 21.3-33.7 % and its λ pricing stay re-runnable after D-268 moved
+    # the live ones. A re-pricing whose baseline cannot be reproduced is not auditable.
+    for edge in ("lo", "mid", "hi"):
+        arms[f"superseded_{edge}"] = _d260_arm(
+            sink=_D260GrowthAnchoredFates(_d259_superseded_weights(edge)),
+            attach_growth_modifiers=True,
+        )
+    arms["lambda_superseded"] = _d260_arm(
+        sink=_D260GrowthAnchoredFates(
+            _d259_superseded_weights("mid"), kappa=0.01, lam=_D260_LAMBDA
+        ),
+        attach_growth_modifiers=True,
+        points=20001,
+    )
     # The arm the `f`-only control is MATCHED to. `_D260_MATCHED_F` was chosen against the
     # UNCORRECTED (pre-modifier) growth-anchored split, so the control must be scored against
     # that arm and not against `growth_mods_mid`, whose split is 10 points away -- comparing the
@@ -1367,6 +1437,9 @@ def test_the_tracer_GAIN_belongs_to_the_split_not_to_growth_anchoring(d260_arms)
     matched = d260_arms["f_matched"]
     growth = d260_arms["growth_nomods_mid"]
     rollero_lo, rollero_hi = _ROLLERO_LEUCINE_SHARE_OF_ISOAMYL_PCT
+    # D-268 re-derived `_D260_MATCHED_F` 0.174 -> 0.2135 when the sourced composition moved the
+    # split it is defined to match. That is a calibration of a control to its own definition;
+    # the guard below is unchanged and is what says the calibration is still exact.
 
     assert rollero_lo < matched["tracer_pct"] < rollero_hi, (
         f"the shipped form at f={_D260_MATCHED_F} reads a tracer of {matched['tracer_pct']:.3f} %, "
@@ -1407,21 +1480,43 @@ def test_raising_growths_OWN_draw_reaches_crepins_band_and_pays_for_it_on_the_tr
     split in Crépin's band. **It buys nothing**, because it pays the whole gain straight back on
     the tracer axis (D-260 §1). This is the refusal's receipt: not "the numerator cannot move"
     but "moving it is the same move, in the other direction".
+
+    **Corrects D-260's own sentence, at D-268.** On the composition D-259 stated, λ=5 landed the
+    split at **73.29 %** — below Crépin's 77 % floor, so it did NOT land in her band; the guard
+    that was supposed to say so was pinned at 70, which let the prose overstate the result by
+    four points. On the sourced composition λ=5 lands **77.83 %**, inside her 77-86, and the
+    guard below is re-pinned against her floor rather than against 70 so the sentence and the
+    assert can no longer disagree. The dial itself is untouched — the price of the lever fell,
+    which is a finding, not a reason to retune it.
     """
     lam = d260_arms["lambda"]
+    superseded = d260_arms["lambda_superseded"]
     baseline = d260_arms["growth_mods_mid"]
     crepin_lo, crepin_hi = _CREPIN_PROTEIN_PCT["leucine"]
     rollero_lo, _ = _ROLLERO_LEUCINE_SHARE_OF_ISOAMYL_PCT
+
+    assert superseded["split_pct"] == pytest.approx(73.29, abs=1.0), (
+        f"at D-259's stated composition λ={_D260_LAMBDA} reads {superseded['split_pct']:.2f} % "
+        "against the 73.29 % D-268 measured. This arm exists so D-260's own pricing stays "
+        "re-runnable; if it has moved, the correction recorded above is measuring something else"
+    )
+    assert superseded["split_pct"] < crepin_lo < lam["split_pct"], (
+        f"the correction is that λ={_D260_LAMBDA} crossed Crépin's {crepin_lo:.0f} % floor when "
+        f"the composition was sourced: {superseded['split_pct']:.2f} % -> "
+        f"{lam['split_pct']:.2f} %. If both sit on one side of it, D-268's re-pricing of this "
+        "lever did not happen and the assert below is not the one to relax"
+    )
 
     assert lam["split_pct"] > baseline["split_pct"] + 30.0, (
         f"λ={_D260_LAMBDA} moved the split only {baseline['split_pct']:.1f} → "
         f"{lam['split_pct']:.1f} %. The lever is supposed to work; if it no longer does, the "
         "refusal below is being carried by the wrong reason"
     )
-    assert 70.0 < lam["split_pct"] < crepin_hi, (
-        f"λ={_D260_LAMBDA} lands the split at {lam['split_pct']:.1f} %, outside the [70, "
-        f"{crepin_hi:.0f}] window this test pins. Pinned two-sided: an arm that overshoots "
-        "Crépin's band is not evidence about reaching it"
+    assert crepin_lo < lam["split_pct"] < crepin_hi, (
+        f"λ={_D260_LAMBDA} lands the split at {lam['split_pct']:.1f} %, outside Crépin's own "
+        f"{crepin_lo:.0f}-{crepin_hi:.0f} %. Pinned against HER band since D-268, not against "
+        "the 70 that let D-260's prose overstate a 73.3 as 'in Crépin's band'; two-sided, "
+        "because an arm that overshoots her band is not evidence about reaching it"
     )
     assert lam["tracer_pct"] < rollero_lo, (
         f"at a split of {lam['split_pct']:.1f} % the tracer reads {lam['tracer_pct']:.3f} %, "
@@ -1454,6 +1549,12 @@ def test_a_growth_anchored_draw_must_carry_growths_OWN_rate_modifiers(
     D-259's order correction (isoleucine still above valine). What does not: every number, and
     "monotonically inverted" — corrected valine now brackets Crépin's 41 and corrected threonine
     sits above her 38.
+
+    **D-268 re-priced it again onto the sourced composition: 19.4-23.2 % → 30.3-35.2 %.** The
+    superseded arms below reproduce D-260's own 21.3-33.7 % so the two prices can be read side
+    by side. Both of D-260's conclusions survive: D-104's 20.9 % is still below the corrected
+    low edge (by 9.4 points now, not 0.4), and the corrected high edge is still far under
+    Crépin's 77 %.
     """
     structural = compile_scenario(commensurate_scenario("crepin", days=1.0))
     scaling_growth = [
@@ -1482,11 +1583,33 @@ def test_a_growth_anchored_draw_must_carry_growths_OWN_rate_modifiers(
             f"{corrected_pct:.1f} %. If the two frames now agree, D-260 §4's correction has "
             "become vacuous and the bracket pinned below is measuring nothing"
         )
-    assert min(corrected) == pytest.approx(21.3, abs=1.5), (
-        f"corrected bracket low edge {min(corrected):.1f} % (recorded 21.3)"
+    assert min(corrected) == pytest.approx(30.3, abs=1.5), (
+        f"corrected bracket low edge {min(corrected):.1f} % (D-268 recorded 30.3 on the sourced "
+        "composition; D-260 recorded 21.3 on the stated one)"
     )
-    assert max(corrected) == pytest.approx(33.7, abs=1.5), (
-        f"corrected bracket high edge {max(corrected):.1f} % (recorded 33.7)"
+    assert max(corrected) == pytest.approx(35.2, abs=1.5), (
+        f"corrected bracket high edge {max(corrected):.1f} % (D-268 recorded 35.2; D-260 33.7)"
+    )
+    # The reproduction of D-260's own bracket, so the re-pricing above is auditable rather than
+    # asserted. Kept in the same test as the live numbers on purpose: whoever re-derives one
+    # sees the other.
+    superseded = [d260_arms[f"superseded_{edge}"]["split_pct"] for edge in _D259_EDGES]
+    assert min(superseded) == pytest.approx(21.3, abs=1.5), (
+        f"the superseded-composition arm reads {min(superseded):.1f} % against D-260's own "
+        "21.3 %. That arm is the baseline D-268's re-pricing is measured against"
+    )
+    assert max(superseded) == pytest.approx(33.7, abs=1.5), (
+        f"the superseded-composition arm reads {max(superseded):.1f} % against D-260's 33.7 %"
+    )
+    for live, old in zip(sorted(corrected), sorted(superseded), strict=True):
+        assert live > old, (
+            f"the sourced composition must raise the split at every edge ({old:.1f} -> "
+            f"{live:.1f} %). A larger draw into the lump cannot lower the share reaching it; if "
+            "it does, the weights the arms ran on are not the ones they name"
+        )
+    assert max(superseded) - min(superseded) > max(corrected) - min(corrected), (
+        "sourcing the residue half must NARROW the bracket — it removes one of the two ranges "
+        "that were moving together. If the sourced span is the wider one, the arms are swapped"
     )
     assert max(corrected) < crepin_lo, (
         f"the corrected bracket tops out at {max(corrected):.1f} %, which must stay below "
@@ -1517,7 +1640,7 @@ _D267_PROTEIN_FRACTION_ANCHORS = {
 
 def _d259_edges(species: str) -> tuple[float, float, float]:
     """The bracket's lo/mid/hi for one precursor, in the units the source is converted into."""
-    share = _D259_RESIDUE_SHARE_OF_PROTEIN[species]
+    share = _D259_BRACKET_SUPERSEDED_AT_D268[species]
     return share["lo"], share["mid"], share["hi"]
 
 
@@ -1602,7 +1725,7 @@ def test_the_sourced_composition_is_above_every_bracket_edge_in_the_frame_the_dr
 def test_the_residue_frame_is_the_losing_reading_and_is_kept_visible_as_one():
     """A units fork is not a band (D-209). Both readings are pinned; only one is used.
 
-    In the residue frame — what ``_D259_RESIDUE_SHARE_OF_PROTEIN``'s own comment declares — the
+    In the residue frame — what ``_D259_BRACKET_SUPERSEDED_AT_D268``'s own comment declared — the
     source contradicts only isoleucine and valine. That is the weaker statement, and recording it
     beside the strong one is what stops a later beat crossing the two into a "band" whose whole
     spread is the fork.
@@ -1637,22 +1760,89 @@ def test_the_protein_fraction_half_is_the_half_the_sourcing_corroborated():
     assert max(_D267_PROTEIN_FRACTION_ANCHORS.values()) == hi, "an anchor must reach the high edge"
 
 
-def test_the_flagged_repair_has_not_been_taken_without_a_record():
-    """The bracket is knowingly wrong and knowingly kept. This is the guard that says so.
+def test_the_repair_was_taken_at_d268_and_a_revert_would_need_a_record_too():
+    """D-267's tripwire, INVERTED at D-268 rather than deleted. It guards both directions.
 
-    D-267 flags the repair rather than shipping it, because moving these five numbers re-prices
-    every arm of the owner-gated build D-266 §9 reserved. A silent edit here would change
-    D-259's, D-260's and D-266's measurements with nothing in the archive saying it happened.
+    Until D-268 this asserted that the stated bracket had not been silently edited. The repair
+    has now been taken, so what needs guarding is the other side: that the weights really are
+    derived from the sourced transcription, and that the superseded literal is no longer on the
+    path that feeds a model run. A revert to the stated bracket is as much an archive event as
+    taking it was, and it fails here.
     """
-    assert _D259_RESIDUE_SHARE_OF_PROTEIN == {
+    shares = _lange_heijnen_shares("free")
+    for edge in _D259_EDGES:
+        weights = _d259_weights(edge)
+        assert set(weights) == set(_TABLE_IV_NAME), "the five precursors are the five drawn"
+        for species, code in _TABLE_IV_NAME.items():
+            expected = _D259_PROTEIN_FRACTION_OF_DRY_WEIGHT[edge] * shares[code] / 100.0
+            assert weights[species] == pytest.approx(expected, rel=1e-12), (
+                f"{species} at edge {edge}: the growth-anchored weight is no longer the sourced "
+                "composition times the protein fraction. If the stated bracket has been put "
+                "back, that is an archive event: append the record and say so — D-268 took "
+                "D-267's flagged repair and re-measured D-259, D-260 and D-266 to do it"
+            )
+            superseded = _D259_BRACKET_SUPERSEDED_AT_D268[species]
+            stated = _D259_PROTEIN_FRACTION_OF_DRY_WEIGHT[edge] * superseded[edge] / 100.0
+            assert weights[species] > stated, (
+                f"{species} at edge {edge}: the sourced weight {weights[species]:.5f} must "
+                f"exceed the superseded {stated:.5f} at every edge — that it does at ALL of "
+                "them is why every number D-259, D-260 and D-266 published was a low estimate"
+            )
+
+    assert _D259_BRACKET_SUPERSEDED_AT_D268 == {
         "leucine": {"lo": 6.0, "mid": 7.5, "hi": 9.0},
         "isoleucine": {"lo": 4.0, "mid": 5.0, "hi": 6.0},
         "valine": {"lo": 4.5, "mid": 5.5, "hi": 6.5},
         "threonine": {"lo": 4.0, "mid": 5.0, "hi": 6.0},
         "phenylalanine": {"lo": 3.5, "mid": 4.5, "hi": 5.5},
     }, (
-        "the D-259 bracket has moved. If that is D-267's flagged repair being taken, it is an "
-        "owner-gated build: append the record, retire the flag with an Unflags marker naming "
-        "D-267, and re-measure every growth-anchored number in D-259, D-260 and D-266 — do not "
-        "just update this literal"
+        "the SUPERSEDED bracket has been edited. It is a record of what D-259 stated, and "
+        "D-267's whole finding is a ratio against it; editing it rewrites that finding rather "
+        "than changing anything the model does"
+    )
+
+
+def test_the_size_of_the_repricing_is_pinned_per_precursor_and_per_edge():
+    """How much bigger the sourced draw is, so "the numbers moved" cannot become "a bit".
+
+    The multiplier is the sourced share over the stated edge, and it is LARGEST at the low edge
+    and smallest at the high one, because the stated bracket's high edge was the closest guess
+    to the measurement. That shape is the reason the re-priced bracket is narrower as well as
+    higher, and it is asserted rather than described.
+    """
+    ratios = {
+        edge: {
+            species: _d259_weights(edge)[species]
+            / (
+                _D259_PROTEIN_FRACTION_OF_DRY_WEIGHT[edge]
+                * _D259_BRACKET_SUPERSEDED_AT_D268[species][edge]
+                / 100.0
+            )
+            for species in _TABLE_IV_NAME
+        }
+        for edge in _D259_EDGES
+    }
+    recorded = {
+        "lo": {"leucine": 1.607, "isoleucine": 1.772, "valine": 1.751},
+        "mid": {"leucine": 1.285, "isoleucine": 1.418, "valine": 1.432},
+        "hi": {"leucine": 1.071, "isoleucine": 1.181, "valine": 1.212},
+    }
+    for edge, expected in recorded.items():
+        for species, value in expected.items():
+            assert ratios[edge][species] == pytest.approx(value, abs=0.002), (
+                f"{species} at edge {edge}: the sourced draw is {ratios[edge][species]:.3f}x the "
+                f"one D-259 stated, against D-268's recorded {value:.3f}x"
+            )
+    for species in _TABLE_IV_NAME:
+        assert ratios["lo"][species] > ratios["mid"][species] > ratios["hi"][species], (
+            f"{species}: the multiplier must shrink from the low edge to the high one "
+            f"({ratios['lo'][species]:.3f} / {ratios['mid'][species]:.3f} / "
+            f"{ratios['hi'][species]:.3f}). It is why the re-priced bracket is NARROWER as well "
+            "as higher; if the order has changed, that explanation no longer holds"
+        )
+    smallest = min(r for edge in ratios.values() for r in edge.values())
+    assert smallest > 1.01, (
+        f"the smallest re-pricing anywhere in the bracket is {smallest:.3f}x. Below ~1.01 the "
+        "sourcing would be a bookkeeping change rather than a measurement one, and D-268's "
+        "vacuity check (its pre-registration's last section) would have fired"
     )

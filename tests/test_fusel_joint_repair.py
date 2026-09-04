@@ -75,6 +75,7 @@ from tests.test_precursor_fates import (
     _D257_LEVEL_PRESERVING_K_FACTOR,
     _D259_EDGES,
     _ROLLERO_LEUCINE_SHARE_OF_ISOAMYL_PCT,
+    _d259_superseded_weights,
     _d259_weights,
     _GrowthAnchoredFates,
 )
@@ -190,9 +191,16 @@ def _rescale_k(params: dict[str, float], blend: bool, k_factor: float) -> None:
             params[spec.k_param] = params[spec.k_param] * k_factor
 
 
-def _install_growth_sink(cs: Any, edge: str) -> tuple[_GrowthAnchoredFates, list[RateModifier]]:
-    """D-259's counterfactual, with growth's own modifiers attached (D-260 §5's correction)."""
-    sink = _GrowthAnchoredFates(_d259_weights(edge))
+def _install_growth_sink(
+    cs: Any, edge: str, weights: Mapping[str, float] | None = None
+) -> tuple[_GrowthAnchoredFates, list[RateModifier]]:
+    """D-259's counterfactual, with growth's own modifiers attached (D-260 §5's correction).
+
+    ``weights`` overrides the composition, and exists for one purpose: the arms that reproduce
+    D-260's and D-266's PUBLISHED numbers run on the composition D-259 stated, which D-268
+    superseded. A re-pricing whose baseline cannot be re-run is not auditable.
+    """
+    sink = _GrowthAnchoredFates(_d259_weights(edge) if weights is None else weights)
     cs.process_set._processes[sink.name] = sink
     attached: list[RateModifier] = []
     for modifier in cs.process_set.active_modifiers:
@@ -233,6 +241,7 @@ def _crepin_arm(
     growth: bool,
     *,
     edge: str = "mid",
+    weights: Mapping[str, float] | None = None,
     f: float = _D257_CATABOLIC_SHARE,
     k_factor: float = _D257_LEVEL_PRESERVING_K_FACTOR,
     points: int = 4001,
@@ -252,7 +261,7 @@ def _crepin_arm(
         sink: _GrowthAnchoredFates | None = None
         attached: list[RateModifier] = []
         if growth:
-            sink, attached = _install_growth_sink(cs, edge)
+            sink, attached = _install_growth_sink(cs, edge, weights)
         traj = _integrate(cs, params, points)
         y, t, schema = np.asarray(traj.y, float), np.asarray(traj.t, float), cs.schema
         species = ("leucine", "isoleucine", "valine", "threonine", "phenylalanine")
@@ -313,6 +322,12 @@ def crepin():
     arms = {name: _crepin_arm(*cfg) for name, cfg in _ARMS.items()}
     for edge in _D259_EDGES:
         arms[f"joint_{edge}"] = _crepin_arm(True, True, edge=edge)
+    # The two arms that reproduce D-260's and D-266's published numbers, on the composition
+    # D-259 stated and D-268 superseded. Without them this module reports today's numbers with
+    # nothing to check them against, and the re-pricing becomes an assertion.
+    superseded = _d259_superseded_weights("mid")
+    arms["growth_superseded"] = _crepin_arm(False, True, weights=superseded)
+    arms["joint_superseded"] = _crepin_arm(True, True, weights=superseded)
     for name, arm in arms.items():
         for s, closure in arm["closure"].items():
             assert closure == pytest.approx(1.0, abs=0.02), (
@@ -492,10 +507,15 @@ def test_the_harness_reproduces_d257_and_d260_before_it_measures_anything(crepin
 
     The ``blend`` arm must read D-257's own numbers — 36.3 / 48.1 / 55.9 % of the isoamyl
     present at nitrogen-gate closure on Rollero's three musts, 172.3 mg/L at the D-112 anchor,
-    72.9 % of phenylalanine stranded on the D-104 fixture — and the ``growth`` arm must read
-    D-260's: leucine split 27.58 %, tracer 5.900 % on Crépin's must. The ``shipped`` arm must
-    read what D-256/D-260 recorded for it. If any of these has moved, the patch bindings or the
-    counterfactual are not the ones the archive measured, and nothing below is attributable.
+    72.9 % of phenylalanine stranded on the D-104 fixture — and the ``shipped`` arm must read
+    what D-256/D-260 recorded for it.
+
+    **D-268 moved the growth-anchored composition, so D-260's and D-266's own numbers are now
+    reproduced by the SUPERSEDED arms** — leucine split 27.58 % / tracer 5.900 % for the growth
+    sink alone, 54.50 % / 3.617 % for the joint arm — while the live arms read the sourced
+    composition's 32.86 % / 5.470 % and 60.61 % / 3.131 %. Both are pinned here: the first pair
+    says the harness is the one the archive measured, the second says what it measures today.
+    If either has moved, nothing below is attributable.
     ([[feedback-reproduce-a-published-number-before-trusting-the-new-column]])
     """
     for yan, recorded in zip(_YANS, (36.3, 48.1, 55.9), strict=True):
@@ -517,12 +537,34 @@ def test_the_harness_reproduces_d257_and_d260_before_it_measures_anything(crepin
     )
     assert d104["shipped"]["phe_left_pct"] == pytest.approx(20.3, abs=2.0)
 
-    growth, shipped = crepin["growth"], crepin["shipped"]
-    assert growth["split_pct"]["leucine"] == pytest.approx(27.58, abs=0.3), (
-        f"growth-anchored leucine split {growth['split_pct']['leucine']:.2f} % against "
-        "D-260's 27.58 %: the counterfactual is not D-260's (are growth's modifiers attached?)"
+    shipped = crepin["shipped"]
+    old_growth, old_joint = crepin["growth_superseded"], crepin["joint_superseded"]
+    assert old_growth["split_pct"]["leucine"] == pytest.approx(27.58, abs=0.3), (
+        f"growth-anchored leucine split {old_growth['split_pct']['leucine']:.2f} % on D-259's "
+        "STATED composition, against D-260's 27.58 %: the counterfactual is not D-260's (are "
+        "growth's modifiers attached?)"
     )
-    assert growth["leucine_tracer_pct"] == pytest.approx(5.900, abs=0.05)
+    assert old_growth["leucine_tracer_pct"] == pytest.approx(5.900, abs=0.05)
+    assert old_joint["split_pct"]["leucine"] == pytest.approx(54.50, abs=0.3), (
+        f"the joint arm reads {old_joint['split_pct']['leucine']:.2f} % on D-259's stated "
+        "composition against D-266's own 54.50 %. This is the baseline D-268's re-pricing is "
+        "measured against; if it has moved, that re-pricing is not attributable to the "
+        "composition"
+    )
+    assert old_joint["leucine_tracer_pct"] == pytest.approx(3.617, abs=0.03)
+
+    growth = crepin["growth"]
+    assert growth["split_pct"]["leucine"] == pytest.approx(32.86, abs=0.3), (
+        f"growth-anchored leucine split {growth['split_pct']['leucine']:.2f} % on the SOURCED "
+        "composition, against D-268's 32.86 %"
+    )
+    assert growth["leucine_tracer_pct"] == pytest.approx(5.470, abs=0.05)
+    for species in growth["split_pct"]:
+        assert growth["split_pct"][species] > old_growth["split_pct"][species], (
+            f"{species}: the sourced composition must raise every split ("
+            f"{old_growth['split_pct'][species]:.2f} -> {growth['split_pct'][species]:.2f} %). "
+            "A bigger draw into the lump cannot lower the share reaching it"
+        )
     assert shipped["split_pct"]["leucine"] == pytest.approx(81.5, abs=0.1)
     assert shipped["leucine_tracer_pct"] == pytest.approx(1.507, abs=0.02)
     assert shipped["isoamyl_um"] == pytest.approx(2123.3, abs=5.0)
@@ -586,9 +628,16 @@ def test_the_joint_arm_CLEARS_the_blocker_d257_refused_the_blend_on(crepin, d104
 
 
 def test_the_joint_arm_KEEPS_the_blends_temporal_gains(rollero):
-    """P6 and P7: the sink swap does not touch production.
+    """P6 and P7: the sink swap does not touch production, and D-268 does not change that.
 
-    Within 1 point of the blend on Rollero's three musts, and the residual over-response is
+    Within 1 point of the blend on Rollero's three musts — **0.11 at all three**, the same to two
+    decimals whether the growth sink runs on the composition D-259 stated or the one D-267
+    sourced. That invariance is worth an assert of its own: the sourced composition raises every
+    weight by 1.01-1.77x and moves the Crépin splits by 6-11 points, so a production landmark
+    that does not notice it is evidence the sink is drawing from the pool rather than steering
+    the rate.
+
+    The residual over-response is
     pinned as what it is: SM250 sits inside his 44.5-51.9 %, SM70 below his 51-54 % and SM425
     above his 42-51 % — a model spread of 36 → 57 % across his nitrogen range where he measures
     a near-flat 42-54 %, the same shape D-257 §1 recorded for the blend alone. The isoamyl
@@ -610,6 +659,16 @@ def test_the_joint_arm_KEEPS_the_blends_temporal_gains(rollero):
             f"SM{yan:.0f}: the joint arm's {joint:.1f} % at gate closure is more than a point "
             f"from the blend's {blend:.1f} %; the growth sink is moving production"
         )
+    gaps = [
+        abs(rollero["joint"][yan]["nt_fraction_pct"] - rollero["blend"][yan]["nt_fraction_pct"])
+        for yan in _YANS
+    ]
+    assert max(gaps) < 0.25, (
+        f"the sink-swap gap is {gaps[0]:.2f} / {gaps[1]:.2f} / {gaps[2]:.2f} points across "
+        "Rollero's range, against the 0.11 D-268 measured at all three. Pinned 4x tighter than "
+        "the bound above so that a sink change which starts steering PRODUCTION fails here "
+        "rather than passing inside a point"
+    )
     lo250, hi250 = 100.0 * min(measured[250.0]), 100.0 * max(measured[250.0])
     assert lo250 < rollero["joint"][250.0]["nt_fraction_pct"] < hi250
     assert rollero["joint"][70.0]["nt_fraction_pct"] < 100.0 * min(measured[70.0])
@@ -624,18 +683,26 @@ def test_the_joint_arm_KEEPS_the_blends_temporal_gains(rollero):
 
 
 def test_the_blend_moves_the_point_along_d260s_line_and_does_not_move_the_line(crepin):
-    """P3, P4 and P5 together — the beat's finding, and it reverses the pre-registered one.
+    """**D-266's headline is RETRACTED at D-268: the tracer left Rollero's band after all.**
 
     D-260's identity ``tracer = (1 − split) · consumed / isoamyl`` binds because the leucine
     pool empties whatever draws it and isoamyl is inert under a sink change. The blend cuts the
     Ehrlich draw (×0.79 gated, ×0.4033 on ``k``), so under the growth sink the lump absorbs the
-    residue and the leucine split rises 27.6 → 54.5 % (46.0-61.5 across the composition
-    bracket). It was pre-registered that the tracer would then fall below Rollero's floor. It
-    does not: 3.62 % (3.06-4.29), inside 3.4-8.2 %, because the split stops well short of
-    Crépin's 77 %. And isoamyl on this must is 2123 → 2177 µM (+2.5 %) — the blend is
-    level-preserved at the Wang anchor by construction — so the LINE is the same line and the
-    joint-satisfaction ceiling (≤ 1170 µM at 77 %) is exactly where D-260 left it. **The joint
-    arm is a different point on D-260's line, not an escape from it.**
+    residue and the leucine split rises.
+
+    **D-266 pre-registered that the tracer would then fall below Rollero's 3.4 % floor, measured
+    3.62 % on the composition D-259 had stated, and scored its own prediction WRONG.** D-267
+    sourced that composition and D-268 took the repair: every weight rises, the split goes
+    27.6 → 32.9 → **60.6 %** (57.8-63.1 across what is left of the bracket), and the tracer falls
+    to **3.13 %** (2.93-3.36) — *below the floor at every edge*. The pre-registered mechanism was
+    right; what was wrong was the composition it had been priced at. The superseded arm is kept
+    beside the live one so both readings stay re-runnable.
+
+    What does NOT change, and is why this is still a point on D-260's line rather than an escape
+    from it: isoamyl on this must is 2123 → 2177 µM (+2.5 %) — the blend is level-preserved at
+    the Wang anchor by construction — and the joint-satisfaction ceiling (≤ 1170 µM at 77 %) is
+    exactly where D-260 left it. The joint arm now misses BOTH of the two leucine observables it
+    was offered as satisfying one of.
     """
     shipped = crepin["shipped"]
     crepin_lo, _ = _CREPIN_PROTEIN_PCT["leucine"]
@@ -661,23 +728,44 @@ def test_the_blend_moves_the_point_along_d260s_line_and_does_not_move_the_line(c
             f"ceiling {ceiling:.0f}; both targets are reachable and the collision has gone"
         )
 
-    joint = crepin["joint"]
-    assert joint["split_pct"]["leucine"] == pytest.approx(54.5, abs=1.5), (
-        f"joint leucine split {joint['split_pct']['leucine']:.1f} % (recorded 54.5)"
+    joint, old_joint = crepin["joint"], crepin["joint_superseded"]
+    assert old_joint["split_pct"]["leucine"] == pytest.approx(54.5, abs=1.5), (
+        f"the superseded-composition arm reads {old_joint['split_pct']['leucine']:.1f} % against "
+        "D-266's published 54.5. That arm is the baseline the retraction below is measured "
+        "against; if it has moved, the retraction is not attributable to the composition"
+    )
+    assert rollero_lo < old_joint["leucine_tracer_pct"] < rollero_hi, (
+        f"on D-259's stated composition the tracer read {old_joint['leucine_tracer_pct']:.3f} %, "
+        f"which must still land inside Rollero's {rollero_lo}-{rollero_hi} % — that is the "
+        "reading D-266 published and D-268 retracts"
+    )
+
+    assert joint["split_pct"]["leucine"] == pytest.approx(60.6, abs=1.5), (
+        f"joint leucine split {joint['split_pct']['leucine']:.1f} % (D-268 recorded 60.6 on the "
+        "sourced composition; D-266 recorded 54.5 on the stated one)"
     )
     assert joint["split_pct"]["leucine"] > crepin["growth"]["split_pct"]["leucine"] + 20.0
     assert joint["split_pct"]["leucine"] < crepin_lo, (
         "the joint arm reaches Crépin's band — D-260's collision is relieved and this record "
         "is out of date"
     )
-    assert rollero_lo < joint["leucine_tracer_pct"] < rollero_hi, (
-        f"joint tracer {joint['leucine_tracer_pct']:.3f} % is outside Rollero's "
-        f"{rollero_lo}-{rollero_hi} %. It was PREDICTED to fall below the floor and did not; "
-        "if it now does, the pre-registered mechanism was right after all — re-record"
+    # THE RETRACTION, asserted at every edge rather than only at the middle: what D-266 read as
+    # "inside the band" is below the floor across the whole of what is left of the bracket.
+    for edge_name in ("joint_lo", "joint", "joint_hi"):
+        tracer = crepin[edge_name]["leucine_tracer_pct"]
+        assert tracer < rollero_lo, (
+            f"{edge_name}: tracer {tracer:.3f} % is back inside Rollero's "
+            f"{rollero_lo}-{rollero_hi} %. D-266 measured 3.62 % there and D-268 measured 3.13 "
+            "on the sourced composition — if it has returned, the retraction is void and needs "
+            "a record, not a relaxed bound"
+        )
+    assert joint["leucine_tracer_pct"] == pytest.approx(3.13, abs=0.15)
+    assert joint["leucine_tracer_pct"] < old_joint["leucine_tracer_pct"], (
+        "sourcing the composition raises the split, and the identity then REQUIRES the tracer to "
+        "fall. If it rose, the two arms are not on one line and the identity is broken"
     )
-    assert joint["leucine_tracer_pct"] == pytest.approx(3.62, abs=0.15)
-    assert crepin["joint_lo"]["split_pct"]["leucine"] == pytest.approx(46.0, abs=1.5)
-    assert crepin["joint_hi"]["split_pct"]["leucine"] == pytest.approx(61.5, abs=1.5)
+    assert crepin["joint_lo"]["split_pct"]["leucine"] == pytest.approx(57.8, abs=1.5)
+    assert crepin["joint_hi"]["split_pct"]["leucine"] == pytest.approx(63.1, abs=1.5)
     assert crepin["joint_hi"]["split_pct"]["leucine"] < crepin_lo
 
 
@@ -685,12 +773,17 @@ def test_the_joint_arm_OVER_shoots_crepin_on_the_three_precursors_the_shipped_si
     """The other side of the split, which the shipped model gets exactly BY CONSTRUCTION.
 
     ``f_non_ehrlich_isoleucine/valine/threonine`` are Crépin's own 51 / 41 / 38 imposed; the
-    growth sink alone under-shoots two of them and over-shoots threonine; the joint arm
-    over-shoots all three (66 / 65 / 81 at the mid composition, and above her at every edge).
-    The end inversion D-259 found survives — leucine is still the lowest and threonine the
-    highest — while isoleucine and valine, which D-259 corrected to the measured order, now
-    read within a point of each other. Phenylalanine reads 99.6 % against its sourced 0.975:
-    just above D-259's 96-99.5 window, on the same side as the growth arm's 98.9.
+    joint arm over-shoots all three (**74 / 73 / 84** at the sourced composition, and above her
+    at every edge — D-266 read 66 / 65 / 81 at the stated one). The end inversion D-259 found
+    survives — leucine is still the lowest and threonine the highest — while isoleucine and
+    valine, which D-259 corrected to the measured order, read within half a point of each other.
+    Phenylalanine reads 99.7 % against its sourced 0.975.
+
+    **D-268 changed one of D-266's own statements here.** D-266 recorded that the growth sink
+    ALONE under-shoots two of the three and over-shoots threonine. On the sourced composition it
+    under-shoots only isoleucine (46.9 against 51) and over-shoots valine (46.0 against 41) as
+    well as threonine (62.6 against 38). The growth sink alone is no longer the arm that is
+    under on the pair.
     """
     for edge in ("lo", "mid", "hi"):
         arm = crepin[f"joint_{edge}"]["split_pct"]
@@ -702,38 +795,65 @@ def test_the_joint_arm_OVER_shoots_crepin_on_the_three_precursors_the_shipped_si
             )
         assert arm["leucine"] < arm["threonine"], "the end inversion has closed; re-open D-259"
     mid = crepin["joint"]["split_pct"]
-    assert mid["isoleucine"] == pytest.approx(66.2, abs=1.5)
-    assert mid["valine"] == pytest.approx(65.2, abs=1.5)
-    assert mid["threonine"] == pytest.approx(81.2, abs=1.5)
+    assert mid["isoleucine"] == pytest.approx(73.5, abs=1.5)
+    assert mid["valine"] == pytest.approx(73.0, abs=1.5)
+    assert mid["threonine"] == pytest.approx(84.0, abs=1.5)
     assert abs(mid["isoleucine"] - mid["valine"]) < 2.0
     assert 99.0 < mid["phenylalanine"] < 100.0
+    old_mid = crepin["joint_superseded"]["split_pct"]
+    for species in ("isoleucine", "valine", "threonine"):
+        assert mid[species] > old_mid[species], (
+            f"{species}: the sourced composition must WIDEN the over-shoot "
+            f"({old_mid[species]:.1f} -> {mid[species]:.1f} % against Crépin's "
+            f"{_CREPIN_PROTEIN_PCT[species][1]:.0f}). This was pre-registered as a cost of "
+            "D-268 and is asserted so it cannot be reported later as a surprise"
+        )
     growth = crepin["growth"]["split_pct"]
-    assert growth["isoleucine"] < 51.0 and growth["valine"] < 41.0 and growth["threonine"] > 38.0
+    assert growth["isoleucine"] < 51.0, (
+        f"the growth sink alone reads {growth['isoleucine']:.1f} % isoleucine; it is the ONE of "
+        "the three it still under-shoots since D-268 sourced the composition"
+    )
+    assert growth["valine"] > 41.0 and growth["threonine"] > 38.0, (
+        f"the growth sink alone reads valine {growth['valine']:.1f} % / threonine "
+        f"{growth['threonine']:.1f} % against Crépin's 41 / 38. D-266 measured valine UNDER her "
+        "41 on the stated composition; the sourced one puts it over, and that reversal is what "
+        "this assert records"
+    )
 
 
 def test_rolleros_leucine_tracer_brackets_the_enrichment_and_overshoots_the_amount(rollero):
-    """P8, refuted on two of three — and the amount says why the SM425 "hit" is not one.
+    """The axis D-268 moved the joint arm CLOSER on — and the amount that says why it is not a win.
 
-    Enrichment on Rollero's own musts: 1.78 / 5.44 / 8.33 % against Table S2's 3.4-3.5 /
-    4.2-4.7 / 6.8-8.2 % — under at SM70, over at SM250, at the top edge at SM425. The shipped
-    arm is under on all three and the growth arm over on all three; the joint arm sits between
-    and its enrichment responds 4.7× across his nitrogen range where his responds ~2.2×. Scored
-    apart from the total ([[feedback-a-near-constant-ratio-can-be-two-errors-growing-together]]),
-    the labelled AMOUNT is over at both higher levels — 101 µM against 55-64, 171 against 65-70
-    — so the SM425 enrichment lands inside the band only because the total it is divided by is
-    2× his (2052 against 793-1034 µM). Two errors, cancelling.
+    Enrichment on Rollero's own musts: **1.54 / 4.69 / 7.18 %** against Table S2's 3.4-3.5 /
+    4.2-4.7 / 6.8-8.2 % — under at SM70, and INSIDE the band at both higher levels. D-266 read
+    1.78 / 5.44 / 8.33 on the composition D-259 stated: under, then over, then at the top edge.
+    So sourcing the composition moved two of the three from outside to inside, and this is the
+    one axis in the module where D-268 improves the joint arm rather than costing it.
+
+    **It is still not evidence the arm is right, and the amount is why.** Scored apart from the
+    total ([[feedback-a-near-constant-ratio-can-be-two-errors-growing-together]]), the labelled
+    AMOUNT is over at both higher levels — 87 µM against his 55-64, 147 against 65-70, i.e.
+    1.4× and 2.1× — so the enrichments land inside the bands only because the total they are
+    divided by is ~2× his (2052 against 793-1034 µM at SM425). Two errors, cancelling; the
+    cancellation is closer than it was, which makes it more misleading, not less. The shipped
+    arm is under on all three and the growth arm over on all three, and the joint arm's
+    enrichment responds 4.7× across his nitrogen range where his responds ~2.2×.
     """
     joint = rollero["joint"]
     lo70 = min(_ROLLERO_EF_LEUCINE_ENRICHMENT[70.0]) * 100.0
     lo250, hi250 = (x * 100.0 for x in sorted(_ROLLERO_EF_LEUCINE_ENRICHMENT[250.0]))
     lo425, hi425 = (x * 100.0 for x in sorted(_ROLLERO_EF_LEUCINE_ENRICHMENT[425.0]))
     assert joint[70.0]["leucine_enrichment_pct"] < lo70
-    assert joint[250.0]["leucine_enrichment_pct"] > hi250, (
-        f"SM250: joint leucine enrichment {joint[250.0]['leucine_enrichment_pct']:.2f} % was "
-        f"measured ABOVE Rollero's {lo250}-{hi250} %; the pre-registration expected below"
+    assert lo250 <= joint[250.0]["leucine_enrichment_pct"] <= hi250, (
+        f"SM250: joint leucine enrichment {joint[250.0]['leucine_enrichment_pct']:.2f} % against "
+        f"Rollero's {lo250}-{hi250} %. D-266 measured it ABOVE the band on D-259's stated "
+        "composition; D-268's sourced one brings it inside, and that move is the finding here"
     )
-    assert joint[425.0]["leucine_enrichment_pct"] == pytest.approx(hi425, abs=0.5)
-    assert joint[425.0]["leucine_enrichment_pct"] > lo425
+    assert lo425 <= joint[425.0]["leucine_enrichment_pct"] <= hi425, (
+        f"SM425: joint leucine enrichment {joint[425.0]['leucine_enrichment_pct']:.2f} % against "
+        f"Rollero's {lo425}-{hi425} %. D-266 read it AT the top edge; D-268 reads it inside"
+    )
+    assert joint[425.0]["leucine_enrichment_pct"] == pytest.approx(7.18, abs=0.4)
     for yan in _YANS:
         assert (
             rollero["shipped"][yan]["leucine_enrichment_pct"]
@@ -745,11 +865,15 @@ def test_rolleros_leucine_tracer_brackets_the_enrichment_and_overshoots_the_amou
         ), f"SM{yan:.0f}: the growth arm alone is no longer over Table S2's ceiling"
     response = joint[425.0]["leucine_enrichment_pct"] / joint[70.0]["leucine_enrichment_pct"]
     assert response > 4.0, f"joint enrichment response {response:.2f}× (recorded 4.7×)"
-    for yan in (250.0, 425.0):
+    for yan, floor_ratio in ((250.0, 1.3), (425.0, 1.9)):
         measured_hi = max(_ROLLERO_EF_LEUCINE_LABELLED_UM[yan])
-        assert joint[yan]["leucine_labelled_um"] > 1.5 * measured_hi, (
+        ratio = joint[yan]["leucine_labelled_um"] / measured_hi
+        assert ratio > floor_ratio, (
             f"SM{yan:.0f}: joint leucine-labelled isoamyl {joint[yan]['leucine_labelled_um']:.0f} "
-            f"µM against Rollero's ≤ {measured_hi} µM — the amount was measured 1.6-2.5× over"
+            f"µM against Rollero's ≤ {measured_hi} µM, {ratio:.2f}×. D-268 measured 1.35× and "
+            "2.10× on the sourced composition (D-266 read 1.6× and 2.4× on the stated one); "
+            "the AMOUNT staying over at both levels is what stops the enrichments landing "
+            "inside the bands from being read as agreement"
         )
     assert joint[425.0]["isoamyl_ef_um"] > 1.9 * max(_ROLLERO_EF_ISOAMYL_UM[425.0]), (
         "the SM425 total is no longer ~2× Rollero's; the cancellation argument above is void"
@@ -775,25 +899,35 @@ def test_valines_tracer_moves_the_WRONG_way_under_the_joint_arm(rollero):
 
 def test_the_growth_sink_alone_breaks_the_propanol_floor_and_the_joint_arm_restores_it(crepin):
     """A finding neither single repair could show. Growth-anchoring leaves threonine's Ehrlich
-    draw un-capped by ``f``, and propanol reads 71.4 % de novo on Crépin's must against the
-    sourced 80 % floor (D-244, cleared at D-248); the blend's cut of the Ehrlich draw brings
-    the pair back to 87.5 %, beside the shipped 87.8 %."""
+    draw un-capped by ``f``, and propanol reads **74.6 %** de novo on Crépin's must against the
+    sourced 80 % floor (D-244, cleared at D-248); the blend's cut of the Ehrlich draw brings the
+    pair back to **89.4 %**, beside the shipped 87.8 %. D-266 measured 71.4 / 87.5 on the
+    composition D-259 stated: the sourced one moves both up, and the finding — one repair breaks
+    the floor, the pair restores it — is unchanged."""
     growth = crepin["growth"]["de_novo"]["propanol"]
     joint = crepin["joint"]["de_novo"]["propanol"]
     assert growth < _PROPANOL_DE_NOVO_FLOOR, (
-        f"growth-anchored propanol reads {growth:.3f} de novo — measured 0.714, under the floor"
+        f"growth-anchored propanol reads {growth:.3f} de novo — D-268 measured 0.746 on the "
+        "sourced composition (D-266 measured 0.714), under the floor either way"
     )
     assert joint > _PROPANOL_DE_NOVO_FLOOR, (
         f"joint propanol reads {joint:.3f} de novo, under the sourced {_PROPANOL_DE_NOVO_FLOOR}"
     )
-    assert joint == pytest.approx(crepin["shipped"]["de_novo"]["propanol"], abs=0.02)
+    assert joint == pytest.approx(crepin["shipped"]["de_novo"]["propanol"], abs=0.03), (
+        f"joint propanol {joint:.4f} against the shipped "
+        f"{crepin['shipped']['de_novo']['propanol']:.4f}. The bound is 0.03 since D-268: the "
+        "sourced composition moved the joint arm 0.875 -> 0.894 while the shipped arm stayed "
+        "at 0.878, so the pair agree to 0.016 rather than 0.003"
+    )
     assert crepin["joint"]["de_novo"]["isoamyl_alcohol"] > 0.9
 
 
 def test_the_joint_arm_closes_both_ledgers_and_never_creates_sugar(d104):
     """P10. The growth sink refunds carbon to ``S`` and nitrogen to ``N`` for the precursor it
-    draws, so the D-117 sparing-credit ceiling is the guard that has to hold: 0.236× growth's
-    draw, against the shipped 0.584× and the hard 1.0. Carbon and nitrogen close to solver
+    draws, so the D-117 sparing-credit ceiling is the guard that has to hold: **0.276×** growth's
+    draw on the sourced composition (D-266 measured 0.236× on the stated one — the refund scales
+    with the draw, which is exactly what D-268 made larger), against the shipped 0.584× and the
+    hard 1.0. Carbon and nitrogen close to solver
     precision and the summed right-hand side never makes sugar appear."""
     joint = d104["joint"]
     assert joint["carbon_rel_drift"] < 1e-9 and joint["nitrogen_rel_drift"] < 1e-9, (
@@ -801,7 +935,7 @@ def test_the_joint_arm_closes_both_ledgers_and_never_creates_sugar(d104):
     )
     assert joint["max_net_ds_dt"] <= 0.0, f"net dS/dt reached {joint['max_net_ds_dt']:+.3e}"
     assert joint["worst_joint_c_refund"] < 1.0
-    assert joint["worst_joint_c_refund"] == pytest.approx(0.236, abs=0.03)
+    assert joint["worst_joint_c_refund"] == pytest.approx(0.276, abs=0.03)
     assert d104["shipped"]["worst_joint_c_refund"] == pytest.approx(0.584, abs=0.03), (
         "the shipped joint refund (D-118's 0.584×) has moved; re-derive before comparing"
     )
