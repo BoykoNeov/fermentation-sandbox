@@ -15,7 +15,7 @@ use. Assert it EXACTLY; an identity has no tolerance.
   weighing. Do not let a note imply otherwise.
 - **Corroboration (independent, cancels his assumption):** invert to cells per g N (2.515e11 at
   330 mg N/L) and price with Roels `CH₁.₈O₀.₅N₀.₂` ⇒ **34.87 pg**, 13 % agreement. It also fixes the
-  frame Coleman left open — read as WET, 40 pg makes yeast 33 % N on a dry basis (real 7-12 %).
+  frame Coleman left open — read as WET, 40 pg makes yeast 33 % N on a dry basis (sourced 6.4-8.3 %, D-270).
 - **Band 28-50 pg**, DERIVED live from `biomass_N_fraction`'s own 0.08-0.14, not asserted.
 
 ## Both readings the archive shipped are RETIRED — do not resurrect either
@@ -61,3 +61,33 @@ that is what would make this `validated`. Cramer et al. 2002 (Coleman's antecede
 if *they* measured it the tier rises. And the ~42 % Coleman-vs-Varela `Y_X/N` gap (D-56 finding 3) is
 now a cell-number-or-cell-mass question with no data separating them — but the elemental route
 forbids resolving it on mass alone (68 pg/cell would reconcile them and implies yeast at 5.2 % N).
+
+# D-270 — `biomass_N_fraction` IS NOT A COMPOSITION IN WINE. Read this before comparing it, or any per-cell nitrogen number, to a sourced cell composition.
+
+**Wine never runs the YAML's 0.114.** `_apply_nitrogen_dependent_yield` overrides it at compile
+from Coleman's `Y_X/N`, so it is `1/Y_X/N(YAN)` — a **yield residual**, rising with the must's
+nitrogen: **0.0362 (50 mg N/L) → 0.1068 (held at the fit's 350 top)**, a factor **2.95**.
+
+* **D-267 §6's "the engine ships 0.114, 1.6-1.8x the sourced nitrogen" is CORRECTED — it read a
+  literal wine does not use.** Against the sourced **0.0640-0.0833** (40-45 % crude protein at
+  N × 6.25; 50 % protein at ⅙ N) wine **straddles**: on D-270's sampled grid 4 arms below, 1
+  inside, 8 above. **That 4/1/8 is a property of the GRID, not a census of the suite's fixtures**
+  (distinct literal `yan_mgl` values + 3 constructed dosed arms) — never quote it as one.
+* **NEVER feed the COMPILED fraction to `convert.py`'s per-cell check.** `f_N ≡ 1/Y_X/N` makes it
+  return **exactly 4e-11 g**; the corroboration becomes a tautology. Its use of the static 0.114
+  is CORRECT and must stay — that is the only reason 34.9-vs-40 is an independent agreement.
+* **The surviving mismatch is BEER's** (gated off the override): nominal **1.368x** the highest
+  sourced estimate, band `[0.08, 0.14]` overlapping the sourced range over **5.6 % of its width**.
+  **REFUSED and flagged on D-14, not repaired**: `dX = YAN/f_N`, so the sourced range raises the
+  ceiling 1.37-1.78x and the growth extent **5.378x → 7.36-9.58x** against a counted 2.918-3.483x
+  and a printed 4-5x. Owner's trade: a sourced composition against a sourced extent.
+* **The sourcing STRENGTHENS D-230's arithmetic refusal — never read it the other way.** Tyrell's
+  crop demands 0.202-0.262 g N/g: **2.42-4.09x** outside the sourced range vs 1.44-1.87x outside
+  the band's 0.14 top. A guard asserts the ORDERING, not the numbers.
+* **The re-priced per-cell mass is REPORTED, NOT TAKEN.** On the sourced composition `convert.py`'s
+  route gives **47.7-62.1 pg** (not 34.9), narrowing the gap to D-230 branch 1's counted
+  70.9-91.9 pg from **2.03-2.64x to 1.14-1.93x**. Evidence on a residue D-232 could only widen —
+  **not** a settlement. The 4e-11 g is the UNIT wine's fitted parameters live in; re-opening it is
+  D-219's, and a tripwire fires if `cells_per_ml_to_pitch_gpl` moves.
+* The unsourced **"real 7-12 %"** that did sanity-check duty in `convert.py`,
+  `test_kinetics_growth.py` and `test_units.py` is REPLACED by the sourced 6.4-8.3 % and pinned.
