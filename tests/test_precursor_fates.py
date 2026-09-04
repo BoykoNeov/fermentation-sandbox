@@ -630,6 +630,15 @@ def test_precursor_consumption_rides_the_ALCOHOL_rate_and_that_is_what_blocks_th
 #: ``Parameter`` — prime directive 2 governs numbers the MODEL reads, and nothing in ``src/``
 #: reads this; it is a counterfactual input read only by this suite, like
 #: ``CHEMISTRY_OF_BEER_GROWTH_FOLD`` (D-258). If a Process is ever built to it, it moves to YAML.
+#:
+#: **D-267 SOURCED IT AND THE BRACKET DID NOT SURVIVE THE SOURCING — these values are retained
+#: DELIBERATELY, not because they are right.** The protein fraction below is corroborated at all
+#: three edges (§2 of the D-267 receipts). The residue shares are not: Lange & Heijnen 2001's
+#: measured composition, converted into the frame this Process's draw actually uses, sits ABOVE
+#: the high edge for all five precursors (see ``_LANGE_HEIJNEN_2001_TABLE_IV_MOL_PCT``). Moving
+#: them re-prices every growth-anchored number in D-259, D-260 and D-266, which is the
+#: owner-gated build D-266 §9 reserved — so the repair is FLAGGED, not shipped. If you change a
+#: number here you are taking that build: retire D-267's flag in the record that does it.
 _D259_PROTEIN_FRACTION_OF_DRY_WEIGHT = {"lo": 0.40, "mid": 0.45, "hi": 0.50}
 _D259_RESIDUE_SHARE_OF_PROTEIN = {  # g residue / 100 g yeast protein
     "leucine": {"lo": 6.0, "mid": 7.5, "hi": 9.0},
@@ -639,6 +648,58 @@ _D259_RESIDUE_SHARE_OF_PROTEIN = {  # g residue / 100 g yeast protein
     "phenylalanine": {"lo": 3.5, "mid": 4.5, "hi": 5.5},
 }
 _D259_EDGES = ("lo", "mid", "hi")
+
+#: D-267 — the composition D-259 could not find. Lange HC, Heijnen JJ (2001), *Biotechnol
+#: Bioeng* 75(3):334-344, **Table IV p.339**, "Amino acid composition of the protein as measured
+#: (mol %)", glucose-limited chemostat *S. cerevisiae*; the paper states the relative abundance
+#: did not vary between cultures, which is what licenses carrying it to a fermenting must.
+#: Transcribed VERBATIM from the table image in ``docs/receipts/d267-yeast-protein-composition/``.
+#: Asx = Asp + Asn and Glx = Glm + Gln are the paper's own footnote, and are read as the ACIDS —
+#: what its acid hydrolysis delivers. The amide reading is the loser of that fork and moves no
+#: verdict (0.22 % on the mean residue mass).
+_LANGE_HEIJNEN_2001_TABLE_IV_MOL_PCT = {
+    "Ala": 9.77, "Arg": 3.86, "Asx": 9.28, "Cys": 0.14, "Glx": 15.48,
+    "Gly": 8.89, "His": 1.93, "Ile": 5.89, "Leu": 8.01, "Lys": 6.57,
+    "Met": 1.14, "Orn": 0.24, "Phe": 3.76, "Pro": 4.22, "Ser": 5.33,
+    "Thr": 5.57, "Trp": 0.65, "Tyr": 1.96, "Val": 7.33,
+}  # fmt: skip
+
+#: Molar mass of the FREE amino acid, g/mol, for every row of Table IV. The five the fusel thread
+#: draws are cross-checked against the engine's own ``MOLAR_MASS`` below rather than trusted here.
+_M_FREE_AMINO_ACID = {
+    "Ala": 89.094, "Arg": 174.201, "Asx": 133.103, "Cys": 121.159, "Glx": 147.130,
+    "Gly": 75.067, "His": 155.155, "Ile": 131.175, "Leu": 131.175, "Lys": 146.189,
+    "Met": 149.208, "Orn": 132.161, "Phe": 165.192, "Pro": 115.132, "Ser": 105.093,
+    "Thr": 119.119, "Trp": 204.229, "Tyr": 181.191, "Val": 117.148,
+}  # fmt: skip
+_M_WATER = 18.0153
+
+#: Table IV's three-letter names for the five precursors, in this suite's species names.
+_TABLE_IV_NAME = {
+    "leucine": "Leu", "isoleucine": "Ile", "valine": "Val",
+    "threonine": "Thr", "phenylalanine": "Phe",
+}  # fmt: skip
+
+
+def _lange_heijnen_shares(frame: str) -> dict[str, float]:
+    """Table IV in mass terms, g per 100 g of protein, in one of the two frames.
+
+    ``residue`` weights each mole by the residue it contributes to the chain — the frame
+    ``_D259_RESIDUE_SHARE_OF_PROTEIN``'s comment declares. ``free`` weights it by the free acid
+    that must LEAVE THE POOL to contribute it, which is the frame :class:`_GrowthAnchoredFates`
+    actually draws in, because it subtracts its product from the free amino-acid slots and the
+    engine's ``MOLAR_MASS`` is the free acid. The denominator is the protein mass either way (the
+    sum of residue masses), so ``free`` sums to well over 100 by exactly the peptide-bond water.
+    """
+    mol = _LANGE_HEIJNEN_2001_TABLE_IV_MOL_PCT
+    numerator = (
+        _M_FREE_AMINO_ACID
+        if frame == "free"
+        else {k: v - _M_WATER for k, v in _M_FREE_AMINO_ACID.items()}
+    )
+    protein = sum(mol[k] * (_M_FREE_AMINO_ACID[k] - _M_WATER) for k in mol)
+    return {k: 100.0 * mol[k] * numerator[k] / protein for k in mol}
+
 
 #: D-104 Finding 4's own growth-anchored numbers, % of consumed precursor reaching the lump.
 _D104_GROWTH_ANCHORED_PCT = {
@@ -1436,4 +1497,162 @@ def test_a_growth_anchored_draw_must_carry_growths_OWN_rate_modifiers(
         f"D-104's 20.9 % must now sit BELOW the corrected bracket's low edge "
         f"({min(corrected):.1f} %), where D-259 measured it at the TOP of the uncorrected one. "
         "That reversal is the correction; if it is gone, say so rather than re-pinning"
+    )
+
+
+# ---------------------------------------------------------------------------------------------
+# D-267 — the composition D-259 stated for want of a source, now sourced. Nothing here runs the
+# model: these guard a transcription, an arithmetic frame, and a repair that is deliberately
+# NOT taken. Receipts: docs/receipts/d267-yeast-protein-composition/.
+# ---------------------------------------------------------------------------------------------
+
+#: The independent anchors D-267 §2 found for protein as a fraction of yeast dry weight.
+_D267_PROTEIN_FRACTION_ANCHORS = {
+    "Concise Encyclopedia, wine yeast, low edge": 0.40,
+    "Concise Encyclopedia, wine yeast, high edge": 0.45,
+    "van Gulik & Heijnen 1995 Table I (after Verduyn)": 0.42,
+    "Understanding Wine Chemistry 2nd ed, chapter note": 0.50,
+}
+
+
+def _d259_edges(species: str) -> tuple[float, float, float]:
+    """The bracket's lo/mid/hi for one precursor, in the units the source is converted into."""
+    share = _D259_RESIDUE_SHARE_OF_PROTEIN[species]
+    return share["lo"], share["mid"], share["hi"]
+
+
+def test_lange_heijnen_table_iv_closes_as_a_mole_composition():
+    """The transcription's own closure — a mole composition must sum to 100 %.
+
+    This is the check that catches a mistyped digit, and it is the only one available: the table
+    is read off an image, so nothing downstream can tell 8.01 from 8.10 except this sum.
+    """
+    total = sum(_LANGE_HEIJNEN_2001_TABLE_IV_MOL_PCT.values())
+    assert len(_LANGE_HEIJNEN_2001_TABLE_IV_MOL_PCT) == 19, "Table IV has 19 rows"
+    assert total == pytest.approx(100.02, abs=0.05), (
+        f"the transcribed mol % sum to {total:.2f}, not the table's own 100.02. A row is "
+        "mistyped — re-read lange_heijnen_2001_tableIV.png rather than adjusting this bound"
+    )
+    assert set(_M_FREE_AMINO_ACID) == set(_LANGE_HEIJNEN_2001_TABLE_IV_MOL_PCT), (
+        "every transcribed row needs a molar mass, or the mass frames below are computed over a "
+        "different set of amino acids than the table lists"
+    )
+
+
+def test_the_growth_anchored_draw_is_in_free_acid_mass_and_the_engine_says_so():
+    """The frame claim, checked against ``src/`` rather than asserted in a comment.
+
+    :class:`_GrowthAnchoredFates` subtracts ``w_i * base_dx * gate`` from an amino-acid POOL slot
+    and refunds carbon and nitrogen at that species' own mass fractions. Every one of those is
+    computed from the engine's ``MOLAR_MASS``, so if ``MOLAR_MASS`` is the free acid then the
+    draw is in free-acid grams, and a ``w_i`` expressed in residue grams under-draws by the
+    peptide-bond water. This test is what establishes that antecedent.
+    """
+    for species, code in _TABLE_IV_NAME.items():
+        assert MOLAR_MASS[species] == pytest.approx(_M_FREE_AMINO_ACID[code], abs=0.01), (
+            f"{species}: the engine carries {MOLAR_MASS[species]:.3f} g/mol against the free "
+            f"acid's {_M_FREE_AMINO_ACID[code]:.3f}. If the engine ever moves to residue masses "
+            "the whole D-267 finding inverts and must be re-recorded, not silently re-pinned"
+        )
+        residue = _M_FREE_AMINO_ACID[code] - _M_WATER
+        assert MOLAR_MASS[species] - residue == pytest.approx(_M_WATER, abs=0.01), (
+            f"{species}: free minus residue must be exactly one water, not "
+            f"{MOLAR_MASS[species] - residue:.3f}"
+        )
+
+    residue_frame = _lange_heijnen_shares("residue")
+    free_frame = _lange_heijnen_shares("free")
+    assert sum(residue_frame.values()) == pytest.approx(100.0, abs=0.05), (
+        "residue shares are shares OF the protein mass and must sum to 100 by construction"
+    )
+    assert sum(free_frame.values()) == pytest.approx(116.53, abs=0.05), (
+        f"free-acid shares sum to {sum(free_frame.values()):.2f} per 100 g protein; the excess "
+        "over 100 IS the peptide-bond water and is the entire size of the frame difference"
+    )
+
+
+def test_the_sourced_composition_is_above_every_bracket_edge_in_the_frame_the_draw_uses():
+    """THE D-267 FINDING. All five precursors sit above D-259's high edge, not inside it.
+
+    The direction is the part that matters: a larger ``w_i`` draws MORE precursor into the lump,
+    so every growth-anchored split D-259, D-260 and D-266 report is a LOW estimate.
+    """
+    free_frame = _lange_heijnen_shares("free")
+    recorded = {"Leu": 9.639, "Ile": 7.088, "Val": 7.878, "Thr": 6.087, "Phe": 5.698}
+
+    for species, code in _TABLE_IV_NAME.items():
+        _, mid, hi = _d259_edges(species)
+        share = free_frame[code]
+        assert share == pytest.approx(recorded[code], abs=0.01), (
+            f"{species}: free-acid share {share:.3f} against D-267's recorded "
+            f"{recorded[code]:.3f} g/100 g protein"
+        )
+        assert share > hi, (
+            f"{species}: the sourced share {share:.3f} must sit ABOVE the bracket's high edge "
+            f"{hi:.1f}. If it no longer does, D-267's finding has been overturned and needs a "
+            "record, not a relaxed assert"
+        )
+        assert share / mid > 1.2, (
+            f"{species}: the sourced share is only {share / mid:.3f}x the MID composition that "
+            "D-259/D-260/D-266 quote as their headline. D-267 recorded 1.22-1.43x; if that gap "
+            "has closed, the 'low estimate' claim in those records no longer holds"
+        )
+
+
+def test_the_residue_frame_is_the_losing_reading_and_is_kept_visible_as_one():
+    """A units fork is not a band (D-209). Both readings are pinned; only one is used.
+
+    In the residue frame — what ``_D259_RESIDUE_SHARE_OF_PROTEIN``'s own comment declares — the
+    source contradicts only isoleucine and valine. That is the weaker statement, and recording it
+    beside the strong one is what stops a later beat crossing the two into a "band" whose whole
+    spread is the fork.
+    """
+    residue_frame = _lange_heijnen_shares("residue")
+    recorded = {"Leu": 8.315, "Ile": 6.115, "Val": 6.666, "Thr": 5.166, "Phe": 5.077}
+    above = set()
+    for species, code in _TABLE_IV_NAME.items():
+        assert residue_frame[code] == pytest.approx(recorded[code], abs=0.01), (
+            f"{species}: residue-frame share {residue_frame[code]:.3f} against the recorded "
+            f"{recorded[code]:.3f}"
+        )
+        if residue_frame[code] > _d259_edges(species)[2]:
+            above.add(species)
+    assert above == {"isoleucine", "valine"}, (
+        f"the residue frame should breach exactly isoleucine and valine, not {sorted(above)}. "
+        "The two frames disagreeing about WHICH edges break is the reason the fork must be "
+        "decided rather than averaged"
+    )
+
+
+def test_the_protein_fraction_half_is_the_half_the_sourcing_corroborated():
+    """D-259's other bracket survives: every anchor D-267 found lies inside 0.40-0.50."""
+    lo = _D259_PROTEIN_FRACTION_OF_DRY_WEIGHT["lo"]
+    hi = _D259_PROTEIN_FRACTION_OF_DRY_WEIGHT["hi"]
+    for name, value in _D267_PROTEIN_FRACTION_ANCHORS.items():
+        assert lo <= value <= hi, (
+            f"{name} gives {value:.2f} g protein/g dry weight, outside D-259's {lo:.2f}-{hi:.2f}. "
+            "That would make the protein half unsourced too, which D-267 §2 says it is not"
+        )
+    assert min(_D267_PROTEIN_FRACTION_ANCHORS.values()) == lo, "an anchor must reach the low edge"
+    assert max(_D267_PROTEIN_FRACTION_ANCHORS.values()) == hi, "an anchor must reach the high edge"
+
+
+def test_the_flagged_repair_has_not_been_taken_without_a_record():
+    """The bracket is knowingly wrong and knowingly kept. This is the guard that says so.
+
+    D-267 flags the repair rather than shipping it, because moving these five numbers re-prices
+    every arm of the owner-gated build D-266 §9 reserved. A silent edit here would change
+    D-259's, D-260's and D-266's measurements with nothing in the archive saying it happened.
+    """
+    assert _D259_RESIDUE_SHARE_OF_PROTEIN == {
+        "leucine": {"lo": 6.0, "mid": 7.5, "hi": 9.0},
+        "isoleucine": {"lo": 4.0, "mid": 5.0, "hi": 6.0},
+        "valine": {"lo": 4.5, "mid": 5.5, "hi": 6.5},
+        "threonine": {"lo": 4.0, "mid": 5.0, "hi": 6.0},
+        "phenylalanine": {"lo": 3.5, "mid": 4.5, "hi": 5.5},
+    }, (
+        "the D-259 bracket has moved. If that is D-267's flagged repair being taken, it is an "
+        "owner-gated build: append the record, retire the flag with an Unflags marker naming "
+        "D-267, and re-measure every growth-anchored number in D-259, D-260 and D-266 — do not "
+        "just update this literal"
     )

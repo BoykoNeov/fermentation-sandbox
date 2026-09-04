@@ -1,0 +1,134 @@
+{
+  "all_species_free_frame": {
+    "Ala": 7.985541700361051,
+    "Arg": 6.1687803819155125,
+    "Asx": 11.33175512192061,
+    "Cys": 0.15561271371699983,
+    "Glx": 20.894575478205155,
+    "Gly": 6.122265810775267,
+    "His": 2.74716310513746,
+    "Ile": 7.088065598662189,
+    "Leu": 9.639287851491362,
+    "Lys": 8.811329164075092,
+    "Met": 1.5604804099598848,
+    "Orn": 0.29098856200839857,
+    "Phe": 5.69820693234942,
+    "Pro": 4.45727942343231,
+    "Ser": 5.138807617486192,
+    "Thr": 6.08692000995575,
+    "Trp": 1.2178453101951598,
+    "Tyr": 3.2580223091586826,
+    "Val": 7.877714072722913
+  },
+  "all_species_residue_frame": {
+    "Ala": 6.3708209627747445,
+    "Arg": 5.530825208212018,
+    "Asx": 9.798018331255212,
+    "Cys": 0.13247444316816842,
+    "Glx": 18.33614384894865,
+    "Gly": 4.652985630924471,
+    "His": 2.4281855182857126,
+    "Ile": 6.1146055020006385,
+    "Leu": 8.31544822937608,
+    "Lys": 7.725483181890645,
+    "Met": 1.3720687783479721,
+    "Orn": 0.251322955353259,
+    "Phe": 5.076779094752233,
+    "Pro": 3.7598258397461053,
+    "Ser": 4.257900603019967,
+    "Thr": 5.166347388834386,
+    "Trp": 1.110417625504157,
+    "Tyr": 2.9340865214750425,
+    "Val": 6.6662603361305255
+  },
+  "amide_fork_size_on_five": {
+    "Ile": 0.015878395978649706,
+    "Leu": 0.02159354020186477,
+    "Phe": 0.012764891179506854,
+    "Thr": 0.013635670390336863,
+    "Val": 0.017647334341386767
+  },
+  "engine_molar_mass_crosscheck": {
+    "checked": [
+      "Ile",
+      "Leu",
+      "Phe",
+      "Thr",
+      "Val"
+    ],
+    "mismatch": {},
+    "note": "engine MOLAR_MASS is the FREE amino acid (leucine 131.175), not the residue"
+  },
+  "mean_residue_mass_Da": {
+    "acid_form": 109.00304734000001,
+    "amide_form": 108.75940894
+  },
+  "mol_pct_total": 100.02,
+  "precursor_verdicts": {
+    "Ile": {
+      "bracket": [
+        4.0,
+        5.0,
+        6.0
+      ],
+      "free_frame": 7.088065598662189,
+      "free_over_hi_ratio": 1.1813442664436982,
+      "free_verdict": "above hi",
+      "residue_frame": 6.1146055020006385,
+      "residue_verdict": "above hi"
+    },
+    "Leu": {
+      "bracket": [
+        6.0,
+        7.5,
+        9.0
+      ],
+      "free_frame": 9.639287851491362,
+      "free_over_hi_ratio": 1.0710319834990403,
+      "free_verdict": "above hi",
+      "residue_frame": 8.31544822937608,
+      "residue_verdict": "inside"
+    },
+    "Phe": {
+      "bracket": [
+        3.5,
+        4.5,
+        5.5
+      ],
+      "free_frame": 5.69820693234942,
+      "free_over_hi_ratio": 1.036037624063531,
+      "free_verdict": "above hi",
+      "residue_frame": 5.076779094752233,
+      "residue_verdict": "inside"
+    },
+    "Thr": {
+      "bracket": [
+        4.0,
+        5.0,
+        6.0
+      ],
+      "free_frame": 6.08692000995575,
+      "free_over_hi_ratio": 1.0144866683259584,
+      "free_verdict": "above hi",
+      "residue_frame": 5.166347388834386,
+      "residue_verdict": "inside"
+    },
+    "Val": {
+      "bracket": [
+        4.5,
+        5.5,
+        6.5
+      ],
+      "free_frame": 7.877714072722913,
+      "free_over_hi_ratio": 1.2119560111881404,
+      "free_verdict": "above hi",
+      "residue_frame": 6.6662603361305255,
+      "residue_verdict": "above hi"
+    }
+  },
+  "source": "Lange HC, Heijnen JJ (2001) Biotechnol Bioeng 75(3):334-344, Table IV p.339, 'Amino acid composition of the protein as measured (mol %)'",
+  "sum_of_shares": {
+    "free_frame": 116.53064157352941,
+    "residue_frame": 99.99999999999999
+  }
+}
