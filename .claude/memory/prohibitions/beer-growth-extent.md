@@ -202,3 +202,30 @@ which is what makes it durable:
   counted in. **D-270's flag on D-14 is UNTOUCHED**: the hunt was taken partly because settling
   the extent residue would dissolve beer's cell-nitrogen trade, and it did not settle it.
   [[feedback-ask-why-the-field-would-publish-it]]
+
+# D-272 — THE CELL-NITROGEN TRADE IS DECIDED: the sourced composition is DECLINED. Do not re-propose moving beer's `biomass_N_fraction`, and do not read D-270's still-open flag as approval.
+
+The owner adjudicated D-270 §5's priced trade (live again at D-271 §8). **Beer keeps the static
+0.114 g N/g cell.** No `src/` change, no new measurement, no marker — the record is the decision.
+
+* **Why declining is the FAITHFUL arm, not the cautious one.** The composition error is
+  **unscored** — no output reports `biomass_N_fraction`; it is a divisor in a ceiling and a
+  stoichiometric coefficient. The extent error the move buys **is** scored, against two
+  independent sources (Tyrell's counts 2.918-3.483x, the printed 4-5x), and the shipped value is
+  already over both (1.076x over the printed fold). Moving trades an invisible error for a bigger
+  visible one. Never re-argue this as "hold vs improve".
+* **D-270's flag on D-14 is deliberately LEFT OPEN, and that is not an oversight.** `Unflags:`
+  means *the fix shipped*; this ships none. Every clause of the flag is still factually true
+  (gated off the override, 0.114, 1.368x the sourced high, 5.6 % band overlap). **An OPEN flag
+  here means "declined at a price", not "agreed and awaiting a build"** — the trap D-269 §5 named.
+  `docs/OPEN.md` cannot express that distinction; only the record and the docstring can.
+* **NO new guard, and none is needed.** Both guards that matter in
+  `tests/test_biomass_nitrogen_frame.py` — `test_beers_band_lies_almost_entirely_above_every_sourced_estimate`
+  and `test_the_sourced_composition_is_refused_for_beer_by_beers_own_growth_extent` — read the value off `beer_generic.yaml`, so moving beer's fraction turns both RED. A test
+  asserting "the owner declined" would guard a sentence, not a behaviour (D-269 §6's reasoning).
+* **The three reopen conditions, and nothing else:** beer's extent residue resolving (still
+  three-way, D-230/D-232/D-258); a brewing-strain nitrogen determination (every sourced figure is
+  wine yeast or a chemostat — and D-271's adjacent hunt came back EMPTY, do not re-run it); or
+  something other than nitrogen coming to limit beer's growth (D-258 worked and REFUSED the
+  oxygen route, so that door is shut). The identity `dX = YAN/f_N` is what makes the two sourced
+  numbers zero-sum; break the coupling and the price changes.
