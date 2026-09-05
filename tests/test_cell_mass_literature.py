@@ -380,6 +380,11 @@ def test_the_literature_figures_are_scoring_targets_not_parameters() -> None:
 
     Same standing as ``TYRELL_CELL_COUNT`` and ``CHEMISTRY_OF_BEER_GROWTH_FOLD``: transcribed
     beside the guards that score them. If a Process is ever built to one, it moves to YAML then.
+
+    **Scope, stated so it is not over-read**: this checks for THESE citations, not for the class
+    of figure. A future beat could ship the same density or dry fraction citing the primary
+    references Klis itself carries, and the guard would stay green. It catches adoption by this
+    record's route, which is the one a reader of this module would take.
     """
     from fermentation.parameters import default_data_dir
 
