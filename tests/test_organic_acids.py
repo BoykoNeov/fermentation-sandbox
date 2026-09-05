@@ -786,7 +786,7 @@ def test_the_model_puts_all_three_acids_on_its_own_fermentation_curve():
     reference = fractions["lactic"]
     for slot, course in fractions.items():
         for day, value in course.items():
-            assert value == pytest.approx(reference[day], abs=1e-6), (
+            assert value == pytest.approx(reference[day], abs=1e-9), (
                 f"{slot} day {day} is {value:.4f} % of its rise against lactic's "
                 f"{reference[day]:.4f} % — the three produced acids no longer share one shape, "
                 "so the single modelled column D-215 §3 read is no longer a single number"
