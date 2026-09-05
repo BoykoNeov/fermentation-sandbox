@@ -228,9 +228,12 @@ TYRELL_SUGAR_GPL = 82.2388545
 #: with strain 15 at +3 ("produces essentially none") and strain 31 at 1.57× the mean ("half as
 #: much again"); succinic reads 15 / 32-76 against a recorded 15 / 32-76.
 #:
-#: **Succinic is the CONTROL, not a third defendant** — see
-#: ``test_the_three_flux_linked_acid_courses_are_mistimed``. Its measured shape is the one closest
-#: to the shipped rate law, so a test that failed on all three alike would not be measuring timing.
+#: **Succinic is the SMALLEST defendant, not the control** (D-273, correcting D-215 §3). It was
+#: called a control because its measured shape is the closest to the shipped rate law *on the
+#: calendar*. Scored against Tyrell's OWN measured flux instead, succinic trails the sugar too —
+#: by +13.5 points of its rise at day 2 and +11.1 at day 5 — and all three acids trail in the
+#: SAME direction, ordered succinic < lactic < malic. See
+#: ``test_tyrells_own_frame_puts_all_three_acids_behind_his_sugar``.
 TYRELL_ACID_COURSE_PPM: dict[str, dict[int, float]] = {
     "lactic": {0: 47.75, 1: 54.75, 2: 58.25, 3: 76.5, 4: 103.25, 5: 104.0, 6: 113.0, 7: 119.5},
     "malic": {0: 78.0, 1: 75.75, 2: 77.0, 3: 76.75, 4: 98.25, 5: 93.0, 6: 96.75, 7: 102.25},
@@ -657,32 +660,48 @@ def test_the_three_flux_linked_acid_courses_are_mistimed():
     Tolerance is **three times** the ±2 ppm figure read tolerance, so a failure here is a shape
     disagreement and not a quarrel about pixels.
 
-    **The three do not fail the same way, and that is the finding**, not a nuisance:
+    **THE RESIDUAL THIS TEST MEASURES IS COMPOSITE, AND D-273 TOOK IT APART.** D-215 §3 read
+    the per-acid signs off this comparison and concluded the three errors OPPOSE — succinic
+    late by 25 points, malic early by 25, lactic nearly right — and therefore that *no single
+    timing correction helps all three*. **That conclusion is withdrawn.** It was measured on
+    the calendar, and the calendar carries the model's own ~3× day-2 speed deficit (D-215 §4,
+    still open, and DELIBERATELY parked at D-223 because the rate that closes it loses both of
+    beer's winning speed anchors). Two defects were being read as one number.
 
-    * **succinic** is the closest to the shipped law and acts as the control — measured 45.9 % of
-      its rise done by day 2 against a modelled 20.5 %, i.e. the model is *late*;
-    * **malic** errs the other way, ~0 % measured against 20.5 % modelled, i.e. the model is
-      *early*;
-    * **lactic** sits between them and is nearly right at day 2, then falls behind.
+    Scored in the source's own frame instead — measured acid against measured flux — **all
+    three acids trail the sugar, in the same direction**, ordered succinic < lactic < malic
+    (``test_tyrells_own_frame_puts_all_three_acids_behind_his_sugar``). The signs flip here
+    because the model's flux deficit at day 2 is +40.7 points and the three real lags are
+    +13.5 / +44.8 / +63.5: the deficit lands INSIDE that span, so subtracting it turns the
+    smallest lag negative and leaves the largest positive
+    (``test_the_models_speed_deficit_lies_inside_the_span_of_the_measured_lags``, which is what
+    makes the explanation falsifiable rather than arithmetic).
 
-    So there is **no single timing correction that helps all three**, and the two large errors have
-    OPPOSITE sign — which is why the shared flux-linked shape survived four beats of endpoint
-    checks. A fix that made all three match by moving one rate law would be fitting a compromise,
-    not a mechanism [[feedback-a-hit-can-be-two-errors-cancelling]].
+    **This test stays an xfail and stays useful**: the calendar disagreement is real, and
+    closing it needs BOTH halves — the parked speed defect and the trailing shape. What it may
+    no longer be cited for is the per-acid SIGN, which is a property of the frame.
+
+    Tolerance is **three times** the ±2 ppm figure read tolerance, so a failure here is a shape
+    disagreement and not a quarrel about pixels.
     """
     _, res = _run(dict(TYRELL_SCENARIO), days=7.0)
     tol = 3.0 * TYRELL_ACID_COURSE_READ_TOL
     got = {slot: _daily_ppm(res, slot) for slot in TYRELL_ACID_COURSE_PPM}
 
-    # DAY 2 FIRST, and across all three — because day 2 is where the opposing-sign finding
-    # lives and this test is what carries it. Iterating acid-by-acid instead would die on
-    # lactic's day 4 (a real but different miss) and the RED would never name the claim the
-    # record leads with [[feedback-grep-finds-claims-not-guards]].
+    # DAY 2 FIRST, and across all three — day 2 is where the residual is largest and where
+    # D-215 §3 read its signs, so it is where the RED has to say that the residual is
+    # COMPOSITE. Iterating acid-by-acid instead would die on lactic's day 4 (a real but
+    # different miss) and the RED would never name the claim the record leads with
+    # [[feedback-grep-finds-claims-not-guards]]. The message no longer asserts a per-acid
+    # direction: that was the frame talking (D-273).
     for slot, course in TYRELL_ACID_COURSE_PPM.items():
         assert got[slot][2] == pytest.approx(course[2], abs=tol), (
-            f"{slot} day 2: model {got[slot][2]:.1f} vs Tyrell's measured {course[2]:.1f} mg/L. "
-            "Day 2 is where the three errors have OPPOSING signs — succinic late, malic early, "
-            f"lactic nearly right (tolerance ±{tol:.0f}, i.e. 3× the figure read tolerance)"
+            f"{slot} day 2: model {got[slot][2]:.1f} vs Tyrell's measured {course[2]:.1f} mg/L "
+            f"(tolerance ±{tol:.0f}, i.e. 3× the figure read tolerance). This residual is TWO "
+            "defects — the model's parked ~3× day-2 speed deficit plus a shape that trails the "
+            "sugar in the source and does not in the model. Do not read its SIGN as a per-acid "
+            "finding; the frame-free statement is in "
+            "test_tyrells_own_frame_puts_all_three_acids_behind_his_sugar (D-273)"
         )
     for slot, course in TYRELL_ACID_COURSE_PPM.items():
         for day, measured in course.items():
@@ -690,6 +709,241 @@ def test_the_three_flux_linked_acid_courses_are_mistimed():
                 f"{slot} day {day}: model {got[slot][day]:.1f} vs Tyrell's measured "
                 f"{measured:.1f} mg/L (tolerance ±{tol:.0f}, i.e. 3× the read tolerance)"
             )
+
+
+def _fermented_fraction(compiled, res, days: float):
+    """The fraction of the wort's fermentable sugar consumed, hour by hour (D-273).
+
+    Same fixed-grid discipline as :func:`_daily_ppm`, and for the same reason: BDF places its
+    steps adaptively, so reading a fraction off the solver's own output at a named time is a
+    double-digit error on a steep limb [[feedback-read-a-fast-curve-on-a-fixed-grid]].
+
+    This is TOTAL sugar decline, which is very slightly MORE than the fermentative uptake the
+    acid producer is paid on: the carbon routed into the acid, fusel and ester pools leaves
+    ``S`` without passing through ``fermentative_uptake_rates``. It is worth ~2 points at the
+    peak, and ``test_the_model_puts_all_three_acids_on_its_own_fermentation_curve`` is what
+    pins that gap rather than leaving it assumed.
+    """
+    grid = np.linspace(0.0, days * 24.0, int(days * 24) + 1)
+    sugar = np.asarray(res.y, dtype=float)[compiled.schema.slice("S"), :]
+    total = np.vstack([np.interp(grid, res.t, row) for row in sugar]).sum(axis=0)
+    initial = float(total[0])
+    return (initial - total) / initial
+
+
+def _hourly_ppm(res, slot: str, days: float):
+    """One slot's course [mg/L] on the same fixed hourly grid as :func:`_fermented_fraction`."""
+    grid = np.linspace(0.0, days * 24.0, int(days * 24) + 1)
+    return np.interp(grid, res.t, np.asarray(res.series(slot), dtype=float)) * 1000.0
+
+
+def _measured_lag_points(day: int) -> dict[str, float]:
+    """Points of its day-0 -> day-7 rise by which each acid TRAILS Tyrell's own flux (D-273).
+
+    Both halves are the source's: :data:`TYRELL_ACID_COURSE_PPM` and
+    :data:`TYRELL_FLUX_FRACTION` come from the same four ferments of the same wort. So this
+    number contains no model quantity at all, which is the whole point of it — it is what
+    D-215 §3 could not see, because that comparison put a measured acid course against a
+    MODELLED flux and read the difference as a property of the acid.
+    """
+    return {
+        slot: 100.0 * TYRELL_FLUX_FRACTION[day]
+        - 100.0 * (course[day] - course[0]) / (course[7] - course[0])
+        for slot, course in TYRELL_ACID_COURSE_PPM.items()
+    }
+
+
+def test_the_model_puts_all_three_acids_on_its_own_fermentation_curve():
+    """THE PREMISE every frame argument in this file rests on (D-273) — and it must hold today.
+
+    ``organic_acid_rates`` is ``Y_<acid> · Σ r_i``, so the run integral is ``Y · ΔS`` and each
+    acid's progress *is* the fermentation's progress, re-scaled. Two consequences are asserted
+    here rather than assumed, because every claim D-273 makes about frames depends on them:
+
+    * the three acids are the SAME curve up to a constant — which is why D-215 §3's modelled
+      column read one number (20.5 %) for all three, and why a per-acid *modelled* shape is not
+      a thing this engine can currently produce;
+    * that curve sits on the model's own fermented fraction to within ~2 points.
+
+    The residual is small, one-signed and worth naming: the acid always trails the sugar
+    slightly, because carbon routed into the acid, fusel and ester pools leaves ``S`` without
+    passing through ``fermentative_uptake_rates``. It peaks at day 2 (-2.09 points) and closes
+    to zero at day 7 by construction. **A future Process that gave these acids a shape of their
+    own would break this test, and should** — it is the pin that says the model has no
+    per-acid timing today, not a claim that it never should.
+    """
+    days = 7.0
+    compiled, res = _run(dict(TYRELL_SCENARIO), days=days)
+    ferm = _fermented_fraction(compiled, res, days)
+    got = {slot: _daily_ppm(res, slot) for slot in TYRELL_ACID_COURSE_PPM}
+
+    fractions = {
+        slot: {
+            day: 100.0 * (course[day] - course[0]) / (course[7] - course[0]) for day in range(1, 8)
+        }
+        for slot, course in got.items()
+    }
+    reference = fractions["lactic"]
+    for slot, course in fractions.items():
+        for day, value in course.items():
+            assert value == pytest.approx(reference[day], abs=1e-6), (
+                f"{slot} day {day} is {value:.4f} % of its rise against lactic's "
+                f"{reference[day]:.4f} % — the three produced acids no longer share one shape, "
+                "so the single modelled column D-215 §3 read is no longer a single number"
+            )
+
+    for day in range(1, 8):
+        flux_pct = 100.0 * float(ferm[day * 24]) / float(ferm[7 * 24])
+        assert reference[day] == pytest.approx(flux_pct, abs=2.5), (
+            f"day {day}: the acids have done {reference[day]:.2f} % of their rise against "
+            f"{flux_pct:.2f} % of the wort fermented (both normalised on day 7). The producer "
+            "is flux-linked, so these must track; a gap beyond the ~2-point carbon-draw "
+            "residual means something else is writing these slots"
+        )
+
+
+def test_tyrells_own_frame_puts_all_three_acids_behind_his_sugar():
+    """THE D-273 HEADLINE, and it contains no model quantity — correcting D-215 §3.
+
+    Tyrell published the acid courses (Figs 9/10/14) and the extract course (Fig. 4) for the
+    SAME four ferments of the SAME wort. Scoring one against the other asks a question the
+    model cannot influence: *in reality, does a produced acid keep pace with the sugar?*
+
+    It does not. All three trail, at both days scored, in one direction, and in a stable order
+    (points of each acid's day-0 -> day-7 rise still owed at that moment):
+
+    ======  ==========  ========  ========  ========
+    day     flux done   succinic    lactic     malic
+    ======  ==========  ========  ========  ========
+    2           59.4 %     +13.5     +44.8     +63.5
+    5          100.3 %     +11.1     +21.9     +38.4
+    ======  ==========  ========  ========  ========
+
+    **Day 1 is deliberately not scored.** Malic's whole rise is 24.25 ppm at a ±2 ppm read
+    tolerance, so its day-1 lag of +24.3 is barely three read errors, and succinic's -3.9 there
+    is inside its own. The finding rests on days 2 and 5, where every lag clears its acid's own
+    read floor several times over.
+
+    **This is the corroboration D-183 already put in the repo, seen from the other side.**
+    Acetic was found to run AHEAD of the flux (86 % of its rise inside the first 15 % of it) and
+    was given a growth-linked producer of its own. These three run BEHIND it. Flux-linkage is
+    not merely mistimed for one acid — it is the wrong shape for the whole set, in both
+    directions, and that is a statement about the sources rather than about this engine.
+    """
+    for day in (2, 5):
+        lag = _measured_lag_points(day)
+        for slot, points in lag.items():
+            course = TYRELL_ACID_COURSE_PPM[slot]
+            floor = 100.0 * TYRELL_ACID_COURSE_READ_TOL / (course[7] - course[0])
+            assert points > floor, (
+                f"day {day}: {slot} trails Tyrell's own flux by {points:+.1f} points of its "
+                f"rise, which does not clear its ±2 ppm read floor of {floor:.1f} points. The "
+                "single-direction finding does not survive this acid"
+            )
+        assert lag["succinic"] < lag["lactic"] < lag["malic"], (
+            f"day {day}: the lag order is not succinic < lactic < malic but "
+            + ", ".join(f"{k}={v:+.1f}" for k, v in sorted(lag.items(), key=lambda kv: kv[1]))
+        )
+
+
+def test_the_models_speed_deficit_lies_inside_the_span_of_the_measured_lags():
+    """WHY the calendar comparison changes sign across the three acids (D-273).
+
+    This is the load-bearing half of the correction, and it is a measurement rather than
+    arithmetic. On the calendar, each acid's residual is *its real lag minus the model's own
+    flux deficit*. Had the deficit been larger than every lag, all three would read early; had
+    it been smaller than every lag, all three would read late. It is neither: it lands INSIDE
+    the span, so the same one defect turns succinic's residual negative and leaves malic's
+    positive. That is the whole of D-215 §3's "OPPOSITE signs".
+
+    Asserting inclusion is what makes the explanation falsifiable. If beer's speed ever moves
+    far enough to leave the span — in either direction — the sign pattern this file has been
+    reading stops being explained, and this test goes red to say so. It is therefore NOT a
+    restatement of the lag test above: that one reads only the source, this one reads the model.
+
+    The deficit is not a target. Closing it was measured and refused at D-216, and the rate that
+    closes it was rejected at D-223 for losing both of beer's speed anchors.
+    """
+    days = 7.0
+    compiled, res = _run(dict(TYRELL_SCENARIO), days=days)
+    ferm = _fermented_fraction(compiled, res, days)
+    for day in (2, 5):
+        lag = _measured_lag_points(day)
+        deficit = 100.0 * TYRELL_FLUX_FRACTION[day] - 100.0 * float(ferm[day * 24])
+        low, high = min(lag.values()), max(lag.values())
+        assert low < deficit < high, (
+            f"day {day}: the model's flux deficit is {deficit:+.1f} points and the measured "
+            f"lags span [{low:+.1f}, {high:+.1f}]. It no longer lands inside them, so the "
+            "opposing per-acid signs on the calendar are no longer explained by one defect "
+            "crossing three different lags (D-273)"
+        )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "D-273: production is proportional to the fermentative flux, so once the wort is out "
+        "the model can place at most the residual sugar's worth of acid - 0.99 % of the rise "
+        "against Tyrell's measured 21.6 % for lactic. Not a speed error: a shape the law "
+        "cannot express at any speed"
+    ),
+)
+def test_the_acids_keep_rising_after_the_wort_is_fermented_out():
+    """A shape the shipped law cannot express AT ANY SPEED (D-273) — so it is not D-215 §4.
+
+    Tyrell's extract panel reads 1.003 at day 5: the wort is fermented out. His acids are not.
+    Lactic goes on from 104.0 to 119.5 ppm, **21.6 % of its whole rise arriving after there is
+    any sugar left to pay for it**. ``organic_acid_rates`` returns ``[]`` the moment the flux
+    stops, so the model owes exactly the residual sugar — 0.99 % of the rise past 99 %
+    attenuation, and identical across the three because they are one curve.
+
+    **Scored on the model's OWN attenuation clock, never the calendar.** That is what separates
+    this from the parked speed defect (D-215 §4 / D-216 / D-223): the model may take as long as
+    it likes to ferment the wort out, and this test does not care. The question is only what it
+    does afterwards, and the answer is structural — nothing.
+
+    **Lactic carries the claim, and the other two only corroborate it.** Which day counts as
+    "fermented out" is a figure read, and the three acids are not equally robust to it:
+
+    ========  ============  ============
+    acid      after day 5   after day 4
+    ========  ============  ============
+    lactic         21.6 %        22.6 %
+    malic          38.1 %        16.5 %
+    succinic       10.8 %         4.3 %
+    ========  ============  ============
+
+    Malic's share more than halves and succinic's falls by a factor of 2.5, because both dip at
+    day 5 by more than the ±2 ppm read tolerance. **Only lactic's number survives either
+    choice**, so only lactic is asserted, and the 38.1 % must not be quoted as the size of this
+    effect [[feedback-a-summary-statistic-is-not-the-curve]].
+
+    Turning this green needs a source that is not paid per gram of sugar. The corpus names one
+    candidate and it arrives spoiled: ``Y_lactic_sugar_beer``'s own note already says *"one
+    dataset cannot separate a late excretion from an autolytic release"*, and D-215 §1 found
+    autolysis reported with OPPOSITE signs by two of the five beer texts, on a weeks-scale
+    against this 7-day window. **This test states the gap; it does not license a mechanism.**
+    """
+    days = 12.0
+    compiled, res = _run(dict(TYRELL_SCENARIO), days=days)
+    ferm = _fermented_fraction(compiled, res, days)
+    assert float(ferm[-1]) >= 0.99, (
+        f"the run never attenuates ({100 * float(ferm[-1]):.1f} % in {days:.0f} days), so there "
+        "is no post-attenuation window to score and this test would be measuring nothing"
+    )
+    attenuated = int(np.argmax(ferm >= 0.99))
+
+    course = TYRELL_ACID_COURSE_PPM["lactic"]
+    measured = (course[7] - course[5]) / (course[7] - course[0])
+    series = _hourly_ppm(res, "lactic", days)
+    model = float(series[-1] - series[attenuated]) / float(series[-1] - series[0])
+    assert model >= measured, (
+        f"lactic gains {model:.2%} of its rise after the model's own wort is 99 % fermented "
+        f"out (hour {attenuated}, day {attenuated / 24:.2f}), against Tyrell's measured "
+        f"{measured:.2%} after his day 5. The producer is Y·flux and returns [] at dryness, so "
+        "what it can place there is the leftover sugar and nothing else — a source not paid "
+        "per gram of sugar is what this asks for (D-273)"
+    )
 
 
 def test_the_acid_courses_are_anchored_to_numbers_recorded_before_them():
