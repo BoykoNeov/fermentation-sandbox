@@ -1,6 +1,6 @@
 ---
 name: beer-acid-course-timing
-description: "D-215 - the corpus holds no missing beer acidifier; the three flux-linked acid timing errors OPPOSE and cancel; and the engine ferments Tyrell's wort ~2.8x too slowly, unscored until now"
+description: "D-215 + D-273 - the corpus holds no missing beer acidifier; the three flux-linked acids all TRAIL the sugar in Tyrell's own frame (the OPPOSING signs were the calendar frame, corrected at D-273) and go on rising after the wort is out; and the engine ferments Tyrell's wort ~3x too slowly"
 metadata: 
   node_type: memory
   type: project
@@ -35,13 +35,22 @@ it from this file.**
   a late excretion from an autolytic release."* **If ever built, BOTH halves ship together** — the
   acid release AND the amino-acid release that pushes pH the other way ([[feedback-gate-both-halves-of-a-pair]]).
 
-**THE THREE `Y·ΔS` ACID TIMING ERRORS OPPOSE AND NEARLY CANCEL. Never "fix the shape" with one knob.**
-- Fraction of each acid's day-0→day-7 rise done **by day 2**: **succinic 45.9 % measured vs 20.5 %
-  modelled (LATE by 25 pts)**, **malic −4.1 % vs 20.5 % (EARLY by 25 pts)**, lactic 14.6 % vs 20.5 %
-  (early by 6). All three share one rate law so the modelled fraction is **identical by
-  construction**. Forcing all three onto measured nets **−0.0083 pH** at day 1 because malic
-  (+0.0182) and succinic (−0.0205) annihilate. **There is no single correction that helps all
-  three**; one that made them agree would be fitting a compromise, not a mechanism.
+**THE THREE `Y·ΔS` ACIDS ALL TRAIL THE SUGAR — ONE DIRECTION, NOT OPPOSING SIGNS (D-273 corrects D-215 §3). Still never "fix the shape" with one knob.**
+- **D-215 §3's per-acid SIGNS were the FRAME, not the acids.** It scored measured acid against
+  MODELLED acid, and that column carries this engine's own **parked** ~3× day-2 speed deficit. In
+  Tyrell's OWN frame — his acids against his own extract curve, both already on disk — **all three
+  TRAIL**: **+13.5 / +44.8 / +63.5** points of their rise at day 2 (succinic / lactic / malic) and
+  **+11.1 / +21.9 / +38.4** at day 5. The deficit (**+40.7** pts) lands **INSIDE** that span, which
+  is the whole of the sign flip. **Never read a per-acid SIGN off model-minus-source here**;
+  **succinic is the SMALLEST defendant, NOT a control.** The refusal stands on a new reason: the
+  lags span ~5×, so one shape still needs three fitted magnitudes. (The old block's
+  **−0.0083 pH** substitution result is unaffected — it forced measured courses in directly.)
+- **NEW at D-273, frame-free, and the 7th xfail: the acids keep rising after the wort is OUT.**
+  Tyrell's extract reads 1.003 at day 5 and lactic still gains **21.6 %** of its rise; `Y·flux`
+  returns `[]` at dryness so the model can place **0.989 %**. Scored on the model's OWN attenuation
+  clock, so **no speed fix reaches it — a SOURCE is missing, not a rate.** Only lactic is asserted:
+  malic's share **halves** (38.1 → 16.5 %) on the other endpoint read, succinic's falls 2.5×.
+  D-183's acetic runs **AHEAD** of the flux, so flux-linkage is wrong for the whole set both ways.
 - **Malic is NOT non-monotone at the four-strain mean** — I claimed that and it was over-read. The
   mean dips 2.25/1.0/1.25 ppm against a **±2 ppm read tolerance**; only strain 15 falls clearly, and
   it is the strain recorded as producing essentially none. **No malic sink is warranted.** (Beer has
@@ -50,9 +59,11 @@ it from this file.**
   **0.0316 pH at day 1 / 0.0266 at day 7** against a day-7 headroom of **0.0082** — the noise floor
   is **3.2×** the headroom and **3.8×** the effect. Reported inconclusive by pre-registered rule.
 
-**THE ENGINE FERMENTS TYRELL'S WORT ~2.8× TOO SLOWLY, AND IT IS NOT THE DAY-1 pH CAUSE.**
-- Fraction of fermentable consumed — model **8.6 / 21.2 / 37.5 / 56.0 / 72.8 / 93.1 %** on days
-  1/2/3/4/5/7 against Tyrell's **15.0 / 59.4 / 80 / 90 / 100.3 / 99.7 %**. **Nothing had ever scored
+**THE ENGINE FERMENTS TYRELL'S WORT ~3.2× TOO SLOWLY AT DAY 2, AND IT IS NOT THE DAY-1 pH CAUSE.**
+- Fraction of fermentable consumed — model **6.2 / 18.7 / 36.7 / 57.6 / 75.8 / 95.8 %** on days
+  1/2/3/4/5/7 against Tyrell's **15.0 / 59.4 / 80 / 90 / 100.3 / 99.7 %**. (**Re-measured at D-273**;
+  D-215's 8.6 / 21.2 / … / 93.1 predate D-222's counted pitch and D-223's re-anchored uptake rate,
+  and the day-2 deficit is now **+40.7 points**, which is the number D-273 §3 rests on.) **Nothing had ever scored
   it**: Fig. 4's three panels were each read by a different beat (D-180 extract *endpoints*, D-207
   pH, D-211 cell counts) and no test asked whether the engine ferments on the source's schedule.
   **Total attenuation is INSIDE §2.2's 5-7 d window (6.08 d, D-211), so the endpoint check passed
@@ -67,7 +78,8 @@ it from this file.**
 
 **What shipped: tests only, no `src/` or parameter change.** `TYRELL_ACID_COURSE_PPM` (Figs 9/10/14
 interiors, four-strain means, ±2 ppm, anchored at both ends to numbers recorded beats earlier),
-`TYRELL_FLUX_FRACTION` (Fig. 4's extract panel), two **strict xfails** in D-208's idiom (state what
+`TYRELL_FLUX_FRACTION` (Fig. 4's extract panel), two **strict xfails** (a third, plus three
+passing guards and a mutation arm, arrive at **D-273**) in D-208's idiom (state what
 is true of the source and false of the model, so a fix turns them GREEN — never pin the current
 wrong value, which is what D-207 refused), and one anchoring test that passes today and must.
 **Both xfails were re-verified under `--runxfail`** and that caught one failing on an
