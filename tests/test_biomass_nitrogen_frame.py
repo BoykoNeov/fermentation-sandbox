@@ -1,4 +1,4 @@
-"""What ``biomass_N_fraction`` actually is in each medium, and what it is not (decision D-270).
+"""What ``biomass_N_fraction`` actually is in each medium, and what it is not (D-270, D-272).
 
 D-267 §6 recorded a mismatch: *"the engine ships ``biomass_N_fraction`` = 0.114 … 1.6-1.8x the
 nitrogen those two wine-yeast statements imply"*. The comparison was made against the YAML
@@ -26,7 +26,17 @@ and a printed 4-5x. Refused, flagged, not built.
 The sourcing **strengthens** D-230's arithmetic refusal of the nitrogen-partition candidate
 rather than weakening it, and that is asserted here so a reader cannot take it the other way.
 
-Receipts: ``M:\\claud_projects\\temp\\ferment\\d270-nitrogen-frame\\``.
+**D-272 ADJUDICATED the trade D-270 handed to the owner: the sourced composition is DECLINED and
+beer keeps 0.114.** It is decided, not pending -- do not re-propose the move as approved-and-
+unbuilt. The composition error is unscored (no output reports ``biomass_N_fraction``), while the
+extent error it would buy is scored against two independent sources and the shipped value is
+already over both. D-270's flag on D-14 is deliberately left OPEN because the code still carries
+the defect; it closes only if beer's extent residue resolves, a brewing-strain composition turns
+up, or something other than nitrogen comes to limit beer's growth (D-272 §4). The two guards
+below that read the value off ``beer_generic.yaml`` are what stops the decision being quietly
+reversed, which is why D-272 adds no test of its own.
+
+Receipts: ``docs/receipts/d270-biomass-nitrogen-frame/``.
 """
 
 from __future__ import annotations
