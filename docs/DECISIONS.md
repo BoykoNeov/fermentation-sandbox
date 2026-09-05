@@ -38400,6 +38400,15 @@ that pins the mismatch sees it is decided rather than pending; its stale receipt
 temp path that no longer exists) is repaired to the in-repo `docs/receipts/d270-biomass-nitrogen-frame/` that the record
 actually shipped.
 
+One more surface, and it is the one that matters most: `docs/OPEN.md` renders a flag's clause
+**verbatim**, so D-270's row still ends "choosing between a sourced composition and a sourced
+extent is the owner's" — which now reads as pending on the very path a reader takes to ask what
+is open. The archive is append-only and that clause cannot be edited, so the repair is one
+sentence in `tools/gen_open_ledger.py`'s section-2 preamble, where it covers **every** row and
+not just this one: a clause is as-written, a later record may have adjudicated it, an open row
+means the code still carries the defect and **not** that the repair is approved and unbuilt, and
+a refusal retires no flag. Generated file, generator-side change, `--check` still green.
+
 ### 7. What stays open
 
 * **The flag itself**, deliberately — see §3. It closes by one of §4's three routes, not by this

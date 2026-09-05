@@ -29,7 +29,7 @@ Benchmarks first, then the rest; file order, then line. `strict xfail` means a f
 
 ## 2. Declared reversals not yet in the code
 
-One row per open (flagging record, target) pair, by target then flagger. The clause is verbatim from the flagging record.
+One row per open (flagging record, target) pair, by target then flagger. The clause is verbatim from the flagging record **as it was written**, and the archive is append-only, so a clause saying a repair is agreed, pending or *the owner's call* may since have been adjudicated by a later record. An open row means the code still carries the defect -- it does **not** mean the repair is approved and merely unbuilt. A refusal ships no fix, so it retires no flag (D-272 §3): before acting on a row, read the flagging record and follow it forward.
 
 | target record | flagged by | clause |
 |---|---|---|
