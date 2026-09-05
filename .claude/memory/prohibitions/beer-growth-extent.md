@@ -165,3 +165,40 @@ The owner authorised **measuring which branch the evidence favours**, explicitly
    sourcing — all where D-227/D-228 left them. **"Wine's nitrogen budget was never audited this
    way" is STALE too**: D-246→D-253 audited it and closed it — see
    `prohibitions/wine-nitrogen-budget.md`, not this line.
+
+# D-271 — THE COUNT+WEIGHT PAIRING DOES NOT EXIST AS PUBLISHED. Do not re-run this search, and do not price branch 1 by cell size.
+
+D-219's open item (a cell COUNT paired with a gravimetric DRY WEIGHT, one ferment, one
+timepoint) was hunted on the owner's call and came back EMPTY. The emptiness has a mechanism,
+which is what makes it durable:
+
+* **Four sources, four misses, one reason** — each reports the ONE currency its own endpoint
+  needs. Crepin 2017 S1 (in-repo since D-246) weighs gravimetrically and counts NOTHING;
+  Varela 2004 counts only the 1e6 cells/mL INOCULUM and weighs only the crop (two timepoints);
+  Foster 2022 counts, and weighs only to normalise trehalose; Tyrell 2013 counts and pitches by
+  count. **Two of the four (Foster, Tyrell) were ALREADY at D-219 §4** and were re-derived —
+  read the archive before hunting. The table is machine-readable in
+  `tests/test_cell_mass_literature.py`; a row with both flags true turns it RED.
+* **The chemostat ring was checked** because cells-per-gram is routine there. It is not: the
+  Delft school works in C-mol and g DW and **does not count cells**. Neither van Gulik & Heijnen
+  1995 nor Lange & Heijnen 2001 (already read at D-267) carries the conversion.
+* **EVERY per-cell mass in reach lands BELOW branch 1's 70.9-91.9 pg** — Klis 16.5/31.2, the
+  60 pg rule of thumb, D-219's settled 40 and band-high 50, D-270 §7's re-priced 47.71-62.12,
+  the sourced cross-check's 56.61. Eight figures. **A DIRECTION, NOT A SETTLEMENT**: none is a
+  pairing, none is an ale cell in wort. Never quote it as "branch 1 is refuted".
+* **THE SIZE ROUTE IS FRAME-BROKEN — do not use it.** Microscopy volume vs flow-cytometry
+  apparent diameter disagree **4.63x/5.24x in volume on the same lab strains**, so branch 1's
+  demanded 188-244 fL cell is 2.26-2.93x a diploid in one frame and ~one haploid in the other.
+  Okada's brewing strain (K7A) is NOT an escape — it lives in the frame that inflates everything.
+  Two guards pin this. [[feedback-two-instruments-two-sizes-one-strain]]
+* **D-219's geometric cross-check is CORRECTED, not moved**: its "~30 % dry matter" was
+  unsourced and its own printed 30-57 pg edges imply 0.270-0.342. Klis sources 1.11 and 0.34;
+  at 0.34 the check is **37.7-56.6 pg**, the value the upper edge already used. **The settled
+  28-50 pg band is UNTOUCHED** — that comes from the elemental route, not this check.
+* **47.71-62.12 pg is the ENGINE-SIDE estimate, never branch 1's demand.** D-270 §7 re-priced
+  the elemental estimate and narrowed the GAP to 1.14-1.93x; D-230's demand stayed at 70.9-91.9.
+  D-271's own first draft conflated them and a guard now separates them.
+* **Nothing here moves the engine's 4e-11 g** — D-219's DEFINITION of the unit Coleman's fit is
+  counted in. **D-270's flag on D-14 is UNTOUCHED**: the hunt was taken partly because settling
+  the extent residue would dissolve beer's cell-nitrogen trade, and it did not settle it.
+  [[feedback-ask-why-the-field-would-publish-it]]

@@ -251,6 +251,10 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"\badh\b",
             r"rate[ -]modifier",
             r"senescence",
+            # A per-cell quantity is a biomass quantity whatever else the title is about.
+            # Matches 3 titles (D-61, D-218, D-271), all of them genuinely this bucket;
+            # D-271's carries none of the other words above and filed nowhere near here.
+            r"per-cell",
         ),
     ),
     (
@@ -274,6 +278,10 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"corroborat",
             r"blocker",
             r"unsourced",
+            # D-271's subject is whether a MEASUREMENT PAIRING exists in the literature at
+            # all -- a provenance question, though its title carries none of the words above
+            # ("sourcing" does not match "sources"). Narrow on purpose: 1 title.
+            r"\bpairing\b",
             # A record whose subject is the TEST rather than the chemistry: a guard, or a
             # mutation matrix run to decide whether one is owed (D-155). Both are narrow --
             # 3 and 2 titles respectively -- so they file the methodology records here

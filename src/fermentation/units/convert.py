@@ -242,7 +242,18 @@ def abv_from_ethanol(ethanol_gpl: float) -> float:
 # (tests/test_biomass_nitrogen_frame.py). The engine's biomass_C_fraction / biomass_N_fraction are
 # declared on dry cell weight in both medium files, so this is the frame they need.
 # A geometric cross-check agrees on magnitude: a 100-150 fL wine/ale cell at
-# rho ~ 1.11 g/mL and ~30 % dry matter is 30-57 pg.
+# rho ~ 1.11 g/mL and 34 % dry matter is 38-57 pg. BOTH constants are sourced at
+# D-271 -- Klis, de Koster & Brul 2014 (Eukaryot. Cell 13(1):2-9) states the route
+# and both values; this line previously carried the dry fraction as an unsourced
+# "~30 %", which its own printed 30-57 pg edges show was doing duty as a 27-34 %
+# range. The sourced 0.34 is the value the UPPER edge was already computed at, so
+# the repair removes a spread rather than moving the check. It is still only a
+# cross-check: the shipped band below comes from the elemental route.
+# D-271 also hunted the one thing that would settle this properly -- a source
+# pairing a cell COUNT with a gravimetric dry WEIGHT in one ferment at one
+# timepoint, D-219's own open item -- and it does not exist as published. Four
+# candidates, each reporting one currency and never both, are in
+# tests/test_cell_mass_literature.py. Do not re-run that search casually.
 #
 # THE TWO READINGS THIS SUPERSEDES, and why each was what it was:
 #   * 18 pg -- asserted, unsourced, in test_validation_varela2004.py and

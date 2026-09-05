@@ -585,7 +585,7 @@ Two disciplines, both as code:
 
 ## Testing & quality gates
 
-`uv run pytest -n auto` (95 test files; unit, integration, conservation, provenance,
+`uv run pytest -n auto` (96 test files; unit, integration, conservation, provenance,
 sampling-surface and doc-consistency checks), `uv run ruff check .`,
 `uv run ruff format --check .`, `uv run mypy`
 (strict on `src`). CI runs all **four** on Python 3.13 and 3.14 — the format check is a separate

@@ -1,0 +1,68 @@
+{
+  "size_route_is_frame_broken": {
+    "klis_haploid_volume_fl": 44.0,
+    "klis_haploid_equivalent_diameter_um": 4.380106645730805,
+    "okada_haploid_apparent_diameter_um": 7.3,
+    "okada_haploid_implied_volume_fl": 203.6888248869234,
+    "haploid_volume_ratio_okada_over_klis": 4.629291474702804,
+    "klis_diploid_volume_fl": 83.0,
+    "okada_diploid_implied_volume_fl": 434.89276543153744,
+    "diploid_volume_ratio_okada_over_klis": 5.239671872669126,
+    "branch1_demand_vs_okada_haploid_volume": [
+      0.9223104656205374,
+      1.1954912805434044
+    ]
+  },
+  "klis_route_reproduces_its_own_printed_values": {
+    "haploid_pg": 16.605600000000003,
+    "diploid_pg": 31.3242,
+    "printed_haploid_pg": 16.5,
+    "printed_diploid_pg": 31.2
+  },
+  "d219_crosscheck_at_sourced_0_34_pg": [
+    37.74000000000001,
+    56.610000000000014
+  ],
+  "d219_crosscheck_at_0_30_pg": [
+    33.300000000000004,
+    49.95
+  ],
+  "d219_printed_crosscheck_pg": [
+    30.0,
+    57.0
+  ],
+  "dry_fraction_d219_printed_edges_imply": [
+    0.27027027027027023,
+    0.3423423423423423
+  ],
+  "branch1_demand_pg": [
+    70.9,
+    91.9
+  ],
+  "branch1_demanded_volume_fl": [
+    187.86433492315845,
+    243.50821409644934
+  ],
+  "branch1_demanded_sphere_diameter_um": [
+    7.105836966941338,
+    7.747679813165103
+  ],
+  "branch1_demand_over_klis_diploid_volume": [
+    2.2634257219657643,
+    2.933833904776498
+  ],
+  "branch1_demand_over_d219_assumed_volume": [
+    1.252428899487723,
+    2.4350821409644934
+  ],
+  "where_each_non_pairing_figure_lands_vs_branch1": {
+    "klis_haploid": "below",
+    "klis_diploid": "below",
+    "rule_of_thumb_60pg": "below",
+    "d219_settled_40pg": "below",
+    "d270_elemental_low": "below",
+    "d270_elemental_high": "below",
+    "sourced_crosscheck_low": "below",
+    "sourced_crosscheck_high": "below"
+  }
+}
