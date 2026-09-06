@@ -38655,6 +38655,12 @@ walking any. `docs/OPEN.md` regenerated. `tests/test_open_ledger.py`, three test
 * **A reason built at runtime still resolves to nothing.** An f-string is unparsed into the
   cell, and a name assigned inside a function or a class body is not seen. Both now *count*
   rather than pass silently, which is the whole of what this record claims about them.
+* **Two full-suite runs landed in this session's task folder and only one was ours** — the
+  other belonged to a concurrent session on the same box, and the two disagreed on the PASS
+  COUNT (2184 vs 2188), not merely on duration, because both overlapped live edits to this
+  archive and its generated index. Neither is quotable. The count in the memory status is off
+  a settled tree, and its +8 over D-273's 2181 is five tests from D-274 (a beat that recorded
+  no count) plus this record's three. → `lessons/measurement.md`'s competitor row.
 * **Nothing here touches what is open scientifically.** The de-novo cap's instrument leg
   stays a strict xfail on the terms D-245 set and D-248 narrowed; the count of open items is
   unchanged at seven.
