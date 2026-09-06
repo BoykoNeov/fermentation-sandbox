@@ -25,9 +25,8 @@ Coarse first cut for *where did we decide X*. A record appears under **every** b
 - **pH, acids & speciation** (35) — D-18, D-22, D-28, D-46, D-65, D-81, D-82, D-124, D-125, D-150, D-151, D-161, D-176, D-178, D-179, D-180, D-181, D-182, D-183, D-186, D-205, D-207, D-208, D-209, D-210, D-211, D-212, D-214, D-215, D-216, D-232, D-233, D-234, D-235, D-250
 - **Core kinetics, yeast & ethanol** (81) — D-4, D-9, D-10, D-11, D-13, D-14, D-15, D-16, D-19, D-27, D-30, D-32, D-35, D-38, D-39, D-41, D-43, D-47, D-48, D-52, D-53, D-54, D-57, D-58, D-61, D-63, D-65, D-71, D-73, D-80, D-85, D-88, D-92, D-117, D-128, D-129, D-132, D-137, D-141, D-145, D-166, D-176, D-183, D-185, D-189, D-190, D-192, D-197, D-198, D-205, D-207, D-211, D-216, D-217, D-218, D-219, D-220, D-221, D-222, D-223, D-226, D-228, D-230, D-232, D-243, D-244, D-245, D-248, D-250, D-252, D-253, D-258, D-259, D-260, D-266, D-267, D-268, D-270, D-271, D-272, D-273
 - **Validation, benchmarks & provenance** (77) — D-1, D-2, D-8, D-12, D-14, D-15, D-17, D-18, D-20, D-24, D-25, D-33, D-37, D-56, D-59, D-60, D-63, D-65, D-66, D-67, D-101, D-105, D-108, D-117, D-118, D-119, D-123, D-128, D-137, D-140, D-142, D-144, D-155, D-156, D-157, D-158, D-159, D-160, D-161, D-162, D-163, D-167, D-168, D-169, D-170, D-171, D-172, D-174, D-193, D-194, D-196, D-200, D-204, D-206, D-208, D-216, D-218, D-219, D-225, D-233, D-235, D-236, D-237, D-238, D-240, D-241, D-242, D-243, D-244, D-246, D-252, D-254, D-258, D-259, D-265, D-266, D-271
-- **Scenario, events, units & tooling** (56) — D-2, D-3, D-5, D-6, D-7, D-18, D-27, D-35, D-36, D-37, D-55, D-57, D-62, D-64, D-65, D-66, D-70, D-81, D-91, D-96, D-99, D-100, D-101, D-110, D-121, D-122, D-138, D-163, D-164, D-165, D-167, D-169, D-176, D-177, D-178, D-179, D-184, D-185, D-186, D-187, D-194, D-197, D-200, D-209, D-216, D-219, D-222, D-229, D-231, D-233, D-234, D-235, D-239, D-250, D-253, D-274
+- **Scenario, events, units & tooling** (57) — D-2, D-3, D-5, D-6, D-7, D-18, D-27, D-35, D-36, D-37, D-55, D-57, D-62, D-64, D-65, D-66, D-70, D-81, D-91, D-96, D-99, D-100, D-101, D-110, D-121, D-122, D-138, D-163, D-164, D-165, D-167, D-169, D-176, D-177, D-178, D-179, D-184, D-185, D-186, D-187, D-194, D-197, D-200, D-209, D-216, D-219, D-222, D-229, D-231, D-233, D-234, D-235, D-239, D-250, D-253, D-274, D-275
 - **Interface, readouts & reporting** (23) — D-22, D-66, D-67, D-82, D-103, D-165, D-167, D-176, D-177, D-199, D-205, D-207, D-211, D-213, D-220, D-234, D-241, D-261, D-262, D-263, D-264, D-265, D-271
-- **Matching no rule (a `TOPIC_RULES` gap — fix the rules, not this line)** (1) — D-275
 
 ### All records, in order
 
@@ -38628,6 +38627,13 @@ backwards flag pointer), because an unreadable reason mis-states one row rather 
 the ledger on a marker that does not exist.
 
 ### 6. What ships
+
+`tools/gen_decisions_toc.py`: three needles in the `Scenario, events, units & tooling` bucket
+for the generated open surface — `open ledger`, `what is open`, `open.md`. This record's own
+title matched no rule and `test_every_record_lands_in_at_least_one_bucket` went red on it, which
+is that test working as written. **Not a bare `ledger`**: six record titles carry "amino-acid
+ledger" / "nitrogen ledger" / "split-ledger" and belong to their own subsystems, so the needle
+names the surface rather than the word.
 
 `tools/gen_open_ledger.py`: `_module_of`, `_import_sources`, `_string_tables`,
 `UNRESOLVED_REASON`, `unresolved_reasons`, and `collect_test_markers` parsing all trees before

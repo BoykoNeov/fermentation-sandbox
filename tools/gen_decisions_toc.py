@@ -326,6 +326,13 @@ TOPIC_RULES: list[tuple[str, tuple[str, ...]]] = [
             r"docstring",
             r"doc-rot",
             r"docs-only",
+            # The OTHER generated navigation surface, sibling to `\bindex\b` above: the open
+            # ledger (D-266) and its machinery (D-275). Not a bare `ledger` -- six record
+            # titles carry "amino-acid ledger" / "nitrogen ledger" / "split-ledger" and belong
+            # to their own subsystems, so the needle names the surface, not the word.
+            r"open ledger",
+            r"what is open",
+            r"open\.md",
             # The structure/plan docs and their maintenance conventions (D-184).
             r"architecture",
             r"structure map",
