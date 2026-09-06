@@ -262,6 +262,58 @@ def _attr_chain(node: ast.expr) -> tuple[str, ...] | None:
     return None
 
 
+def _module_of(rel: str) -> str:
+    """`tests/benchmarks/test_x.py` -> `tests.benchmarks.test_x`, the name an import uses."""
+    stem = rel.removesuffix(".py")
+    return stem.removesuffix("/__init__").replace("/", ".")
+
+
+def _import_sources(tree: ast.Module, module: str) -> dict[str, tuple[str, str]]:
+    """Module-level `from X import NAME [as LOCAL]` -> `LOCAL: (X, NAME)`, absolute and
+    relative alike. Star imports are unresolvable by AST and are skipped."""
+    package = module.rsplit(".", 1)[0] if "." in module else ""
+    sources: dict[str, tuple[str, str]] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        target = node.module or ""
+        if node.level:
+            parts = package.split(".") if package else []
+            parts = parts[: len(parts) - (node.level - 1)] if node.level > 1 else parts
+            target = ".".join([*parts, target]) if target else ".".join(parts)
+        for alias in node.names:
+            if alias.name != "*":
+                sources[alias.asname or alias.name] = (target, alias.name)
+    return sources
+
+
+def _string_tables(trees: dict[str, ast.Module]) -> dict[str, dict[str, str]]:
+    """Per-module `NAME -> text` tables, with imported names followed across test modules.
+
+    `_module_strings` alone only sees the file it is given, so a `reason=` naming a constant
+    that lives in a *sibling* test module resolved to the bare identifier and the ledger
+    printed `_D245_D120_LEGS_GONE_DIRECTION_BACK_AT_D248` with no records linked -- an open
+    row nobody could read. Re-exports mean a name can arrive two hops away, so this iterates
+    to a fixed point rather than resolving once. A locally assigned name shadows an import.
+    """
+    tables = {module: _module_strings(tree) for module, tree in trees.items()}
+    imports = {module: _import_sources(tree, module) for module, tree in trees.items()}
+    for _ in range(len(trees) + 1):
+        changed = False
+        for module, bindings in imports.items():
+            table = tables[module]
+            for local, (source, original) in bindings.items():
+                if local in table:
+                    continue
+                text = tables.get(source, {}).get(original)
+                if text is not None:
+                    table[local] = text
+                    changed = True
+        if not changed:
+            break
+    return tables
+
+
 def _module_strings(tree: ast.Module) -> dict[str, str]:
     """Module-level `NAME = "..."` (or a `+` of literals), for resolving `reason=NAME`."""
     consts: dict[str, str] = {}
@@ -334,6 +386,22 @@ def _records_in(reason: str) -> tuple[str, ...]:
     return tuple(seen)
 
 
+# A reason that survives the AST walk as a bare Python identifier is one the parser could not
+# resolve to any text -- which is what an imported constant did until `_string_tables` followed
+# it. Counted and printed, the way marker-shaped lines the parser cannot read are: a row whose
+# reason is a variable name states nothing, and it should be visible that it states nothing.
+UNRESOLVED_REASON = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def unresolved_reasons(
+    markers: list[TestMarker], body_skips: list[BodySkip]
+) -> list[tuple[str, int, str]]:
+    """`(file, line, reason)` for every marker or body skip whose reason is an identifier."""
+    rows = [(m.file, m.line, m.reason) for m in markers]
+    rows += [(b.file, b.line, b.reason) for b in body_skips]
+    return [row for row in rows if row[2] and UNRESOLVED_REASON.fullmatch(row[2])]
+
+
 def _walk_bodies(node: ast.AST, stack: list[str], out: list[tuple[str, ast.Call, str]]) -> None:
     """Every `pytest.xfail(...)` / `pytest.skip(...)` call, with its innermost enclosing
     function ("<module>" when there is none)."""
@@ -358,11 +426,18 @@ def collect_test_markers(
     markers: list[TestMarker] = []
     body_skips: list[BodySkip] = []
     files = sorted(path for path in tests_root.rglob("*.py") if "__pycache__" not in path.parts)
+    # Every tree first: a `reason=` may name a constant defined in another test module, so
+    # the string tables cannot be built one file at a time.
+    rels = {path: path.relative_to(root).as_posix() for path in files}
+    trees = {
+        rel: ast.parse(path.read_text(encoding="utf-8"), filename=rel) for path, rel in rels.items()
+    }
+    tables = _string_tables({_module_of(rel): tree for rel, tree in trees.items()})
     for path in files:
-        rel = path.relative_to(root).as_posix()
+        rel = rels[path]
         benchmark = rel.startswith("tests/benchmarks/")
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=rel)
-        consts = _module_strings(tree)
+        tree = trees[rel]
+        consts = tables[_module_of(rel)]
 
         decorated = [
             node
@@ -489,7 +564,9 @@ def build_ledger(archive: Archive, markers: list[TestMarker], body_skips: list[B
         f"{benchmarks} in `tests/benchmarks/`). {len(archive.open_flags)} open flags on "
         f"{len(flagged_targets)} records. {len(archive.retired)} retired. "
         f"{len(body_skips)} conditional skips inside test bodies. "
-        f"{len(archive.unparsed)} marker-shaped lines the parser cannot read.",
+        f"{len(archive.unparsed)} marker-shaped lines the parser cannot read. "
+        f"{len(unresolved_reasons(markers, body_skips))} reasons that resolved to a bare "
+        "variable name rather than text.",
         "",
         "Regenerate with `uv run python tools/gen_open_ledger.py` (`--check` in CI).",
         "",

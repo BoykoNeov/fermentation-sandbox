@@ -23,6 +23,7 @@ This file deliberately imports nothing from ``fermentation``.
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import pathlib
 import re
@@ -214,3 +215,79 @@ def test_body_skips_are_listed_not_hidden() -> None:
     assert len(census) == 2
     assert all(b.kind == "skip" and "parameter set" in b.reason for b in census)
     assert not any(m.file == "tests/test_banded_undrawn_census.py" for m in markers)
+
+
+# --------------------------------------------------------- reasons that live in another file
+
+_IMPORTED_REASON = "test_the_de_novo_cap_is_inert_where_the_precursor_exhausts"
+
+
+def test_a_reason_defined_in_another_test_module_resolves() -> None:
+    """An xfail whose `reason=` names a constant imported from a sibling test module.
+
+    ``_D245_D120_LEGS_GONE_DIRECTION_BACK_AT_D248`` is assigned in
+    ``test_fusel_keto_acid_node.py`` and imported by ``test_fusel_catabolic_shape.py``, where
+    the marker sits. The generator used to read module-level assignments in the marked file
+    ONLY, so this row shipped with the bare identifier as its reason and an empty records
+    column -- one of seven rows in the file that answers "what is open", stating nothing.
+    """
+    markers, _ = gen.collect_test_markers()
+    marker = next(m for m in markers if str(m.name) == _IMPORTED_REASON)
+
+    assert marker.file == "tests/test_fusel_catabolic_shape.py"
+    assert marker.kind_label == "strict xfail"
+    assert str(marker.reason).startswith("D-245:")
+    # The records the resolved text names -- none of which were reachable from the identifier.
+    for label in ("D-245", "D-120", "D-206", "D-246", "D-248", "D-254"):
+        assert label in marker.records, f"{label} unlinked: {marker.records}"
+
+
+def test_no_reason_is_left_as_a_bare_variable_name() -> None:
+    """The tripwire, and its reach is measured rather than asserted.
+
+    A reason that survives as an identifier resolved to nothing -- whatever the mechanism
+    (an import shape the AST walk cannot follow, a name built at runtime). The mutation arm
+    below restores the single-file behaviour that caused the D-245 row and confirms this
+    check fires on it: a guard that cannot name a real regression forbids nothing.
+    """
+    markers, body_skips = gen.collect_test_markers()
+    unread = gen.unresolved_reasons(markers, body_skips)
+    assert not unread, f"reasons that state only a variable name: {unread}"
+
+    # Mutation: resolve names against the marked file alone, as the generator once did.
+    path = pathlib.Path(str(gen.TESTS)) / "test_fusel_catabolic_shape.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    local_only = gen._module_strings(tree)
+    marker = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == _IMPORTED_REASON
+    )
+    call = next(d for d in marker.decorator_list if isinstance(d, ast.Call) and gen._mark_kind(d))
+    regressed = str(gen._reason_of(call, local_only, positional=False))
+    assert gen.UNRESOLVED_REASON.fullmatch(regressed), (
+        "the mutation no longer reproduces the single-file failure, so this test is not "
+        f"measuring the thing it claims to catch: {regressed!r}"
+    )
+
+
+def test_imported_reasons_resolve_through_shadowing_and_re_export() -> None:
+    """`_string_tables` on synthetic modules: two hops, and a local name that wins.
+
+    Re-export means a constant can arrive more than one module away, which is why the
+    resolution iterates. A name assigned in the importing module is that module's own and
+    must not be replaced by the import of the same name.
+    """
+    trees = {
+        "pkg.leaf": ast.parse('WHY = "D-1: the leaf text"\n'),
+        "pkg.middle": ast.parse("from pkg.leaf import WHY\n"),
+        "pkg.top": ast.parse("from pkg.middle import WHY\n"),
+        "pkg.own": ast.parse('from pkg.leaf import WHY\n\nWHY = "D-2: mine"\n'),
+        "pkg.rel": ast.parse("from .leaf import WHY as REASON\n"),
+    }
+    tables = gen._string_tables(trees)
+
+    assert tables["pkg.middle"]["WHY"] == "D-1: the leaf text"
+    assert tables["pkg.top"]["WHY"] == "D-1: the leaf text"
+    assert tables["pkg.own"]["WHY"] == "D-2: mine"
+    assert tables["pkg.rel"]["REASON"] == "D-1: the leaf text"
