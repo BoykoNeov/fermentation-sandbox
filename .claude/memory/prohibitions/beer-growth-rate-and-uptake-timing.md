@@ -23,7 +23,7 @@ inverted to 0.659x (model too FAST). Full detail:
 `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by path. Read
 it before proposing anything about beer's growth rate, nitrogen-uptake timing, or the two
 terms D-210 parked. Every bullet is *what it forbids* + the record to read for *why*. **If a
-prohibition looks unconvincing, go read D-211 — do not argue past it from this file.**
+prohibition looks unconvincing, go read its D-record — do not argue past it from this file.**
 
 **The uptake-timing defect is CLOSED and its parameter is CALIBRATED. Do not re-propose it.**
 - **`mu_max` (beer) is 0.034 /h, band 0.031-0.040, MEASURED** against Tyrell 2013 Fig. 4's

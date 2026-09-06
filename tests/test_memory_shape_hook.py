@@ -404,3 +404,86 @@ def test_no_detail_directory_is_silent_rather_than_an_error(
     target = repo.joinpath(*hook.MEMORY_DIR, hook.PROJECT_NAME)
     message = _emit(hook, monkeypatch, target)["systemMessage"]
     assert hook.DETAIL_DIR not in message
+
+
+# ----------------------------------------- the standing "go read" pointer (2026-09-06)
+
+POINTER_SENTENCE = (
+    "Every bullet is *what it forbids* + the record to read for *why*. "
+    "**If a prohibition looks unconvincing, go read {target} \u2014 do not argue past it "
+    "from this file.**"
+)
+
+
+def _header(target: str, wrap_at: int | None = None) -> str:
+    """A prohibitions-file header whose standing pointer names ``target``.
+
+    ``wrap_at`` puts the hard wrap after that many words, because the live files wrap this
+    sentence at ~100 columns and the break lands somewhere different in every one of them.
+    """
+    text = POINTER_SENTENCE.format(target=target)
+    if wrap_at is None:
+        return text
+    words = text.split(" ")
+    return " ".join(words[:wrap_at]) + "\n" + " ".join(words[wrap_at:])
+
+
+def test_a_fixed_record_number_in_the_standing_pointer_fires(hook: ModuleType) -> None:
+    """The slot is boilerplate, so a number in it rots on a schedule.
+
+    D-273 corrected D-215 §3; the beat rewrote ``beer-acid-course-timing.md``'s frontmatter
+    description AND its body block to say so, and left the header telling readers to go read
+    D-215. The file said "corrected" twice and "go argue with the corrected record" once.
+    """
+    (finding,) = hook.pointer_findings("prohibitions/beer.md", _header("D-215"))
+    assert finding.file == "prohibitions/beer.md"
+    assert "D-215" in finding.detail and "its D-record" in finding.detail
+
+
+def test_the_house_idiom_is_clean(hook: ModuleType) -> None:
+    """ "its D-record" cannot go stale: the bullet it defers to carries the live citation.
+
+    Seventeen of the 33 files that carry this sentence already said this; the check exists to
+    stop the other sixteen's form coming back with the next copied header.
+    """
+    assert hook.pointer_findings("prohibitions/beer.md", _header("its D-record")) == []
+    assert hook.pointer_findings("prohibitions/beer.md", _header("the D-record above")) == []
+
+
+def test_the_pointer_check_survives_the_wrap_it_lives_under(hook: ModuleType) -> None:
+    """The arm that measures the check's reach rather than its existence.
+
+    A pattern written with single spaces matches only the files whose wrapping happens to
+    agree with it -- on the first pass over the live tree such a pattern found ten of the
+    sixteen violations and reported the other six as clean. Every wrap point must fire.
+    """
+    words = len(POINTER_SENTENCE.format(target="D-215").split(" "))
+    fired = [i for i in range(1, words) if hook.pointer_findings("p.md", _header("D-215", i))]
+    assert len(fired) == words - 1, (
+        f"the pointer fired at only {len(fired)} of {words - 1} wrap points. A file whose "
+        "header wraps anywhere else is reported CLEAN while carrying the defect"
+    )
+
+
+def test_the_pointer_check_reaches_the_split_out_detail_files(
+    hook: ModuleType, repo: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """That is where the sentence lives -- the project memory carries it once, the 44 files
+    that were carved out of it carry it 33 times between them."""
+    target = _detail(hook, repo, "beer.md", _header("D-215", 12))
+    message = _emit(hook, monkeypatch, target)["systemMessage"]
+    assert f"{hook.DETAIL_DIR}/beer.md" in message
+    assert "pointer names D-215" in message
+
+
+def test_an_always_on_rule_the_index_carries_is_a_boot_row(hook: ModuleType) -> None:
+    """``BOOT_ROWS`` is the mechanism behind a prose rule, so a gap in it accuses the owner.
+
+    ``feedback-run-tests-at-below-normal-priority`` fires on every suite run regardless of
+    task -- exactly like the two rows either side of it -- and the owner had put it in the
+    index. The hook was reporting it as a lesson row that belongs in ``lessons/``. Pinned so a
+    later trim of this list does not silently restore that false finding.
+    """
+    assert "feedback-run-tests-at-below-normal-priority" in hook.BOOT_ROWS
+    row = "- [Run tests](feedback-run-tests-at-below-normal-priority.md) — hook"
+    assert hook.index_findings(f"# Index\n\n{row}\n") == []

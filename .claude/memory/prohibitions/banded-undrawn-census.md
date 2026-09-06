@@ -11,7 +11,7 @@ metadata:
 before proposing anything about "parameters the ensemble cannot draw", a seed's uncertainty being
 missing from a reported band, `burst_antioxidant_initial`, beer's `*_typical_wort` levels, or
 wiring a seed into a Process's `reads`. Every bullet is *what it forbids* + the record to read for
-*why*. **If a prohibition looks unconvincing, go read D-240 — do not argue past it from here.**
+*why*. **If a prohibition looks unconvincing, go read its D-record — do not argue past it from here.**
 
 - **The census is RUN and CLASSIFIED — never re-propose it as unenumerated.** D-237 §6's parked
   item is CLOSED. **32** compile-read names drawn nowhere, **27** banded union-wide / **28**

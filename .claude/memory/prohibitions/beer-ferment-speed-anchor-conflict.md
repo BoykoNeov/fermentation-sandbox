@@ -43,7 +43,7 @@ retired rate; one is wrong and D-223 could not say which.
 split out of `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by
 path. Read it before proposing anything about beer's uptake rate, catabolite repression, the
 §2.2 attenuation benchmark, or the pitch in `TYRELL_SCENARIO`. **If a prohibition looks
-unconvincing, go read D-216 — do not argue past it from this file.**
+unconvincing, go read its D-record — do not argue past it from this file.**
 
 **SUPERSEDED IN PART BY D-222 — read this block first.** Three things below are now FALSE.
 1. **The pitch prohibition is SPENT and the pitch is CORRECTED.** `TYRELL_SCENARIO` now carries

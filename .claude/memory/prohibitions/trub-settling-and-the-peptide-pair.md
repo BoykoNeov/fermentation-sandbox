@@ -10,7 +10,7 @@ metadata:
 `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by path. Read it
 before proposing anything about trub, beer's protein buffer, `peptide_buffer_capacity_beer`, or
 K⁺/H⁺ antiport. Every bullet is *what it forbids* + the record to read for *why*. **If a
-prohibition looks unconvincing, go read D-214 — do not argue past it from this file.**
+prohibition looks unconvincing, go read its D-record — do not argue past it from this file.**
 
 **REFUSED and MEASURED. D-209 §8's two parked terms are now BOTH closed — do not re-propose
 either as unbuilt, and do not re-park them.**

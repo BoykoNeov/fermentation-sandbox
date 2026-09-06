@@ -42,8 +42,10 @@ use. Assert it EXACTLY; an identity has no tolerance.
 - **`TYRELL_SCENARIO` carries 2.51× Tyrell's counted 0.3984 g/L.** Deliberately NOT corrected: the
   price is a `mu_max` refit (fitted at 1.0), day-2 shortfall 2.81× → **6.58×**, N drawn by 24 h
   0.360 → **0.145 (outside** Tyrell's 0.234-0.448), and beer's pH 7/8 → 6/8 days.
-- **2.51× and D-215's "~2.8× too slow" are NOT two routes agreeing.** D-215's was measured at pitch
-  1.0, with the excess already in. They **COMPOUND**: 6.58 ≈ 2.51 × 2.62.
+- **2.51× and D-215's day-2 slowness are NOT two routes agreeing.** D-215's was measured at pitch
+  1.0, with the excess already in. They **COMPOUND**: 6.58 ≈ 2.51 × 2.62. **Its "~2.8×" is now
+  "~3.2×"** — D-273 re-measured the deficit off D-222's counted pitch and D-223's re-anchored rate.
+  The compounding is unaffected: it rests on the 2.62, not on the 2.8.
 
 ## Wine call sites
 Both now convert 10⁶ cells/mL → **0.0400 g/L**. All six Varela pins hold — **but that is about the ASSERTS,

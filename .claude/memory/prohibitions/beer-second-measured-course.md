@@ -43,7 +43,7 @@ retired rate; one is wrong and D-223 could not say which.
 `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by path and
 does **not** index it in `MEMORY.md`. Read it before proposing anything about beer's ferment
 speed, §2.2's attenuation window, Foster 2022, or the model's peak timing. **If a prohibition
-looks unconvincing, go read D-220 — do not argue past it from this file.**
+looks unconvincing, go read its D-record — do not argue past it from this file.**
 
 **MEASURED, three corrections, NOTHING BUILT.** No parameter moved, no knob touched.
 

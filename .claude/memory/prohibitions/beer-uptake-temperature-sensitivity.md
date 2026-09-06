@@ -12,7 +12,7 @@ metadata:
 Detail split out of `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points
 here by path. Read it before proposing anything about `E_a_uptake`, re-sourcing its band, or the
 temperature any Tyrell comparison is scored at. Every bullet is *what it forbids* + the record to
-read for *why*. **If a prohibition looks unconvincing, go read D-217 — do not argue past it from
+read for *why*. **If a prohibition looks unconvincing, go read its D-record — do not argue past it from
 this file.**
 
 **MEASURED NULL and a provenance repair. No `src/` change, no parameter VALUE moved.**

@@ -12,7 +12,7 @@ metadata:
 `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by path. Read it
 before proposing anything about `y0` and the ensemble, `cation_charge`, `initial_ph`,
 `peptide_buffer_capacity_beer`, or "the ensemble should sample X". Every bullet is *what it
-forbids* + the record to read for *why*. **If a prohibition looks unconvincing, go read D-233 —
+forbids* + the record to read for *why*. **If a prohibition looks unconvincing, go read its D-record —
 do not argue past it from this file.**
 
 - **The anchor re-solve is BUILT — never re-propose it as unbuilt or as a known gap.**

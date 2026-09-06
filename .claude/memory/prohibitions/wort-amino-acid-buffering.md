@@ -12,7 +12,7 @@ metadata:
 `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by path. Read it
 before proposing anything about beer's buffering capacity, the peptide lump, D-209 §8's
 "buffer-removal half", or beer's day-7 pH agreement. Every bullet is *what it forbids* + the
-record to read for *why*. **If a prohibition looks unconvincing, go read D-239 — do not argue
+record to read for *why*. **If a prohibition looks unconvincing, go read its D-record — do not argue
 past it from this file.**
 
 **D-209 §8's BUFFER-REMOVAL HALF IS BUILT. Never re-propose it as unbuilt or as a candidate for

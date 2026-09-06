@@ -11,7 +11,7 @@ metadata:
 before proposing anything about wine YAN, `yan_mgl`, `amino_acids_gpl`, `biomass_N_fraction`,
 Coleman's `Y_X/N` regression, the fusel node's de-novo shares, or "the nitrogen budget is wrong".
 Every bullet is *what it forbids* + the record to read for *why*. **If a prohibition looks
-unconvincing, go read D-243/D-244 — do not argue past it from here.** Siblings:
+unconvincing, go read its D-record — do not argue past it from here.** Siblings:
 `seed-reads-repair.md` (D-241), `banded-undrawn-census.md` (D-240).
 
 - **The evaluation point is CLOSED — never re-propose it as open.** D-243 found it and left it on

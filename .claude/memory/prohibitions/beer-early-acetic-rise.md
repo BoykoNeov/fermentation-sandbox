@@ -12,7 +12,7 @@ metadata:
 out of `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by
 path. Read it before proposing anything about beer's acetic timing, beer's wort oxygen, or
 beer's glycerol. Every bullet is *what it forbids* + the record to read for *why*. **If a
-prohibition looks unconvincing, go read D-212 — do not argue past it from this file.**
+prohibition looks unconvincing, go read its D-record — do not argue past it from this file.**
 
 **The beat is a REFUSAL and it was PRE-REGISTERED as 55 % likely to be one. Do not re-propose
 it as unbuilt work.**

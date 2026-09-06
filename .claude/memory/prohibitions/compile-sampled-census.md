@@ -13,7 +13,7 @@ metadata:
 before proposing anything about "parameters that are pinned at compile", `set_ph` under an
 ensemble, `copper_typical`, the `must_aa_fraction_*` split, or a scenario override knob. Every
 bullet is *what it forbids* + the record to read for *why*. **If a prohibition looks
-unconvincing, go read D-234 — do not argue past it from this file.** **Both of D-234's LIVE rows
+unconvincing, go read its D-record — do not argue past it from this file.** **Both of D-234's LIVE rows
 were REPAIRED on 2026-08-26 (D-235 pH, D-236 copper); the census now has NO live row.**
 
 - **The census is RUN and CLASSIFIED — never re-propose it as unenumerated.** D-233 §10's parked

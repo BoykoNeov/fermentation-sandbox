@@ -12,7 +12,7 @@ metadata:
 `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by path. Read
 it before proposing anything about `add_dap`, dosed phosphate, or the nitrogen pool's charge.
 Every bullet is *what it forbids* + the record to read for *why*. **If a prohibition looks
-unconvincing, go read D-210 — do not argue past it from this file.**
+unconvincing, go read its D-record — do not argue past it from this file.**
 
 **`add_dap` doses a SALT and both ions SHIP. Do not re-propose either as unbuilt.**
 - **`phosphate` is a state slot in BOTH registries** — `dap_phosphate_fraction` 0.74206 g

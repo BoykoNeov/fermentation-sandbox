@@ -12,7 +12,7 @@ metadata:
 `.claude/memory/project-fermentation-sandbox.md`; that file's ledger points here by path. Read
 it before proposing anything about beer's dissolved oxygen, wort aeration, or an O₂ coupling in
 either medium. Every bullet is *what it forbids* + the record to read for *why*. **If a
-prohibition looks unconvincing, go read D-213 — do not argue past it from this file.**
+prohibition looks unconvincing, go read its D-record — do not argue past it from this file.**
 
 **BUILT. Do not re-propose beer's dissolved oxygen as missing** — that claim was true for
 ~140 records and is now false.

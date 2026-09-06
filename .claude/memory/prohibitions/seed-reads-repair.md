@@ -13,7 +13,7 @@ metadata:
 before proposing anything about making a compile-time seed drawable, `seed_reads`,
 `y0_for_member`, "the ensemble does not vary the initial conditions", or the two Coleman biomass
 coefficients. Every bullet is *what it forbids* + the record to read for *why*. **If a prohibition
-looks unconvincing, go read D-241 — do not argue past it from here.** Sibling:
+looks unconvincing, go read its D-record — do not argue past it from here.** Sibling:
 `banded-undrawn-census.md` (D-240, the census this repaired six rows of).
 
 - **The repair is BUILT — never re-propose "make the seeds drawable" as open work.**

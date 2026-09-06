@@ -13,7 +13,7 @@ Read before proposing anything about `stored_nitrogen`, `AssimilableNitrogenUpta
 growth's nitrogen Monod, the D-32 swap's refund, `Process.touches_where_present`, mid-run wine pH
 on a dosed must, or "MLF/Brett are starved by yeast uptake". Sibling:
 `wine-nitrogen-budget.md` (D-243→D-248), which this corrects on two counts.
-**If a prohibition looks unconvincing, go read D-250 — do not argue past it from here.**
+**If a prohibition looks unconvincing, go read its D-record — do not argue past it from here.**
 
 - **`stored_nitrogen` is in NO charge balance and NEVER goes back into `N`.** D-248 refunded
   uptake's surplus to `N`, which `acidbase` reads at the must's mean charge per mole N (D-209) —

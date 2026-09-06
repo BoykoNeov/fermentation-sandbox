@@ -138,6 +138,41 @@ the recall path on each file's own `description:`. That is a real regression in 
 firing, accepted deliberately -- the alternative on offer was a flat list that silently drops
 its tail, which fires nothing at all and lies about it.
 
+A RECORD NUMBER IN THE STANDING "GO READ" LINE IS A STALENESS BUG WITH A SCHEDULE (2026-09-06)
+------------------------------------------------------------------------------------------------
+Every prohibitions/ file opens with the same instruction: "if a prohibition looks unconvincing,
+go read <X> -- do not argue past it from this file." Sixteen of the 44 files had a fixed record
+number in that <X> slot; the other seventeen said "its D-record". The slot is BOILERPLATE -- it
+is copied in when a file is created and nobody re-reads it when the subject moves -- so a number
+sitting there rots on a schedule.
+
+It rotted. D-273 corrected D-215 section 3; the beat rewrote beer-acid-course-timing.md's
+frontmatter description AND its body block to say so, and left the header sending readers to
+D-215. The file said "corrected" twice and "go argue with the corrected record" once, and the
+owner is the one who found it.
+
+The repair is CONTENT, not a threshold: "its D-record" cannot go stale, because the bullet it
+defers to carries the citation that IS maintained. All sixteen were converted in the same commit
+as this check, so it lands INERT -- a check arriving with live violations gets muted rather than
+obeyed, which is the failure mode the block cap avoided by being sized from a measured shape.
+What it binds is the next file created by copying an existing header.
+
+A GENERAL STALENESS LINTER WAS DESIGNED AND REJECTED, WITH NUMBERS. The obvious bigger check:
+build the correction map from DECISIONS.md's Corrects:/Flags: markers (gen_decisions_toc.py
+already derives it) and flag any memory file citing a corrected record without naming its
+corrector. Measured before writing it: 547 findings across the 44 prohibition files plus the
+project memory. Restricting it to each file's frontmatter description plus its opening block --
+the two surfaces a reader and the recall path meet first -- still gives 155.
+
+Nearly all of those are false, and structurally so. The map's edges are per-CLAUSE, not
+per-record: D-185 (the split record) is named in almost every header and is "corrected" by D-229
+on something unrelated; D-211 is corrected by five later records on five different clauses. A
+check firing 155 times gets muted, and a muted check reads as coverage -- the same failure this
+docstring already records for the derived-total and digit-density designs. Record granularity
+cannot express "corrected on the clause you are quoting", so that linter is not buildable from
+the markers that exist. The narrow check below is what IS buildable: it forbids the one slot
+where a record number is boilerplate rather than evidence.
+
 STILL NOT COVERED: the global ~/.claude/CLAUDE.md is a fourth boot surface, lives outside the
 repo, and is deliberately out of scope here. And the row-count channel is closed for MEMORY.md
 only by CONVENTION -- nothing here forbids a new lesson row being added to the index instead
@@ -204,7 +239,11 @@ BOOT_ROWS = frozenset(
         "feedback-discuss-disagreements",
         "feedback-closer-to-reality-decides",
         "feedback-never-pipe-checks-to-tail",
+        # Added 2026-09-06: it fires on every suite run regardless of task, exactly like the two
+        # rows either side of it, and the owner had put it in the index -- so the mechanism was
+        # reporting the owner's own always-on rule as misfiled. Fix the list, not the file.
         "feedback-full-suite-before-green",
+        "feedback-run-tests-at-below-normal-priority",
         "feedback-verify-latest-state-not-breadcrumbs",
     }
 )
@@ -238,6 +277,20 @@ GUIDE_BLOCK_LINE_CAP = 14
 # dropping the file at a byte limit, is measured in bytes. A char cap on a multi-byte file
 # reports a number the loader does not use.
 INDEX_ROW_CAP_BYTES = 320
+
+# The standing "if a prohibition looks unconvincing, go read <X> -- do not argue past it" line.
+# <X> must never be a fixed record number; see the docstring for the beat that proved it.
+#
+# Whitespace-tolerant throughout because the instruction is hard-wrapped at ~100 columns and the
+# break lands in a different place in every file -- a naive single-space pattern missed six of
+# the sixteen live violations on the first pass, which would have shipped a check that fires on
+# only the files whose wrapping happened to agree with it.
+STALE_POINTER = re.compile(
+    r"looks\s+unconvincing,?\s*\**\s*go\s+read\s+(.+?)\s*"
+    + "—"  # em dash; the file is otherwise ASCII
+    + r"\s*do\s+not\s+argue\s+past\s+it",
+    re.S,
+)
 
 MAX_REPORTED = 10
 
@@ -292,6 +345,29 @@ def block_findings(name: str, text: str, cap: int) -> list[Finding]:
         for start, body in block_spans(text.splitlines())
         if len(body) > cap
     ]
+
+
+def pointer_findings(name: str, text: str) -> list[Finding]:
+    """A fixed record number in the standing "go read ..." instruction.
+
+    That slot is boilerplate, so nothing brings a reader back to it when the subject moves --
+    the number rots there while the file's description and bullets are corrected around it.
+    """
+    findings: list[Finding] = []
+    for match in STALE_POINTER.finditer(text):
+        target = " ".join(match.group(1).split())
+        if not re.search(r"D-\d+", target):
+            continue
+        findings.append(
+            Finding(
+                name,
+                text.count("\n", 0, match.start(1)) + 1,
+                f'the standing "go read" pointer names {target} -- that slot is boilerplate '
+                "nobody re-reads, so the number rots while the bullets are corrected around "
+                'it; say "its D-record" and let the bullet carry the citation',
+            )
+        )
+    return findings
 
 
 def index_findings(text: str, name: str = INDEX_NAME) -> list[Finding]:
@@ -387,6 +463,8 @@ def collect(root: pathlib.Path) -> tuple[list[Finding], list[str]]:
         except OSError:
             continue
         findings.extend(block_findings(name, text, cap) if cap else index_findings(text))
+        if name == PROJECT_NAME:
+            findings.extend(pointer_findings(name, text))
         reported.append(f"  {name}: {_shape(text, name)}")
 
     # Reported APART from the three above: these are reached by path, never auto-loaded, so
@@ -400,6 +478,7 @@ def collect(root: pathlib.Path) -> tuple[list[Finding], list[str]]:
         except OSError:
             continue
         findings.extend(block_findings(f"{DETAIL_DIR}/{path.name}", text, BLOCK_LINE_CAP))
+        findings.extend(pointer_findings(f"{DETAIL_DIR}/{path.name}", text))
         total += len(text.splitlines())
     if detail:
         reported.append(f"  {DETAIL_DIR}/: {len(detail)} files, {total} lines (by path, NOT boot)")
